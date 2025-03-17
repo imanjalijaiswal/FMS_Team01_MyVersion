@@ -1,0 +1,52 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcworkspace/
+*.xcuserdata/
+*.xccheckout
+*.xcodeproj/project.xcworkspace/
+!default.xcworkspace/
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Simulator Devices
+Library/Developer/CoreSimulator/
+userdata/
+
+# Archives
+*.xcarchive
+
+# Swift Playgrounds
+timeline.xctimeline
+
+# Swift Package artifacts
+.build/
+
+# Debug files
+*.mode1v3
+*.pbxuser
+*.swp
+*.swo
+*.DS_Store
+
+# Environment files (if used)
+.env
+
+# Firebase & Google Services
+GoogleService-Info.plist
