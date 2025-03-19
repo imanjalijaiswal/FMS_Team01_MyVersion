@@ -10,9 +10,9 @@ import Foundation
 struct Driver: Identifiable, Codable  {
     let id: UUID
     let driverID: Int
-    let fullName: String
+    var fullName: String
     let email: String
-    let phoneNumber: String
+    var phoneNumber: String
     let licenseNumber: String
 }
 
@@ -26,11 +26,12 @@ struct Vehicle: Identifiable, Codable  {
     let fuelType: FuelType
     let loadCapacity: Float
     let insurancePolicyNumber: String
-    let insuranceExpiryDate: Date
+    var insuranceExpiryDate: Date
     let pucCertificateNumber: String
-    let pucExpiryDate: Date
+    var pucExpiryDate: Date
     let rcNumber: String
-    let rcExpiryDate: Date
+    var rcExpiryDate: Date
+    var currentLocation: String
 }
 
 
