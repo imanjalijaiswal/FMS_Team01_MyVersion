@@ -97,13 +97,4 @@ class AuthManager{
             throw error
         }
     }
-
-
-
-
-
-
-
-
-
 }
