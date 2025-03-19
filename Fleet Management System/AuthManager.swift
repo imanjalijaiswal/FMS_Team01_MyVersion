@@ -33,7 +33,7 @@ class AuthManager{
     static let shared = AuthManager()
     
     private init(){}
-    let client = SupabaseClient(supabaseURL: URL(string: "https://aimtaxxpvcyqbxvhpqtj.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpbXRheHhwdmN5cWJ4dmhwcXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIwMjE5OTIsImV4cCI6MjA1NzU5Nzk5Mn0.eKLVh5E8JwwXYFAIIAcaaI_rtuj-7-0wk_qnDK7Je04")
+    let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
 
     func getCurrentSession() async throws -> AppUser? {
         let session = try await client.auth.session
