@@ -11,6 +11,8 @@ struct LoginFormView: View {
     @State private var isBlinking = false
     @State private var isLoading = false
     @State private var showForgotPassword = false
+    @State private var show2FAView = false
+    @State private var tempAuthenticatedUser: AppUser?
     
     var body: some View {
         ZStack {
@@ -128,6 +130,11 @@ struct LoginFormView: View {
                 ForgotPasswordView(isPresented: $showForgotPassword)
             }
         }
+        .fullScreenCover(isPresented: $show2FAView) {
+            if let tempUser = tempAuthenticatedUser {
+                TwoFactorView(authenticatedUser: tempUser, user: $user)
+            }
+        }
     }
     
     // MARK: - Authentication Handlers
@@ -145,9 +152,18 @@ struct LoginFormView: View {
         Task {
             do {
                 let signedInUser = try await viewModel.signInWithEmail(email: email, password: password)
+                
                 DispatchQueue.main.async {
-                    self.user = signedInUser
-                    self.errorMessage = nil
+                    if viewModel.is2FARequired, let tempUser = viewModel.getAuthenticatedUser() {
+                        // If 2FA is required, show the 2FA view
+                        self.tempAuthenticatedUser = tempUser
+                        self.show2FAView = true
+                        self.errorMessage = nil
+                    } else {
+                        // If no 2FA required, set the user directly
+                        self.user = signedInUser
+                        self.errorMessage = nil
+                    }
                     self.isLoading = false
                 }
             } catch let authError as AuthError {
