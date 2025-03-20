@@ -36,12 +36,24 @@ class AuthManager{
     // Flag to enable/disable 2FA for testing
     static var is2FAEnabled = true
     
+    // Flag to track if 2FA has been completed
+    private var is2FACompleted = false
+    
+    // Store the current 2FA code
+    private var current2FACode: String = ""
+    
     private init(){}
     let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
 
     func getCurrentSession() async throws -> AppUser? {
         let session = try await client.auth.session
         let userId = session.user.id.uuidString
+        
+        // If 2FA is enabled and not completed, sign out to force re-authentication
+        if AuthManager.is2FAEnabled && !is2FACompleted {
+            try await signOut()
+            return nil
+        }
         
         do {
             let role = try await getUserRole(userId: userId) 
@@ -55,6 +67,7 @@ class AuthManager{
     
     func signOut() async throws{
         try await client.auth.signOut()
+        is2FACompleted = false
     }
     
     // MARK: - REgistration
@@ -198,25 +211,29 @@ class AuthManager{
     // MARK: - Two-Factor Authentication
 
     // Generate and send a 2FA code to the user's email
-    func generateAndSend2FACode(email: String) async throws -> String {
-        // Generate a 6-digit code
-        let authCode = String(format: "%06d", Int.random(in: 0...999999))
-        
-        // Log the code to console for testing
-        print("2FA code for \(email): \(authCode)")
-        
-        // Use the same approach as resetPasswordWithOTP
+    func generateAndSend2FACode(email: String) async throws {
+        // Use Supabase's OTP method
         try await client.auth.signInWithOTP(
             email: email,
             shouldCreateUser: false
         )
-        
-        return authCode
     }
 
     // Verify the 2FA code entered by the user
-    func verify2FACode(submittedCode: String, actualCode: String) -> Bool {
-        return submittedCode == actualCode
+    func verify2FACode(email: String, token: String) async throws -> Bool {
+        do {
+            // Use Supabase's OTP verification
+            try await client.auth.verifyOTP(
+                email: email,
+                token: token,
+                type: .email
+            )
+            is2FACompleted = true
+            return true
+        } catch {
+            print("2FA verification error: \(error.localizedDescription)")
+            return false
+        }
     }
 
     // Enhanced sign-in method with 2FA support
@@ -233,13 +250,17 @@ class AuthManager{
             let role = try await getUserRole(userId: userId)
             let appUser = AppUser(id: userId, email: userEmail, role: role)
             
+            // Reset 2FA completed flag
+            is2FACompleted = false
+            
             // Only initiate 2FA if it's enabled
             if AuthManager.is2FAEnabled {
                 // Generate and send 2FA code
-                let _ = try await generateAndSend2FACode(email: email)
+                try await generateAndSend2FACode(email: email)
                 return appUser
             } else {
                 // Skip 2FA if disabled
+                is2FACompleted = true
                 return appUser
             }
         } catch {

@@ -21,8 +21,6 @@ class TwoFactorViewModel: ObservableObject {
         do {
             // Generate and send code via AuthManager
             if let email = authenticatedUser.email {
-                // Just send the OTP, we don't need to store the actual code anymore
-                // since Supabase will handle verification
                 try await authManager.generateAndSend2FACode(email: email)
                 self.isLoading = false
                 self.errorMessage = "Verification code sent to \(email)"
@@ -47,7 +45,7 @@ class TwoFactorViewModel: ObservableObject {
         
         do {
             // Use Supabase's OTP verification
-            let isVerified = try await authManager.verifyOTP(email: email, token: verificationCode)
+            let isVerified = try await authManager.verify2FACode(email: email, token: verificationCode)
             
             if !isVerified {
                 errorMessage = "Invalid verification code. Please try again."
