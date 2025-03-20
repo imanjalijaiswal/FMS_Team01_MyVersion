@@ -10,6 +10,7 @@ struct LoginFormView: View {
     @State private var isPasswordVisible: Bool = false
     @State private var isBlinking = false
     @State private var isLoading = false
+    @State private var showForgotPassword = false
     
     var body: some View {
         ZStack {
@@ -98,6 +99,16 @@ struct LoginFormView: View {
                 .disabled(isLoading)
                 .padding(.horizontal)
                 
+                // Forgot Password Button
+                Button(action: {
+                    showForgotPassword = true
+                }) {
+                    Text("Forgot Password?")
+                        .foregroundColor(Color.primaryGradientStart)
+                        .font(.subheadline)
+                }
+                .padding(.top, 5)
+                
                 // Show error message if login fails
                 if let errorMessage = errorMessage {
                     Text(errorMessage)
@@ -112,6 +123,9 @@ struct LoginFormView: View {
             .contentShape(Rectangle()) // Make the whole content tappable
             .onTapGesture {
                 hideKeyboard()
+            }
+            .sheet(isPresented: $showForgotPassword) {
+                ForgotPasswordView(isPresented: $showForgotPassword)
             }
         }
     }
