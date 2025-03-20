@@ -14,6 +14,7 @@ enum AuthError: LocalizedError {
     case invalidEmail
     case emptyFields
     case passwordTooShort
+    case inactiveUser
     
     var errorDescription: String? {
         switch self {
@@ -27,6 +28,8 @@ enum AuthError: LocalizedError {
             return "❌ Email and password fields cannot be empty."
         case .passwordTooShort:
             return "❌ Password must be at least 6 characters."
+        case .inactiveUser:
+            return "❌ Your account is currently inactive. Please contact your administrator."
         }
     }
 }
@@ -78,6 +81,15 @@ class SignInViewModel: ObservableObject {
             
             // Otherwise just return the user directly (2FA disabled)
             return authUser
+        } catch let error as AuthError {
+            switch error {
+            case .inactiveUser:
+                throw AuthError.inactiveUser
+            case .invalidCredentials:
+                throw AuthError.invalidCredentials
+            default:
+                throw AuthError.invalidCredentials
+            }
         } catch {
             // Convert NSError to AuthError if needed
             if let nsError = error as NSError?,
