@@ -9,10 +9,14 @@ import Foundation
 import Supabase
 import Auth
 
-struct AppUser{
+struct AppUser: Equatable {
    var id: String
    var email: String?
-    var role : Role
+   var role: Role
+   
+   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
+       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
+   }
 }
 
 struct UserRoles:Codable{
@@ -44,6 +48,9 @@ class AuthManager{
     
     // UserDefaults key for storing 2FA completion status
     private let twoFACompletedKey = "twoFACompleted"
+    
+    // Cache for first time login status to avoid repetitive database queries
+    private var firstTimeLoginCache: [String: Bool] = [:]
     
     private init(){
         // Load 2FA completion status from UserDefaults
@@ -79,6 +86,9 @@ class AuthManager{
         is2FACompleted = false
         // Clear 2FA completion status in UserDefaults
         UserDefaults.standard.set(false, forKey: twoFACompletedKey)
+        
+        // Clear the firstTimeLogin cache to ensure fresh state on next login
+        firstTimeLoginCache.removeAll()
     }
     
     // MARK: - REgistration
@@ -127,12 +137,17 @@ class AuthManager{
     }
     
     func checkFirstTimeLogin(userId: String) async throws -> Bool {
+        // Check if we have a cached value
+        if let cachedValue = firstTimeLoginCache[userId] {
+            return cachedValue
+        }
+        
         guard let userUUID = UUID(uuidString: userId) else {
-            throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
+            print("Invalid UUID format: \(userId)")
+            return false // Default to false if UUID is invalid
         }
 
         do {
-
             let response: UserRoles = try await client
                 .from("UserRoles")
                 .select("*")
@@ -141,11 +156,40 @@ class AuthManager{
                 .execute()
                 .value
             
+            // Cache the result
+            firstTimeLoginCache[userId] = response.firstTimeLogin
+            
             return response.firstTimeLogin
         } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
+            print("Error fetching firstTimeLogin status: \(error.localizedDescription)")
+            return false // Default to false in case of errors
+        }
+    }
+
+    /// Updates the firstTimeLogin status for a user in the UserRoles table
+    func updateFirstTimeLoginStatus(userId: String, firstTimeLogin: Bool) async throws {
+        guard let userUUID = UUID(uuidString: userId) else {
+            throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
+        }
+        
+        do {
+            try await client
+                .from("UserRoles")
+                .update(["firstTimeLogin": firstTimeLogin])
+                .eq("id", value: userUUID)
+                .execute()
+            
+            // Update the cache
+            firstTimeLoginCache[userId] = firstTimeLogin
+        } catch {
+            print("Error updating firstTimeLogin status: \(error.localizedDescription)")
             throw error
         }
+    }
+
+    /// Clear any cached state for a user ID
+    func clearUserCache(userId: String) {
+        firstTimeLoginCache.removeValue(forKey: userId)
     }
 
     // MARK: - Password Reset with OTP
@@ -273,7 +317,17 @@ class AuthManager{
             is2FACompleted = false
             UserDefaults.standard.set(false, forKey: twoFACompletedKey)
             
-            // Only initiate 2FA if it's enabled
+            // Check if this is a first-time login
+            let isFirstTime = try await checkFirstTimeLogin(userId: userId)
+            
+            // Skip 2FA if it's a first-time login - they need to reset password first
+            if isFirstTime {
+                // Mark 2FA as completed to bypass that check
+                mark2FACompleted()
+                return appUser
+            }
+            
+            // Otherwise, proceed with normal 2FA flow if enabled
             if AuthManager.is2FAEnabled {
                 // Generate and send 2FA code
                 try await generateAndSend2FACode(email: email)
