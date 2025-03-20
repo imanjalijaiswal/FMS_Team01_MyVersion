@@ -58,6 +58,9 @@ class TwoFactorViewModel: ObservableObject {
                 errorMessage = "Invalid verification code. Please try again."
             } else {
                 errorMessage = nil
+                // The 2FA flag is already set in verify2FACode, but we can explicitly call mark2FACompleted
+                // to ensure it's set in all cases
+                authManager.mark2FACompleted()
             }
             
             return isVerified

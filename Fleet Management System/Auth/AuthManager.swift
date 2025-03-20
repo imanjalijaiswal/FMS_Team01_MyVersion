@@ -42,24 +42,33 @@ class AuthManager{
     // Store the current 2FA code
     private var current2FACode: String = ""
     
-    private init(){}
+    // UserDefaults key for storing 2FA completion status
+    private let twoFACompletedKey = "twoFACompleted"
+    
+    private init(){
+        // Load 2FA completion status from UserDefaults
+        is2FACompleted = UserDefaults.standard.bool(forKey: twoFACompletedKey)
+    }
+    
     let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
 
     func getCurrentSession() async throws -> AppUser? {
-        let session = try await client.auth.session
-        let userId = session.user.id.uuidString
-        
-        // If 2FA is enabled and not completed, sign out to force re-authentication
-        if AuthManager.is2FAEnabled && !is2FACompleted {
-            try await signOut()
-            return nil
-        }
-        
         do {
-            let role = try await getUserRole(userId: userId) 
-            return AppUser(id: userId, email: session.user.email, role: role)
+            // Try to get the current session
+            let session = try await client.auth.session
+            let userId = session.user.id.uuidString
+            
+            // If 2FA is not required or has been completed, return the user
+            if !AuthManager.is2FAEnabled || is2FACompleted {
+                let role = try await getUserRole(userId: userId)
+                return AppUser(id: userId, email: session.user.email, role: role)
+            } else {
+                // 2FA is required but not completed - force re-authentication
+                try await signOut()
+                return nil
+            }
         } catch {
-            print("Error fetching role: \(error)")
+            print("Error in getCurrentSession: \(error)")
             return nil
         }
     }
@@ -68,6 +77,8 @@ class AuthManager{
     func signOut() async throws{
         try await client.auth.signOut()
         is2FACompleted = false
+        // Clear 2FA completion status in UserDefaults
+        UserDefaults.standard.set(false, forKey: twoFACompletedKey)
     }
     
     // MARK: - REgistration
@@ -228,12 +239,20 @@ class AuthManager{
                 token: token,
                 type: .email
             )
-            is2FACompleted = true
+            // Mark 2FA as completed
+            mark2FACompleted()
             return true
         } catch {
             print("2FA verification error: \(error.localizedDescription)")
             return false
         }
+    }
+    
+    // Mark 2FA as completed
+    func mark2FACompleted() {
+        is2FACompleted = true
+        // Save 2FA completion status to UserDefaults
+        UserDefaults.standard.set(true, forKey: twoFACompletedKey)
     }
 
     // Enhanced sign-in method with 2FA support
@@ -252,6 +271,7 @@ class AuthManager{
             
             // Reset 2FA completed flag
             is2FACompleted = false
+            UserDefaults.standard.set(false, forKey: twoFACompletedKey)
             
             // Only initiate 2FA if it's enabled
             if AuthManager.is2FAEnabled {
@@ -260,7 +280,7 @@ class AuthManager{
                 return appUser
             } else {
                 // Skip 2FA if disabled
-                is2FACompleted = true
+                mark2FACompleted()
                 return appUser
             }
         } catch {
