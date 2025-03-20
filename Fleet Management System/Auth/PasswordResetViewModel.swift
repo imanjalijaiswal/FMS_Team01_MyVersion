@@ -11,5 +11,8 @@ class PasswordResetViewModel: ObservableObject {
         
         // Update the firstTimeLogin flag to false
         try await authManager.updateFirstTimeLoginStatus(userId: userId, firstTimeLogin: false)
+        
+        // Clear any cached user state to ensure fresh data
+        authManager.clearUserCache(userId: userId)
     }
 } 

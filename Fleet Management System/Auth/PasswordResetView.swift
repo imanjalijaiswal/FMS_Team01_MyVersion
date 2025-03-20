@@ -4,6 +4,7 @@ struct PasswordResetView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = PasswordResetViewModel()
     @Binding var user: AppUser?
+    @Binding var isFirstTimeLogin: Bool
     
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -145,7 +146,7 @@ struct PasswordResetView: View {
                     
                     Button("Continue") {
                         // Continue to the main app
-                        showSuccess = false
+                        navigateToMainApp()
                     }
                     .padding()
                     .background(Color.white)
@@ -201,12 +202,6 @@ struct PasswordResetView: View {
                     self.isLoading = false
                     self.errorMessage = nil
                     self.showSuccess = true
-                    
-                    // After a short delay, dismiss and continue to the main app
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        self.showSuccess = false
-                        // No need to set user here as it's already set
-                    }
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -217,11 +212,22 @@ struct PasswordResetView: View {
         }
     }
     
+    private func navigateToMainApp() {
+        // Update the firstTimeLogin flag to immediately transition to the main app
+        DispatchQueue.main.async {
+            self.isFirstTimeLogin = false
+            self.showSuccess = false
+        }
+    }
+    
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
 #Preview {
-    PasswordResetView(user: .constant(AppUser(id: "123", email: "test@example.com", role: .driver)))
+    PasswordResetView(
+        user: .constant(AppUser(id: "123", email: "test@example.com", role: .driver)),
+        isFirstTimeLogin: .constant(true)
+    )
 } 
