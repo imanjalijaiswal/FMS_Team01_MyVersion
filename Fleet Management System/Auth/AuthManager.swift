@@ -7,6 +7,7 @@
 
 import Foundation
 import Supabase
+import Auth
 
 struct AppUser{
    var id: String

@@ -109,12 +109,18 @@ struct LoginFormView: View {
                 Spacer()
             }
             .padding(.top, 60)
+            .contentShape(Rectangle()) // Make the whole content tappable
+            .onTapGesture {
+                hideKeyboard()
+            }
         }
     }
     
     // MARK: - Authentication Handlers
     
     private func handleSignIn() {
+        hideKeyboard()
+        
         guard !email.isEmpty, !password.isEmpty else {
             errorMessage = "⚠️ Please enter email and password."
             return
@@ -142,6 +148,12 @@ struct LoginFormView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Keyboard Handling
+    
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
