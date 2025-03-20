@@ -1,16 +1,21 @@
 import SwiftUI
 import Foundation
 
+enum DriverStatus: String, Codable {
+    case available = "Available"
+    case onTrip = "On Trip"
+}
+
 struct Driver: Identifiable, Equatable {
     let id = UUID()
     let name: String
     let totalTrips: Int
     let licenseNumber: String
     let emailId: String
-    let employeeId: String
+    let driverID: String
     let phoneNumber: String
-    let isAvailable: Bool
-    let isActive: Bool
+    let status: DriverStatus
+    let workingStatus: Bool
     
     static func == (lhs: Driver, rhs: Driver) -> Bool {
         lhs.id == rhs.id
@@ -31,10 +36,10 @@ class DriverViewModel: ObservableObject {
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
             emailId: driver.emailId,
-            employeeId: driver.employeeId,
+            driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
-            isAvailable: false,
-            isActive: false
+            status: .available,
+            workingStatus: false
         )
         
         drivers.removeAll { $0.id == driver.id }
@@ -47,10 +52,10 @@ class DriverViewModel: ObservableObject {
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
             emailId: driver.emailId,
-            employeeId: driver.employeeId,
+            driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
-            isAvailable: true,
-            isActive: true
+            status: .available,
+            workingStatus: true
         )
         
         drivers.removeAll { $0.id == driver.id }
@@ -84,7 +89,7 @@ struct DriverRowView: View {
                     Text(driver.name)
                         .font(.callout)
                         .fontWeight(.medium)
-                        .foregroundColor(driver.isActive ? .primary : .red)
+                        .foregroundColor(driver.workingStatus ? .primary : .red)
                     
                     HStack(spacing: 12) {
                         HStack(spacing: 4) {
@@ -96,18 +101,18 @@ struct DriverRowView: View {
                                 .foregroundColor(.gray)
                         }
                         
-                        if driver.isActive {
+                        if driver.workingStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(driver.isAvailable ? Color.green : Color.gray)
+                                    .fill((driver.status == .available) ? Color.green : Color.gray)
                                     .frame(width: 4, height: 4)
-                                Text(driver.isAvailable ? "Available" : "On Trip")
+                                Text(driver.status.rawValue)
                                     .font(.caption)
-                                    .foregroundColor(driver.isAvailable ? .green : .gray)
+                                    .foregroundColor((driver.status == .available) ? .green : .gray)
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(driver.isAvailable ? Color.green.opacity(0.1) : Color.gray.opacity(0.1))
+                            .background((driver.status == .available) ? Color.green.opacity(0.1) : Color.gray.opacity(0.1))
                             .cornerRadius(8)
                         }
                     }
@@ -139,18 +144,18 @@ struct DriversView: View {
         let searchResults = viewModel.drivers.filter { driver in
             searchText.isEmpty ||
             driver.name.localizedCaseInsensitiveContains(searchText) ||
-            driver.employeeId.localizedCaseInsensitiveContains(searchText)
+            driver.driverID.localizedCaseInsensitiveContains(searchText)
         }
         
         switch selectedFilter {
         case "Available":
-            return searchResults.filter { $0.isAvailable && $0.isActive }
+            return searchResults.filter { $0.status == .available && $0.workingStatus }
         case "On Trip":
-            return searchResults.filter { !$0.isAvailable && $0.isActive }
+            return searchResults.filter { $0.status == .onTrip && $0.workingStatus }
         case "Inactive":
-            return searchResults.filter { !$0.isActive }
+            return searchResults.filter { !$0.workingStatus }
         default:
-            return searchResults.filter { $0.isActive }
+            return searchResults.filter { $0.workingStatus }
         }
     }
     
@@ -192,16 +197,16 @@ struct DriversView: View {
         .onAppear {
             if viewModel.drivers.isEmpty {
                 viewModel.drivers = [
-                    Driver(name: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", employeeId: "EMP001", phoneNumber: "+1234567890", isAvailable: true, isActive: true),
-                    Driver(name: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", employeeId: "EMP002", phoneNumber: "+0987654321", isAvailable: true, isActive: true),
-                    Driver(name: "Mike Johnson", totalTrips: 156, licenseNumber: "DL345678", emailId: "mike@example.com", employeeId: "EMP003", phoneNumber: "+1122334455", isAvailable: true, isActive: true),
-                    Driver(name: "Sarah Wilson", totalTrips: 112, licenseNumber: "DL456789", emailId: "sarah@example.com", employeeId: "EMP004", phoneNumber: "+2233445566", isAvailable: true, isActive: true),
-                    Driver(name: "David Brown", totalTrips: 143, licenseNumber: "DL567890", emailId: "david@example.com", employeeId: "EMP005", phoneNumber: "+3344556677", isAvailable: true, isActive: true),
-                    Driver(name: "Emma Davis", totalTrips: 87, licenseNumber: "DL678901", emailId: "emma@example.com", employeeId: "EMP006", phoneNumber: "+4455667788", isAvailable: true, isActive: true),
-                    Driver(name: "James Wilson", totalTrips: 165, licenseNumber: "DL789012", emailId: "james@example.com", employeeId: "EMP007", phoneNumber: "+5566778899", isAvailable: true, isActive: true),
-                    Driver(name: "Linda Taylor", totalTrips: 134, licenseNumber: "DL890123", emailId: "linda@example.com", employeeId: "EMP008", phoneNumber: "+6677889900", isAvailable: true, isActive: true),
-                    Driver(name: "Robert Martin", totalTrips: 145, licenseNumber: "DL901234", emailId: "robert@example.com", employeeId: "EMP009", phoneNumber: "+7788990011", isAvailable: true, isActive: true),
-                    Driver(name: "Mary Anderson", totalTrips: 98, licenseNumber: "DL012345", emailId: "mary@example.com", employeeId: "EMP010", phoneNumber: "+8899001122", isAvailable: true, isActive: true)
+                    Driver(name: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true),
+                    Driver(name: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true),
+                    Driver(name: "Mike Johnson", totalTrips: 156, licenseNumber: "DL345678", emailId: "mike@example.com", driverID: "EMP003", phoneNumber: "+1122334455", status: .available, workingStatus: true),
+                    Driver(name: "Sarah Wilson", totalTrips: 112, licenseNumber: "DL456789", emailId: "sarah@example.com", driverID: "EMP004", phoneNumber: "+2233445566", status: .available, workingStatus: true),
+                    Driver(name: "David Brown", totalTrips: 143, licenseNumber: "DL567890", emailId: "david@example.com", driverID: "EMP005", phoneNumber: "+3344556677", status: .available, workingStatus: true),
+                    Driver(name: "Emma Davis", totalTrips: 87, licenseNumber: "DL678901", emailId: "emma@example.com", driverID: "EMP006", phoneNumber: "+4455667788", status: .available, workingStatus: true),
+                    Driver(name: "James Wilson", totalTrips: 165, licenseNumber: "DL789012", emailId: "james@example.com", driverID: "EMP007", phoneNumber: "+5566778899", status: .available, workingStatus: true),
+                    Driver(name: "Linda Taylor", totalTrips: 134, licenseNumber: "DL890123", emailId: "linda@example.com", driverID: "EMP008", phoneNumber: "+6677889900", status: .available, workingStatus: true),
+                    Driver(name: "Robert Martin", totalTrips: 145, licenseNumber: "DL901234", emailId: "robert@example.com", driverID: "EMP009", phoneNumber: "+7788990011", status: .available, workingStatus: true),
+                    Driver(name: "Mary Anderson", totalTrips: 98, licenseNumber: "DL012345", emailId: "mary@example.com", driverID: "EMP010", phoneNumber: "+8899001122", status: .available, workingStatus: true)
                 ]
             }
         }
@@ -237,7 +242,7 @@ struct DriverDetailView: View {
             }
             
             Section("Driver Info") {
-                InfoRow(title: "Employee ID", value: driver.employeeId)
+                InfoRow(title: "Employee ID", value: driver.driverID)
                 InfoRow(title: "License Number", value: driver.licenseNumber)
                 InfoRow(title: "Total Trips", value: "\(driver.totalTrips)")
             }
@@ -260,7 +265,7 @@ struct DriverDetailView: View {
             }
             
             Section {
-                if driver.isActive {
+                if driver.workingStatus {
                     Button(action: {
                         showingDisableAlert = true
                     }) {
@@ -394,10 +399,10 @@ struct AddDriverView: View {
                                 totalTrips: 0,
                                 licenseNumber: licenseNumber,
                                 emailId: email,
-                                employeeId: employeeId,
+                                driverID: employeeId,
                                 phoneNumber: phone,
-                                isAvailable: true,
-                                isActive: true
+                                status: .available,
+                                workingStatus: true
                             )
                             
                             viewModel.addDriver(newDriver)
