@@ -9,10 +9,14 @@ import Foundation
 import Supabase
 import Auth
 
-struct AppUser{
+struct AppUser: Equatable {
    var id: String
    var email: String?
-    var role : Role
+   var role: Role
+   
+   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
+       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
+   }
 }
 
 struct UserRoles:Codable{
@@ -144,6 +148,24 @@ class AuthManager{
             return response.firstTimeLogin
         } catch {
             print("Error fetching user role: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    /// Updates the firstTimeLogin status for a user in the UserRoles table
+    func updateFirstTimeLoginStatus(userId: String, firstTimeLogin: Bool) async throws {
+        guard let userUUID = UUID(uuidString: userId) else {
+            throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
+        }
+        
+        do {
+            try await client
+                .from("UserRoles")
+                .update(["firstTimeLogin": firstTimeLogin])
+                .eq("id", value: userUUID)
+                .execute()
+        } catch {
+            print("Error updating firstTimeLogin status: \(error.localizedDescription)")
             throw error
         }
     }
