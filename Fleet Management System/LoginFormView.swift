@@ -1,175 +1,192 @@
-//
-//  LoginFormView.swift
-//  Fleet Management System
-//
-//  Created by Aditya Mathur on 19/03/25.
-//
-
-import Foundation
-
 import SwiftUI
 
 struct LoginFormView: View {
-        @StateObject private var viewModel = SignInViewModel()
-        
-        @State private var errorMessage: String?
-        @Binding var user: AppUser?
-        @State private var email: String = ""
-        @State private var password: String = ""
-        @State private var isPasswordVisible: Bool = false
-        @State private var isBlinking = false
-        @State private var isLoading = false
-        
-        var body: some View {
-            ZStack {
-                Color.white.ignoresSafeArea()
+    @StateObject private var viewModel = SignInViewModel()
+    
+    @State private var errorMessage: String?
+    @Binding var user: AppUser?
+    @State private var email: String = ""
+    @State private var password: String = ""
+    @State private var isPasswordVisible: Bool = false
+    @State private var isBlinking = false
+    @State private var isLoading = false
+    @State private var showForgotPassword = false
+    @State private var show2FAView = false
+    @State private var tempAuthenticatedUser: AppUser?
+    
+    var body: some View {
+        ZStack {
+            Color.white.ignoresSafeArea()
+            
+            VStack(spacing: 25) {
+                ZStack {
+                    Circle()
+                        .fill(Color.primaryGradientStart)
+                        .frame(width: 150, height: 150)
+                    
+                    Image(isPasswordVisible ? "panda-open" : "panda-closed")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 135, height: 135)
+                        .scaleEffect(1.0)
+                        .animation(.easeInOut(duration: 0.2), value: isPasswordVisible)
+                }
+                .padding(.bottom, 20)
                 
-                VStack(spacing: 25) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.primaryGradientStart)
-                            .frame(width: 150, height: 150)
-                        
-                        Image(isBlinking ? "panda-closed" : (password.isEmpty || isPasswordVisible ? "panda-open" : "panda-closed"))
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 135, height: 135)
-                            .scaleEffect(1.0)
-                            .animation(
-                                .easeInOut(duration: 0.2)
-                                .speed(0.4),
-                                value: password.isEmpty || isPasswordVisible
-                            )
-                    }
-                    .padding(.bottom, 20)
-                    .onAppear {
-                        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                isBlinking = true
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                withAnimation(.easeInOut(duration: 0.1)) {
-                                    isBlinking = false
-                                }
-                            }
-                        }
-                    }
+                Text("Welcome To")
+                    .font(.title2)
+                    .foregroundColor(.gray)
+                
+                Text("InFleet Express")
+                    .font(.title)
+                    .fontWeight(.bold)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Email")
+                        .foregroundColor(.black)
+                        .padding(.leading)
                     
-                    Text("Welcome To")
-                        .font(.title2)
-                        .foregroundColor(.gray)
-                    
-                    Text("InFleet Express")
-                        .font(.title)
-                        .fontWeight(.bold)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Email")
-                            .foregroundColor(.black)
-                            .padding(.leading)
-                        
-                        TextField("Enter your email", text: $email)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                    }
-                    .padding(.horizontal)
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Password")
-                            .foregroundColor(.black)
-                            .padding(.leading)
-                        
-                        HStack {
-                            if isPasswordVisible {
-                                TextField("Enter password", text: $password)
-                            } else {
-                                SecureField("Enter password", text: $password)
-                            }
-                            
-                            Button(action: {
-                                isPasswordVisible.toggle()
-                            }) {
-                                Image(systemName: isPasswordVisible ? "eye.fill" : "eye.slash.fill")
-                                    .foregroundColor(.gray)
-                            }
-                        }
+                    TextField("Enter your email", text: $email)
                         .padding()
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
-                    }
-                    .padding(.horizontal)
-                    
-                    // Login Button
-                    Button(action: {
-                        handleSignIn()
-                    }) {
-                        HStack {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            }
-                            Text(isLoading ? "Logging in..." : "Log In")
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isLoading ? Color.gray : Color.primaryGradientStart)
-                        .cornerRadius(12)
-                    }
-                    .disabled(isLoading) // Disable button while loading
-                    .padding(.horizontal)
-                    
-                    // Show error message if login fails
-                    if let errorMessage = errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.footnote)
-                            .padding(.top, 5)
-                    }
-                    
-                    Spacer()
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
                 }
-                .padding(.top, 60)
+                .padding(.horizontal)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Password")
+                        .foregroundColor(.black)
+                        .padding(.leading)
+                    
+                    HStack {
+                        if isPasswordVisible {
+                            TextField("Enter password", text: $password)
+                        } else {
+                            SecureField("Enter password", text: $password)
+                        }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye.fill" : "eye.slash.fill")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                
+                // Login Button
+                Button(action: {
+                    handleSignIn()
+                }) {
+                    HStack {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        }
+                        Text(isLoading ? "Logging in..." : "Log In")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isLoading ? Color.gray : Color.primaryGradientStart)
+                    .cornerRadius(12)
+                }
+                .disabled(isLoading)
+                .padding(.horizontal)
+                
+                // Forgot Password Button
+                Button(action: {
+                    showForgotPassword = true
+                }) {
+                    Text("Forgot Password?")
+                        .foregroundColor(Color.primaryGradientStart)
+                        .font(.subheadline)
+                }
+                .padding(.top, 5)
+                
+                // Show error message if login fails
+                if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.footnote)
+                        .padding(.top, 5)
+                }
+                
+                Spacer()
+            }
+            .padding(.top, 60)
+            .contentShape(Rectangle()) // Make the whole content tappable
+            .onTapGesture {
+                hideKeyboard()
+            }
+            .sheet(isPresented: $showForgotPassword) {
+                ForgotPasswordView(isPresented: $showForgotPassword)
             }
         }
-        
-        // MARK: - Authentication Handlers
-        
-        private func handleSignIn() {
-            guard !email.isEmpty, !password.isEmpty else {
-                errorMessage = "⚠️ Please enter email and password."
-                return
+        .fullScreenCover(isPresented: $show2FAView) {
+            if let tempUser = tempAuthenticatedUser {
+                TwoFactorView(authenticatedUser: tempUser, user: $user)
             }
-            
-            isLoading = true
-            
-            Task {
-                do {
-                    let signedInUser = try await viewModel.signInWithEmail(email: email, password: password)
-                    DispatchQueue.main.async {
+        }
+    }
+    
+    // MARK: - Authentication Handlers
+    
+    private func handleSignIn() {
+        hideKeyboard()
+        
+        guard !email.isEmpty, !password.isEmpty else {
+            errorMessage = "⚠️ Please enter email and password."
+            return
+        }
+        
+        isLoading = true
+        
+        Task {
+            do {
+                let signedInUser = try await viewModel.signInWithEmail(email: email, password: password)
+                
+                DispatchQueue.main.async {
+                    if viewModel.is2FARequired, let tempUser = viewModel.getAuthenticatedUser() {
+                        // If 2FA is required, show the 2FA view
+                        self.tempAuthenticatedUser = tempUser
+                        self.show2FAView = true
+                        self.errorMessage = nil
+                    } else {
+                        // If no 2FA required, set the user directly
                         self.user = signedInUser
                         self.errorMessage = nil
-                        self.isLoading = false
                     }
-                } catch let authError as AuthError {
-                    DispatchQueue.main.async {
-                        self.errorMessage = authError.localizedDescription
-                        self.isLoading = false
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.errorMessage = "❌ Something went wrong. Please try again."
-                        self.isLoading = false
-                    }
+                    self.isLoading = false
+                }
+            } catch let authError as AuthError {
+                DispatchQueue.main.async {
+                    self.errorMessage = authError.localizedDescription
+                    self.isLoading = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.errorMessage = "❌ Something went wrong. Please try again."
+                    self.isLoading = false
                 }
             }
         }
     }
-
-    #Preview {
-        LoginFormView(user: .constant(nil))
+    
+    // MARK: - Keyboard Handling
+    
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
+}
+
+#Preview {
+    LoginFormView(user: .constant(nil))
+}
