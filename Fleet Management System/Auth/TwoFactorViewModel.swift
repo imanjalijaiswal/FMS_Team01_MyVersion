@@ -5,6 +5,7 @@ class TwoFactorViewModel: ObservableObject {
     @Published var verificationCode: String = ""
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
+    @Published var hasSentCode: Bool = false
     
     private let authManager = AuthManager.shared
     private let authenticatedUser: AppUser
@@ -15,16 +16,20 @@ class TwoFactorViewModel: ObservableObject {
     
     // Send verification code
     func sendVerificationCode() async throws {
+        // If code has already been sent, don't send again
+        if hasSentCode {
+            return
+        }
+        
         self.isLoading = true
         self.errorMessage = nil
         
         do {
             // Generate and send code via AuthManager
             if let email = authenticatedUser.email {
-                // Just send the OTP, we don't need to store the actual code anymore
-                // since Supabase will handle verification
                 try await authManager.generateAndSend2FACode(email: email)
                 self.isLoading = false
+                self.hasSentCode = true
                 self.errorMessage = "Verification code sent to \(email)"
             } else {
                 self.isLoading = false
@@ -47,12 +52,15 @@ class TwoFactorViewModel: ObservableObject {
         
         do {
             // Use Supabase's OTP verification
-            let isVerified = try await authManager.verifyOTP(email: email, token: verificationCode)
+            let isVerified = try await authManager.verify2FACode(email: email, token: verificationCode)
             
             if !isVerified {
                 errorMessage = "Invalid verification code. Please try again."
             } else {
                 errorMessage = nil
+                // The 2FA flag is already set in verify2FACode, but we can explicitly call mark2FACompleted
+                // to ensure it's set in all cases
+                authManager.mark2FACompleted()
             }
             
             return isVerified

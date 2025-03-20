@@ -9,10 +9,14 @@ import Foundation
 import Supabase
 import Auth
 
-struct AppUser{
+struct AppUser: Equatable {
    var id: String
    var email: String?
-    var role : Role
+   var role: Role
+   
+   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
+       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
+   }
 }
 
 struct UserRoles:Codable{
@@ -36,18 +40,42 @@ class AuthManager{
     // Flag to enable/disable 2FA for testing
     static var is2FAEnabled = true
     
-    private init(){}
+    // Flag to track if 2FA has been completed
+    private var is2FACompleted = false
+    
+    // Store the current 2FA code
+    private var current2FACode: String = ""
+    
+    // UserDefaults key for storing 2FA completion status
+    private let twoFACompletedKey = "twoFACompleted"
+    
+    // Cache for first time login status to avoid repetitive database queries
+    private var firstTimeLoginCache: [String: Bool] = [:]
+    
+    private init(){
+        // Load 2FA completion status from UserDefaults
+        is2FACompleted = UserDefaults.standard.bool(forKey: twoFACompletedKey)
+    }
+    
     let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
 
     func getCurrentSession() async throws -> AppUser? {
-        let session = try await client.auth.session
-        let userId = session.user.id.uuidString
-        
         do {
-            let role = try await getUserRole(userId: userId) 
-            return AppUser(id: userId, email: session.user.email, role: role)
+            // Try to get the current session
+            let session = try await client.auth.session
+            let userId = session.user.id.uuidString
+            
+            // If 2FA is not required or has been completed, return the user
+            if !AuthManager.is2FAEnabled || is2FACompleted {
+                let role = try await getUserRole(userId: userId)
+                return AppUser(id: userId, email: session.user.email, role: role)
+            } else {
+                // 2FA is required but not completed - force re-authentication
+                try await signOut()
+                return nil
+            }
         } catch {
-            print("Error fetching role: \(error)")
+            print("Error in getCurrentSession: \(error)")
             return nil
         }
     }
@@ -55,6 +83,12 @@ class AuthManager{
     
     func signOut() async throws{
         try await client.auth.signOut()
+        is2FACompleted = false
+        // Clear 2FA completion status in UserDefaults
+        UserDefaults.standard.set(false, forKey: twoFACompletedKey)
+        
+        // Clear the firstTimeLogin cache to ensure fresh state on next login
+        firstTimeLoginCache.removeAll()
     }
     
     // MARK: - REgistration
@@ -100,6 +134,62 @@ class AuthManager{
             print("Error fetching user role: \(error.localizedDescription)")
             throw error
         }
+    }
+    
+    func checkFirstTimeLogin(userId: String) async throws -> Bool {
+        // Check if we have a cached value
+        if let cachedValue = firstTimeLoginCache[userId] {
+            return cachedValue
+        }
+        
+        guard let userUUID = UUID(uuidString: userId) else {
+            print("Invalid UUID format: \(userId)")
+            return false // Default to false if UUID is invalid
+        }
+
+        do {
+            let response: UserRoles = try await client
+                .from("UserRoles")
+                .select("*")
+                .eq("id", value: userUUID)
+                .single()
+                .execute()
+                .value
+            
+            // Cache the result
+            firstTimeLoginCache[userId] = response.firstTimeLogin
+            
+            return response.firstTimeLogin
+        } catch {
+            print("Error fetching firstTimeLogin status: \(error.localizedDescription)")
+            return false // Default to false in case of errors
+        }
+    }
+
+    /// Updates the firstTimeLogin status for a user in the UserRoles table
+    func updateFirstTimeLoginStatus(userId: String, firstTimeLogin: Bool) async throws {
+        guard let userUUID = UUID(uuidString: userId) else {
+            throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
+        }
+        
+        do {
+            try await client
+                .from("UserRoles")
+                .update(["firstTimeLogin": firstTimeLogin])
+                .eq("id", value: userUUID)
+                .execute()
+            
+            // Update the cache
+            firstTimeLoginCache[userId] = firstTimeLogin
+        } catch {
+            print("Error updating firstTimeLogin status: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    /// Clear any cached state for a user ID
+    func clearUserCache(userId: String) {
+        firstTimeLoginCache.removeValue(forKey: userId)
     }
 
     // MARK: - Password Reset with OTP
@@ -176,25 +266,37 @@ class AuthManager{
     // MARK: - Two-Factor Authentication
 
     // Generate and send a 2FA code to the user's email
-    func generateAndSend2FACode(email: String) async throws -> String {
-        // Generate a 6-digit code
-        let authCode = String(format: "%06d", Int.random(in: 0...999999))
-        
-        // Log the code to console for testing
-        print("2FA code for \(email): \(authCode)")
-        
-        // Use the same approach as resetPasswordWithOTP
+    func generateAndSend2FACode(email: String) async throws {
+        // Use Supabase's OTP method
         try await client.auth.signInWithOTP(
             email: email,
             shouldCreateUser: false
         )
-        
-        return authCode
     }
 
     // Verify the 2FA code entered by the user
-    func verify2FACode(submittedCode: String, actualCode: String) -> Bool {
-        return submittedCode == actualCode
+    func verify2FACode(email: String, token: String) async throws -> Bool {
+        do {
+            // Use Supabase's OTP verification
+            try await client.auth.verifyOTP(
+                email: email,
+                token: token,
+                type: .email
+            )
+            // Mark 2FA as completed
+            mark2FACompleted()
+            return true
+        } catch {
+            print("2FA verification error: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    // Mark 2FA as completed
+    func mark2FACompleted() {
+        is2FACompleted = true
+        // Save 2FA completion status to UserDefaults
+        UserDefaults.standard.set(true, forKey: twoFACompletedKey)
     }
 
     // Enhanced sign-in method with 2FA support
@@ -211,13 +313,28 @@ class AuthManager{
             let role = try await getUserRole(userId: userId)
             let appUser = AppUser(id: userId, email: userEmail, role: role)
             
-            // Only initiate 2FA if it's enabled
+            // Reset 2FA completed flag
+            is2FACompleted = false
+            UserDefaults.standard.set(false, forKey: twoFACompletedKey)
+            
+            // Check if this is a first-time login
+            let isFirstTime = try await checkFirstTimeLogin(userId: userId)
+            
+            // Skip 2FA if it's a first-time login - they need to reset password first
+            if isFirstTime {
+                // Mark 2FA as completed to bypass that check
+                mark2FACompleted()
+                return appUser
+            }
+            
+            // Otherwise, proceed with normal 2FA flow if enabled
             if AuthManager.is2FAEnabled {
                 // Generate and send 2FA code
-                let _ = try await generateAndSend2FACode(email: email)
+                try await generateAndSend2FACode(email: email)
                 return appUser
             } else {
                 // Skip 2FA if disabled
+                mark2FACompleted()
                 return appUser
             }
         } catch {
