@@ -14,18 +14,7 @@ struct FleetManagerView: View {
     
     var body: some View {
         VStack {
-            FleetManagerTabBarView()
+            FleetManagerTabBarView(user: $user, role: $role)
         }
     }
-        func signOut() {
-            Task {
-                do {
-                    try await AuthManager.shared.signOut()
-                    user = nil
-                    role = nil
-                } catch {
-                    print("Error signing out: \(error)")
-                }
-            }
-        }
     }

@@ -602,6 +602,11 @@ struct AssignTripView: View {
 
 
 struct FleetManagerDashboardView: View {
+    
+    @Binding var user: AppUser?
+    @Binding var role : Role?
+    @State private var showingProfile = false
+
     @StateObject private var viewModel = DriverViewModel()
     
     @State private var assignedTrips: [AssignedTrip] = []
@@ -728,6 +733,29 @@ struct FleetManagerDashboardView: View {
             }
         }
         .navigationTitle("Dashboard")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    // Action for the bell button
+                }) {
+                    Image(systemName: "bell.fill")
+                        .font(.title2)
+                        .foregroundColor(.primaryGradientStart)
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    // Action for the bell button
+                    showingProfile = true
+                }) {
+                    Image(systemName: "person.circle")
+                        .font(.title)
+                        .foregroundColor(.primaryGradientStart)
+                }
+            }
+        }.sheet(isPresented: $showingProfile) {
+            ProfileView(user: $user, role: $role)
+        }
         .background(Color(red: 242/255, green: 242/255, blue: 247/255))
         .onAppear {
             if viewModel.drivers.isEmpty {
@@ -752,7 +780,17 @@ struct FleetManagerDashboardView: View {
         }
     }
 }
-
+//func signOut() {
+//    Task {
+//        do {
+//            try await AuthManager.shared.signOut()
+//            user = nil
+//            role = nil
+//        } catch {
+//            print("Error signing out: \(error)")
+//        }
+//    }
+//}
 struct SearchBar: View {
     @Binding var text: String
     
@@ -822,10 +860,12 @@ struct FilterSection<T: Hashable>: View {
 
 
 struct FleetManagerTabBarView: View {
+    @Binding var user: AppUser?
+    @Binding var role : Role?
     var body: some View {
         TabView {
             NavigationView {
-                FleetManagerDashboardView()
+                FleetManagerDashboardView(user: $user, role: $role)
             }
             .tabItem {
                 Image(systemName: "chart.bar.fill")

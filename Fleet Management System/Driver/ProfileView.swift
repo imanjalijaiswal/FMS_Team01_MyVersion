@@ -45,8 +45,6 @@ struct ProfileView: View {
                 
                     user = nil
                     role = nil
-                    print(user)
-                    print(role)
                 }
 
             } catch {
@@ -127,7 +125,7 @@ struct ProfileView: View {
                                         .font(.title2)
                                         .padding()
                                         .background(Color.white)
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.statusRed)
                                         .cornerRadius(10)
                                 }
                                 .padding(.bottom, 50)
