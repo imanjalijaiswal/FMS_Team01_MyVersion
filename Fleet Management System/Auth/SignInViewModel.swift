@@ -56,15 +56,28 @@ class SignInViewModel: ObservableObject {
             // Use the new 2FA method instead of the regular sign-in
             let user = try await authManager.signInWithEmailAndInitiate2FA(email: validatedEmail, password: password)
             
-            // If we got a user back and 2FA is enabled, set flag and temp user
-            if AuthManager.is2FAEnabled, let authUser = user {
+            // If the user is null or not found, return nil
+            guard let authUser = user else {
+                return nil
+            }
+            
+            // Check if this is a first-time login
+            let isFirstTimeLogin = try await authManager.checkFirstTimeLogin(userId: authUser.id)
+            
+            // Skip 2FA if it's a first-time login
+            if isFirstTimeLogin {
+                return authUser  // Return the user directly, bypassing 2FA
+            }
+            
+            // Otherwise, if 2FA is required, set up for 2FA
+            if AuthManager.is2FAEnabled {
                 is2FARequired = true
                 tempAuthenticatedUser = authUser
                 return nil
             }
             
-            // Otherwise just return the user directly (2FA disabled or not required)
-            return user
+            // Otherwise just return the user directly (2FA disabled)
+            return authUser
         } catch {
             // Convert NSError to AuthError if needed
             if let nsError = error as NSError?,
