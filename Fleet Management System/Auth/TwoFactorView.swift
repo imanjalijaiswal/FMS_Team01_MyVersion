@@ -115,11 +115,6 @@ struct TwoFactorView: View {
                 Spacer()
             }
         }
-        .onAppear {
-            Task {
-                await sendVerificationCode()
-            }
-        }
     }
     
     private func sendVerificationCode() async {

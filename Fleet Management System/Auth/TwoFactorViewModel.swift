@@ -5,6 +5,7 @@ class TwoFactorViewModel: ObservableObject {
     @Published var verificationCode: String = ""
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
+    @Published var hasSentCode: Bool = false
     
     private let authManager = AuthManager.shared
     private let authenticatedUser: AppUser
@@ -15,6 +16,11 @@ class TwoFactorViewModel: ObservableObject {
     
     // Send verification code
     func sendVerificationCode() async throws {
+        // If code has already been sent, don't send again
+        if hasSentCode {
+            return
+        }
+        
         self.isLoading = true
         self.errorMessage = nil
         
@@ -23,6 +29,7 @@ class TwoFactorViewModel: ObservableObject {
             if let email = authenticatedUser.email {
                 try await authManager.generateAndSend2FACode(email: email)
                 self.isLoading = false
+                self.hasSentCode = true
                 self.errorMessage = "Verification code sent to \(email)"
             } else {
                 self.isLoading = false
