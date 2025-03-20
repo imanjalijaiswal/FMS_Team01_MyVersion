@@ -1,9 +1,9 @@
 # Xcode
 DerivedData/
-*.xcuserstate
-*.xcworkspace/
-*.xcuserdata/
-*.xccheckout
+xcuserstate
+xcworkspace/
+xcuserdata/
+xccheckout
 *.xcodeproj/project.xcworkspace/
 !default.xcworkspace/
 
