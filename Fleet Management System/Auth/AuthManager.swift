@@ -101,6 +101,28 @@ class AuthManager{
             throw error
         }
     }
+    
+    func checkFirstTimeLogin(userId: String) async throws -> Bool {
+        guard let userUUID = UUID(uuidString: userId) else {
+            throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
+        }
+
+        do {
+
+            let response: UserRoles = try await client
+                .from("UserRoles")
+                .select("*")
+                .eq("id", value: userUUID)
+                .single()
+                .execute()
+                .value
+            
+            return response.firstTimeLogin
+        } catch {
+            print("Error fetching user role: \(error.localizedDescription)")
+            throw error
+        }
+    }
 
     // MARK: - Password Reset with OTP
     
