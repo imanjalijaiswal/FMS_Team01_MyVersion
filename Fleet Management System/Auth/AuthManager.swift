@@ -13,6 +13,7 @@ struct AppUser: Equatable {
    var id: String
    var email: String?
    var role: Role
+//   var workingStatus: Bool
    
    static func == (lhs: AppUser, rhs: AppUser) -> Bool {
        return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
@@ -33,6 +34,22 @@ enum Role:String,Codable{
     case maintenancePersonal
 }
 
+//enum AuthError: Error {
+//    case inactiveUser
+//    case invalidCredentials
+//    case networkError
+//    
+//    var description: String {
+//        switch self {
+//        case .inactiveUser:
+//            return "Your account is currently inactive. Please contact your administrator."
+//        case .invalidCredentials:
+//            return "Invalid email or password."
+//        case .networkError:
+//            return "Network error occurred. Please try again."
+//        }
+//    }
+//}
 
 class AuthManager{
     static let shared = AuthManager()
@@ -105,11 +122,19 @@ class AuthManager{
     // MARK: - SigniIN
     
     func signInWithEmail(email: String, password: String) async throws -> AppUser {
-        
         let session = try await client.auth.signIn(email: email, password: password)
         let userId = session.user.id.uuidString
+        
+        // Check working status first
+        let workingStatus = try await getWorkingStatus(userId: userId)
+        if !workingStatus {
+            try await client.auth.signOut() // Sign out immediately if inactive
+            throw AuthError.inactiveUser
+        }
+        
+        // If working status is true, proceed with getting role and creating user
         let role = try await getUserRole(userId: userId)
-        return AppUser(id: session.user.id.uuidString, email: session.user.email, role:role)
+        return AppUser(id: session.user.id.uuidString, email: session.user.email, role: role)
     }
     
     // MARK: - User Roles
@@ -183,6 +208,28 @@ class AuthManager{
             firstTimeLoginCache[userId] = firstTimeLogin
         } catch {
             print("Error updating firstTimeLogin status: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    func getWorkingStatus(userId: String) async throws -> Bool {
+        guard let userUUID = UUID(uuidString: userId) else {
+            throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
+        }
+
+        do {
+
+            let response: UserRoles = try await client
+                .from("UserRoles")
+                .select("*")
+                .eq("id", value: userUUID)
+                .single()
+                .execute()
+                .value
+            
+            return response.workingStatus
+        } catch {
+            print("Error fetching user role: \(error.localizedDescription)")
             throw error
         }
     }
@@ -307,6 +354,14 @@ class AuthManager{
             // Get the user from the response
             let user = authResponse.user
             let userId = user.id.uuidString
+            
+            // Check working status first
+            let workingStatus = try await getWorkingStatus(userId: userId)
+            if !workingStatus {
+                try await client.auth.signOut() // Sign out immediately if inactive
+                throw AuthError.inactiveUser
+            }
+            
             let userEmail = user.email
             
             // Get user role
@@ -340,6 +395,9 @@ class AuthManager{
         } catch {
             // Handle known errors
             print("Auth error: \(error.localizedDescription)")
+            if let authError = error as? AuthError {
+                throw authError
+            }
             throw error
         }
     }
