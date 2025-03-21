@@ -21,66 +21,6 @@ struct DashboardCard: View {
     }
 }
 
-struct VehicleStatusView: View {
-    let movingCount: Int
-    let stationaryCount: Int
-    let maintenanceCount: Int
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Vehicle Status")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            VStack(spacing: 0) {
-                HStack {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("\(movingCount) vehicles moving")
-                    Spacer()
-                }
-                .padding()
-                
-                Divider()
-                
-                HStack {
-                    Circle()
-                        .fill(Color.gray)
-                        .frame(width: 8, height: 8)
-                    Text("\(stationaryCount) vehicles are ready to go")
-                    Spacer()
-                }
-                .padding()
-                
-                Divider()
-                
-                HStack {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text("\(maintenanceCount) vehicles in maintenance")
-                    Spacer()
-                }
-                .padding()
-            }
-            .background(Color.white)
-            .cornerRadius(12)
-            .shadow(radius: 1)
-        }
-    }
-}
-
-struct AssignedTrip: Identifiable {
-    let id = UUID()
-    let driverName: String
-    let vehicleNumber: String
-    let startLocation: String
-    let endLocation: String
-    let estimatedTime: String
-    let currentLocation: String
-}
-
 class SearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
     @Published var results: [MKLocalSearchCompletion] = []
     private let completer: MKLocalSearchCompleter
@@ -102,188 +42,6 @@ class SearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegat
     
     func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
         print(error.localizedDescription)
-    }
-}
-
-struct LocationSearchBar: View {
-    @Binding var text: String
-    let placeholder: String
-    @Binding var selectedLocation: String?
-    @State private var showingMap = false
-    @StateObject private var searchCompleter = SearchCompleter()
-    @State private var showResults = false
-    
-    var body: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                TextField(placeholder, text: $text)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .onChange(of: text, initial: false) { oldValue, newValue in
-                        searchCompleter.search(with: newValue)
-                        showResults = !newValue.isEmpty
-                    }
-                
-                Button(action: { showingMap = true }) {
-                    Image(systemName: "map")
-                        .foregroundColor(.blue)
-                }
-            }
-            
-            if showResults && !searchCompleter.results.isEmpty {
-                ScrollView {
-                    VStack(alignment: .leading) {
-                        ForEach(searchCompleter.results, id: \.self) { result in
-                            Button(action: {
-                                text = result.title
-                                selectedLocation = result.title
-                                showResults = false
-                            }) {
-                                VStack(alignment: .leading) {
-                                    Text(result.title)
-                                        .foregroundColor(.primary)
-                                    Text(result.subtitle)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                            Divider()
-                        }
-                    }
-                    .padding()
-                }
-                .background(Color(.systemBackground))
-                .cornerRadius(8)
-                .shadow(radius: 2)
-            }
-        }
-        .sheet(isPresented: $showingMap) {
-            MapLocationPicker(selectedLocation: $selectedLocation, searchText: $text)
-        }
-    }
-}
-
-struct MapLocationPicker: View {
-    @Environment(\.dismiss) var dismiss
-    @Binding var selectedLocation: String?
-    @Binding var searchText: String
-    @State private var position = MapCameraPosition.region(MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
-        span: MKCoordinateSpan(latitudeDelta: 30.0, longitudeDelta: 30.0)
-    ))
-    @State private var searchTextMap = ""
-    @StateObject private var searchCompleter = SearchCompleter()
-    @State private var showResults = false
-    
-    func getLocationName(center: CLLocationCoordinate2D) {
-        let location = CLLocation(latitude: center.latitude, longitude: center.longitude)
-        CLGeocoder().reverseGeocodeLocation(location) { placemarks, error in
-            if let placemark = placemarks?.first {
-                let address = [
-                    placemark.name,
-                    placemark.locality,
-                    placemark.administrativeArea,
-                    placemark.country
-                ].compactMap { $0 }.joined(separator: ", ")
-                selectedLocation = address
-                searchText = address
-            }
-        }
-    }
-    
-    var body: some View {
-        NavigationView {
-            ZStack(alignment: .top) {
-                Map(position: $position) { }
-                    .mapStyle(.standard)
-                    .edgesIgnoringSafeArea(.all)
-                    .overlay(alignment: .center) {
-                        Image(systemName: "mappin")
-                            .font(.title)
-                            .foregroundColor(.red)
-                    }
-                
-                VStack {
-                    HStack {
-                        TextField("Search location", text: $searchTextMap)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .padding(8)
-                            .background(Color.white)
-                            .cornerRadius(8)
-                            .shadow(radius: 2)
-                            .onChange(of: searchTextMap, initial: false) { oldValue, newValue in
-                                searchCompleter.search(with: newValue)
-                                showResults = !newValue.isEmpty
-                            }
-                    }
-                    .padding()
-                    
-                    if showResults && !searchCompleter.results.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading) {
-                                ForEach(searchCompleter.results, id: \.self) { result in
-                                    Button(action: {
-                                        searchTextMap = result.title
-                                        let searchRequest = MKLocalSearch.Request(completion: result)
-                                        let search = MKLocalSearch(request: searchRequest)
-                                        search.start { response, error in
-                                            guard let coordinate = response?.mapItems.first?.placemark.coordinate else { return }
-                                            position = .region(MKCoordinateRegion(
-                                                center: coordinate,
-                                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                                            ))
-                                        }
-                                        showResults = false
-                                    }) {
-                                        VStack(alignment: .leading) {
-                                            Text(result.title)
-                                                .foregroundColor(.primary)
-                                            Text(result.subtitle)
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                    Divider()
-                                }
-                            }
-                            .padding()
-                        }
-                        .background(Color.white)
-                        .cornerRadius(8)
-                        .shadow(radius: 2)
-                        .padding(.horizontal)
-                    }
-                }
-            }
-            .navigationTitle("Select Location")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        if let center = position.region?.center {
-                            getLocationName(center: center)
-                        }
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                if let center = position.region?.center {
-                    getLocationName(center: center)
-                }
-            }
-            .onChange(of: position) { oldValue, newValue in
-                if let center = newValue.region?.center {
-                    getLocationName(center: center)
-                }
-            }
-        }
     }
 }
 
@@ -309,412 +67,127 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 }
 
-struct AssignTripView: View {
-    let driver: Driver
-    @Environment(\.dismiss) var dismiss
-    @State private var startLocation = ""
-    @State private var endLocation = ""
-    @State private var selectedVehicle: Vehicle? = nil
-    @State private var selectedStartLocation: String? = nil
-    @State private var selectedEndLocation: String? = nil
-    @State private var showingAlert = false
-    @State private var selectedDate = Date()
-    @State private var selectedTime = Date()
-    @State private var showDatePicker = false
-    @State private var showTimePicker = false
-    @State private var showVehiclePicker = false
-    @State private var selectedDriver1: Driver? = nil
-    @State private var selectedDriver2: Driver? = nil
-    @State private var showDriver1Picker = false
-    @State private var showDriver2Picker = false
-    @ObservedObject var viewModel: DriverViewModel
-    
-    let availableVehicles = [
-        Vehicle(number: "TN36AL5963", model: "Tata", companyName: "Tata Motors", yearOfManufacture: 2020, vin: "1234567890", plateNumber: "TN36AL5963", fuelType: "Diesel", loadCapacity: "10 tons", insuranceNumber: "1234567890", insuranceExpiry: Date(), pucNumber: "1234567890", pucExpiry: Date(), rcNumber: "1234567890", rcExpiry: Date(), currentLocation: "Bangalore", isAvailable: true, isActive: true),
-        Vehicle(number: "TN36AL5964", model: "Ashok Leyland", companyName: "Ashok Leyland", yearOfManufacture: 2021, vin: "2345678901", plateNumber: "TN36AL5964", fuelType: "Diesel", loadCapacity: "15 tons", insuranceNumber: "2345678901", insuranceExpiry: Date(), pucNumber: "2345678901", pucExpiry: Date(), rcNumber: "2345678901", rcExpiry: Date(), currentLocation: "Chennai", isAvailable: true, isActive:true)
-    ]
-    
-    var availableDrivers1: [Driver] {
-        viewModel.drivers.filter { $0.workingStatus && $0.status == .available }
-    }
 
-    var availableDrivers2: [Driver] {
-        viewModel.drivers.filter { $0.workingStatus && $0.status == .available && $0.id != selectedDriver1?.id }
-    }
-    
-    var isFormValid: Bool {
-        !startLocation.isEmpty &&
-        !endLocation.isEmpty &&
-        selectedVehicle != nil &&
-        selectedDriver1 != nil
-    }
+struct ProgressBarView: View {
+    let title: String
+    let total: Int
+    let items: [(String, Int, Color)]
     
     var body: some View {
-        NavigationView {  
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    
-                    LocationSearchBar(
-                        text: $startLocation,
-                        placeholder: "Pickup Location",
-                        selectedLocation: $selectedStartLocation
-                    )
-                    
-                    LocationSearchBar(
-                        text: $endLocation,
-                        placeholder: "Drop-off Location",
-                        selectedLocation: $selectedEndLocation
-                    )
-                    
-                    VStack {
-                        Button(action: { showDatePicker.toggle() }) {
-                            HStack {
-                                Text("Date")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text(selectedDate.formatted(date: .abbreviated, time: .omitted))
-                                    .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showDatePicker ? 90 : 0))
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if showDatePicker {
-                            DatePicker(
-                                "Select Date",
-                                selection: $selectedDate,
-                                displayedComponents: [.date]
-                            )
-                            .datePickerStyle(.graphical)
-                            .transition(.opacity)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-
-                    VStack {
-                        Button(action: { showTimePicker.toggle() }) {
-                            HStack {
-                                Text("Time")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text(selectedTime.formatted(date: .omitted, time: .shortened))
-                                    .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showTimePicker ? 90 : 0))
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if showTimePicker {
-                            DatePicker(
-                                "Select Time",
-                                selection: $selectedTime,
-                                displayedComponents: [.hourAndMinute]
-                            )
-                            .datePickerStyle(.wheel)
-                            .labelsHidden()
-                            .transition(.opacity)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-
-                    VStack {
-                        Button(action: { withAnimation { showVehiclePicker.toggle() } }) {
-                            HStack {
-                                Text("Vehicle")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text(selectedVehicle?.number ?? "Select Vehicle")
-                                    .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showVehiclePicker ? 90 : 0))
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if showVehiclePicker {
                             VStack(alignment: .leading, spacing: 8) {
-                                ForEach(availableVehicles) { vehicle in
-                                    Button(action: {
-                                        selectedVehicle = vehicle
-                                        withAnimation { showVehiclePicker = false }
-                                    }) {
                                         HStack {
-                                            Text(vehicle.number)
-                                                .foregroundColor(.primary)
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primaryGradientStart)
                                             Spacer()
-                                            if selectedVehicle == vehicle {
-                                                Image(systemName: "checkmark")
-                                                    .foregroundColor(.blue)
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                    }
-                                    if vehicle != availableVehicles.last {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .transition(.opacity)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-
-                    VStack {
-                        Button(action: { showDriver1Picker.toggle() }) {
-                            HStack {
-                                Text("Driver 1")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text(selectedDriver1?.fullName ?? "Select Driver 1")
+                Text("Total: \(total)")
                                     .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showDriver1Picker ? 90 : 0))
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if showDriver1Picker {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(availableDrivers1) { driver in
-                                    Button(action: {
-                                        selectedDriver1 = driver
-                                        if selectedDriver2?.id == driver.id {
-                                            selectedDriver2 = nil
-                                        }
-                                        withAnimation { showDriver1Picker = false }
-                                    }) {
-                                        HStack {
-                                            Text(driver.fullName)
-                                                .foregroundColor(.primary)
-                                            Spacer()
-                                            if selectedDriver1 == driver {
-                                                Image(systemName: "checkmark")
-                                                    .foregroundColor(.blue)
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                    }
-                                    if driver != availableDrivers1.last {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .transition(.opacity)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-
-                    VStack {
-                        Button(action: { showDriver2Picker.toggle() }) {
-                            HStack {
-                                Text("Driver 2")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text(selectedDriver2?.fullName ?? "Select Driver 2")
-                                    .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showDriver2Picker ? 90 : 0))
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if showDriver2Picker {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(availableDrivers2) { driver in
-                                    Button(action: {
-                                        selectedDriver2 = driver
-                                        withAnimation { showDriver2Picker = false }
-                                    }) {
-                                        HStack {
-                                            Text(driver.fullName)
-                                                .foregroundColor(.primary)
-                                            Spacer()
-                                            if selectedDriver2 == driver {
-                                                Image(systemName: "checkmark")
-                                                    .foregroundColor(.blue)
-                                            }
-                                        }
-                                        .padding(.vertical, 8)
-                                    }
-                                    if driver != availableDrivers2.last {
-                                        Divider()
-                                    }
-                                }
-                            }
-                            .transition(.opacity)
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                }
-                .padding()
             }
-            .navigationTitle("Assign Trip")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        let newTrip = AssignedTrip(
-                            driverName: [selectedDriver1?.fullName, selectedDriver2?.fullName]
-                                .compactMap { $0 }
-                                .joined(separator: ", "),
-                            vehicleNumber: selectedVehicle?.number ?? "",
-                            startLocation: startLocation,
-                            endLocation: endLocation,
-                            estimatedTime: selectedTime.formatted(date: .omitted, time: .shortened),
-                            currentLocation: "Bangalore"
-                        )
-                        
-                        viewModel.assignedTrips.append(newTrip)
-                        showingAlert = true
-                    }
-                    .disabled(!isFormValid)
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+            
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    ForEach(items, id: \.0) { item in
+                        let width = CGFloat(item.1) / CGFloat(total) * geometry.size.width
+                        Rectangle()
+                            .fill(item.2)
+                            .frame(width: width)
                     }
                 }
+                .frame(height: 8)
+                .clipShape(Capsule())
             }
-            .alert("Success", isPresented: $showingAlert) {
-                Button("OK") {
-                    dismiss()
+            .frame(height: 8)
+            
+            HStack(spacing: 16) {
+                ForEach(items, id: \.0) { item in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(item.2)
+                            .frame(width: 8, height: 8)
+                        Text("\(item.0)")
+                            .font(.caption)
+                        Text("(\(item.1))")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                 }
-            } message: {
-                Text("Trip assigned successfully")
             }
         }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(radius: 1)
     }
 }
 
-
-
-struct FleetManagerDashboardView: View {
-    
-    @Binding var user: AppUser?
-    @Binding var role : Role?
-    @State private var showingProfile = false
-
-    @StateObject private var viewModel = DriverViewModel()
-    
-    @State private var assignedTrips: [AssignedTrip] = []
-    @State private var showTripDetails = false
-    @State private var selectedTrip: AssignedTrip?
-    @State private var showAssignTrip = false
+struct AnalyticsCard: View {
+    let title: String
+    let value: String
+    let unit: String
+    let change: Double
     
     var body: some View {
-        VStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    HStack(spacing: 16) {
-                        DashboardCard(title: "Total Vehicles", value: "163", color: .orange)
-                        DashboardCard(title: "Total Drivers", value: "45", color: .blue)
-                    }
-                    
-                    VehicleStatusView(movingCount: 3, stationaryCount: 3, maintenanceCount: 50)
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Assigned Trips")
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
                             .font(.headline)
-                            .padding(.horizontal)
-                        
-                        if viewModel.assignedTrips.isEmpty {
-                            VStack(spacing: 0) {
-                                HStack {
-                                    Text("No trips assigned")
+                .foregroundColor(.primaryGradientStart)
+            
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primaryGradientStart)
+                Text(unit)
+                    .font(.subheadline)
                                         .foregroundColor(.gray)
-                                    Spacer()
-                                }
-                                .padding()
-                            }
-                            .background(Color.white)
-                            .cornerRadius(12)
-                            .shadow(radius: 1)
-                        } else {
-                            ForEach(viewModel.assignedTrips) { trip in
-                                Button(action: {
-                                    selectedTrip = trip
-                                    showTripDetails = true
-                                }) {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        HStack {
-                                            Text("Trip ID: TRP-2024-001")
-                                                .font(.headline)
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .foregroundColor(.teal)
-                                        }
-                                        
-                                        Text("Tata Prima LX 2823.K")
-                                            .font(.body)
-                                            .foregroundColor(.gray)
-                                        Text("MH 04 HJ 1234")
-                                            .foregroundColor(.orange)
-                                        
-                                        Text("Today • Electronics, 2500 kg")
-                                            .foregroundColor(.gray)
-                                        
-                                        VStack(alignment: .leading, spacing: 16) {
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text("Pickup")
-                                                    .foregroundColor(.gray)
-                                                HStack(spacing: 8) {
-                                                    Circle()
-                                                        .fill(Color.teal)
-                                                        .frame(width: 8, height: 8)
-                                                    Text(trip.startLocation)
-                                                }
-                                            }
-                                            
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                Text("Drop-off")
-                                                    .foregroundColor(.gray)
-                                                HStack(spacing: 8) {
-                                                    Circle()
-                                                        .fill(Color.orange)
-                                                        .frame(width: 8, height: 8)
-                                                    Text(trip.endLocation)
-                                                }
-                                            }
-                                        }
-                                        
-                                        HStack {
-                                            Image(systemName: "arrow.up.right")
-                                                .foregroundColor(.teal)
-                                            Text("985 km - 14 hours")
-                                                .foregroundColor(.gray)
+            }
+            
+            HStack(spacing: 4) {
+                Image(systemName: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                    .foregroundColor(change >= 0 ? .green : .red)
+                Text("\(abs(change), specifier: "%.1f")%")
+                    .font(.caption)
+                    .foregroundColor(change >= 0 ? .green : .red)
                                         }
                                     }
                                     .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
                                     .background(Color.white)
                                     .cornerRadius(12)
                                     .shadow(radius: 1)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                    }
-                }
-                .padding()
-            }
+}
 
-            Button(action: { showAssignTrip = true }) {
-                HStack {
-                    Text("Assign a Trip")
-                        .fontWeight(.medium)
+struct UpdateCard: View {
+    let iconName: String
+    let title: String
+    let description: String
+    let timeAgo: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .font(.title2)
+                .foregroundColor(.orange)
+                .padding(8)
+                .background(Color.orange.opacity(0.1))
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primaryGradientStart)
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                Text(timeAgo)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            
                     Spacer()
+            
                     Image(systemName: "chevron.right")
                         .foregroundColor(.gray)
                 }
@@ -722,17 +195,101 @@ struct FleetManagerDashboardView: View {
                 .background(Color.white)
                 .cornerRadius(12)
                 .shadow(radius: 1)
+    }
+}
+
+struct FleetManagerDashboardView: View {
+    @Binding var user: AppUser?
+    @Binding var role: Role?
+    @State private var showingProfile = false
+    @StateObject private var viewModel = DriverViewModel()
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // Fleet Overview Section
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Fleet Overview")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primaryGradientStart)
+                    
+                    ProgressBarView(
+                        title: "Drivers",
+                        total: 15,
+                        items: [
+                            ("Available", 8, Color.mint),
+                            ("In Trip", 5, Color.primaryGradientEnd),
+                            ("Disabled", 2, Color.orange)
+                        ]
+                    )
+                    
+                    ProgressBarView(
+                        title: "Maintenance",
+                        total: 4,
+                        items: [
+                            ("Completed", 2, Color.mint),
+                            ("In Progress", 2, Color.primaryGradientEnd)
+                        ]
+                    )
+                    
+                    ProgressBarView(
+                        title: "Trucks",
+                        total: 15,
+                        items: [
+                            ("Available", 8, Color.mint),
+                            ("Assigned", 5, Color.primaryGradientEnd),
+                            ("Disabled", 2, Color.orange)
+                        ]
+                    )
+                }
+                .padding(.horizontal)
+                
+                // Fleet Analytics Section
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Fleet Analytics")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primaryGradientStart)
+                    
+                    HStack(spacing: 16) {
+                        AnalyticsCard(
+                            title: "Fuel Consumed",
+                            value: "1250.5",
+                            unit: "L",
+                            change: 5.2
+                        )
+                        
+                        AnalyticsCard(
+                            title: "Maintenance Cost",
+                            value: "8500.0",
+                            unit: "USD",
+                            change: -2.1
+                        )
+                    }
             }
             .padding(.horizontal)
-            .padding(.bottom)
-            .sheet(isPresented: $showAssignTrip) {
-                AssignTripView(
-                    driver: Driver(fullName: "", totalTrips: 0, licenseNumber: "", emailId: "", driverID: "", phoneNumber: "", status: .available, workingStatus: true),
-                    viewModel: viewModel
-                )
+                
+                // Recent Updates Section
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Recent Updates")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primaryGradientStart)
+                    
+                    UpdateCard(
+                        iconName: "wrench.fill",
+                        title: "Maintenance Updated",
+                        description: "Robert Brown updated maintenance status for TRK003",
+                        timeAgo: "51 sec. ago"
+                    )
+                }
+                .padding(.horizontal)
             }
+            .padding(.vertical)
         }
-        .navigationTitle("Dashboard")
+        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+        .navigationTitle("Fleet Manager")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
@@ -740,57 +297,25 @@ struct FleetManagerDashboardView: View {
                 }) {
                     Image(systemName: "bell.fill")
                         .font(.title2)
-                        .foregroundColor(.primaryGradientStart)
+                        .foregroundColor(.primaryGradientEnd)
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
-                    // Action for the bell button
                     showingProfile = true
                 }) {
                     Image(systemName: "person.circle")
                         .font(.title)
-                        .foregroundColor(.primaryGradientStart)
+                        .foregroundColor(.primaryGradientEnd)
                 }
             }
-        }.sheet(isPresented: $showingProfile) {
-            ProfileView(user: $user, role: $role)
         }
-        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
-        .onAppear {
-            if viewModel.drivers.isEmpty {
-                viewModel.drivers = [
-                    Driver(fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true),
-                    Driver(fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true),
-                    Driver(fullName: "Mike Johnson", totalTrips: 156, licenseNumber: "DL345678", emailId: "mike@example.com", driverID: "EMP003", phoneNumber: "+1122334455", status: .available, workingStatus: true),
-                    Driver(fullName: "Sarah Wilson", totalTrips: 112, licenseNumber: "DL456789", emailId: "sarah@example.com", driverID: "EMP004", phoneNumber: "+2233445566", status: .available, workingStatus: true),
-                    Driver(fullName: "David Brown", totalTrips: 143, licenseNumber: "DL567890", emailId: "david@example.com", driverID: "EMP005", phoneNumber: "+3344556677", status: .available, workingStatus: true),
-                    Driver(fullName: "Emma Davis", totalTrips: 87, licenseNumber: "DL678901", emailId: "emma@example.com", driverID: "EMP006", phoneNumber: "+4455667788", status: .available, workingStatus: true),
-                    Driver(fullName: "James Wilson", totalTrips: 165, licenseNumber: "DL789012", emailId: "james@example.com", driverID: "EMP007", phoneNumber: "+5566778899", status: .available, workingStatus: true),
-                    Driver(fullName: "Linda Taylor", totalTrips: 134, licenseNumber: "DL890123", emailId: "linda@example.com", driverID: "EMP008", phoneNumber: "+6677889900", status: .available, workingStatus: true),
-                    Driver(fullName: "Robert Martin", totalTrips: 145, licenseNumber: "DL901234", emailId: "robert@example.com", driverID: "EMP009", phoneNumber: "+7788990011", status: .available, workingStatus: true),
-                    Driver(fullName: "Mary Anderson", totalTrips: 98, licenseNumber: "DL012345", emailId: "mary@example.com", driverID: "EMP010", phoneNumber: "+8899001122", status: .available, workingStatus: true),
-                    Driver(fullName: "William Clark", totalTrips: 178, licenseNumber: "DL123456", emailId: "william@example.com", driverID: "EMP011", phoneNumber: "+9900112233", status: .available, workingStatus: true),
-                    Driver(fullName: "Patricia Lee", totalTrips: 132, licenseNumber: "DL234567", emailId: "patricia@example.com", driverID: "EMP012", phoneNumber: "+0011223344", status: .available, workingStatus: true),
-                    Driver(fullName: "Richard Hall", totalTrips: 156, licenseNumber: "DL345678", emailId: "richard@example.com", driverID: "EMP013", phoneNumber: "+1122334455", status: .available, workingStatus: true),
-                    Driver(fullName: "Barbara White", totalTrips: 123, licenseNumber: "DL456789", emailId: "barbara@example.com", driverID: "EMP014", phoneNumber: "+2233445566", status: .available, workingStatus: true),
-                    Driver(fullName: "Michael King", totalTrips: 167, licenseNumber: "DL567890", emailId: "michael@example.com", driverID: "EMP015", phoneNumber: "+3344556677", status: .available, workingStatus: true)
-                ]
-            }
+        .sheet(isPresented: $showingProfile) {
+            ProfileView(user: $user, role: $role)
         }
     }
 }
-//func signOut() {
-//    Task {
-//        do {
-//            try await AuthManager.shared.signOut()
-//            user = nil
-//            role = nil
-//        } catch {
-//            print("Error signing out: \(error)")
-//        }
-//    }
-//}
+
 struct SearchBar: View {
     @Binding var text: String
     
@@ -859,6 +384,7 @@ struct FilterSection<T: Hashable>: View {
 }
 
 
+
 struct FleetManagerTabBarView: View {
     @Binding var user: AppUser?
     @Binding var role : Role?
@@ -868,27 +394,31 @@ struct FleetManagerTabBarView: View {
                 FleetManagerDashboardView(user: $user, role: $role)
             }
             .tabItem {
-                Image(systemName: "chart.bar.fill")
-                Text("Dashboard")
+                Label("Dashboard", systemImage: "square.grid.2x2")
             }
             
             NavigationView {
-                DriversView()
+                StaffView()
             }
             .tabItem {
-                Image(systemName: "person.2.fill")
-                Text("Drivers")
+                Label("Staff", systemImage: "person.2.fill")
             }
             
             NavigationView {
                 VehiclesView()
             }
             .tabItem {
-                Image(systemName: "car.fill")
-                Text("Vehicles")
+                Label("Vehicles", systemImage: "car.fill")
+            }
+            
+            NavigationView {
+                TripsView()
+            }
+            .tabItem {
+                Label("Trips", systemImage: "map.fill")
             }
         }
-        .preferredColorScheme(.light)
+        .accentColor(.primaryGradientEnd)
     }
 }
 
