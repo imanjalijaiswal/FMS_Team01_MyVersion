@@ -142,7 +142,7 @@ class DriverViewModel: ObservableObject {
                     fullName: driver.fullName,
                     totalTrips: driver.totalTrips + 1,
                     licenseNumber: driver.licenseNumber,
-                    emailId: driver.emailId,
+                    email: driver.email,
                     driverID: driver.driverID,
                     phoneNumber: driver.phoneNumber,
                     status: .onTrip,
