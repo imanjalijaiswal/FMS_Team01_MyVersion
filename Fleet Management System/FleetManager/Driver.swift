@@ -12,7 +12,7 @@ enum DriverStatus: String, Codable {
 }
 
 struct Driver: Identifiable, Equatable {
-    let id = UUID()
+    let id : UUID
     let fullName: String
     let totalTrips: Int
     let licenseNumber: String
@@ -21,7 +21,7 @@ struct Driver: Identifiable, Equatable {
     let phoneNumber: String
     let status: DriverStatus
     let workingStatus: Bool
-    let role: StaffRole
+    let role: Role
     
     static func == (lhs: Driver, rhs: Driver) -> Bool {
         lhs.id == rhs.id
@@ -39,7 +39,7 @@ class DriverViewModel: ObservableObject {
     
     func removeDriver(_ driver: Driver) {
         let inactiveDriver = Driver(
-            fullName: driver.fullName,
+            id: UUID(), fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
             emailId: driver.emailId,
@@ -56,7 +56,7 @@ class DriverViewModel: ObservableObject {
     
     func enableDriver(_ driver: Driver) {
         let activeDriver = Driver(
-            fullName: driver.fullName,
+            id: UUID(), fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
             emailId: driver.emailId,
@@ -168,7 +168,7 @@ struct StaffView: View {
     
     var filteredStaff: [Driver] {
         let roleFiltered = viewModel.drivers.filter { driver in
-            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenance
+            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenancePersonal
         }
         
         let searchResults = roleFiltered.filter { staff in
@@ -230,18 +230,15 @@ struct StaffView: View {
             }
         }
         .sheet(isPresented: $showingAddStaff) {
-            AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenance)
+            AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenancePersonal)
         }
         .background(Color(red: 242/255, green: 242/255, blue: 247/255))
         .onAppear {
             if viewModel.drivers.isEmpty {
                 // Add sample drivers with roles
                 let sampleDrivers = [
-                    Driver(fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
-                    Driver(fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver),
-                    // Add maintenance staff
-                    Driver(fullName: "Mike Tech", totalTrips: 0, licenseNumber: "", emailId: "mike.tech@example.com", driverID: "MECH001", phoneNumber: "+1122334455", status: .available, workingStatus: true, role: .maintenance),
-                    Driver(fullName: "Sarah Engineer", totalTrips: 0, licenseNumber: "", emailId: "sarah.eng@example.com", driverID: "MECH002", phoneNumber: "+2233445566", status: .available, workingStatus: true, role: .maintenance)
+                    Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
+                    Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
                 ]
                 viewModel.drivers = sampleDrivers
             }
@@ -363,7 +360,7 @@ struct DriverDetailView: View {
 struct AddDriverView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: DriverViewModel
-    let staffRole: StaffRole
+    let staffRole: Role
     
     @State private var employeeId = ""
     @State private var fullName = ""
@@ -392,8 +389,6 @@ struct AddDriverView: View {
         NavigationView {
             Form {
                 Section("Driver Details") {
-                    TextField("Employee ID", text: $employeeId)
-                        .textContentType(.name)
                     TextField("Full Name", text: $fullName)
                         .textContentType(.name)
                     TextField("Email", text: $email)
@@ -434,7 +429,7 @@ struct AddDriverView: View {
                     Button("Done") {
                         if isValidEmail(email) && isValidPhone(phone) {
                             let newDriver = Driver(
-                                fullName: fullName,
+                                id: UUID(), fullName: fullName,
                                 totalTrips: 0,
                                 licenseNumber: licenseNumber,
                                 emailId: email,
