@@ -28,29 +28,22 @@ struct DriverView: View {
         Task {
             do {
                 try await AuthManager.shared.signOut()
-                let newTrip = Trips(
-                    tripId: "TRP-2024-003",
-                    truckType: "BharatBenz 2823C",
-                    numberPlate: "DL 01 HH 9876",
-                    type: .assigned,
-                    date: "Thursday - Mar 21, 2024",
-                    details: "Auto Parts, 3200 kg",
-                    pickup: Location(
-                        name: "Maruti Suzuki Plant",
-                        address: "IMT Manesar, Gurugram, Haryana"
-                    ),
-                    destination: Location(
-                        name: "Tata Motors Factory",
-                        address: "MIDC Pimpri, Pune, Maharashtra"
-                    ),
-                    distance: "1420 km",
-                    estimatedTime: "20 hours",
-                    partner: Partner(
-                        name: "Amit Patel",
-                        company: "Maruti Suzuki",
-                        contactNumber: "+91 76543 21098",
-                        email: "amit.patel@maruti.com"
-                    )
+                
+                let newTrip = Trip(
+                        id: UUID(),
+                        tripID: 3,
+                        assignedByFleetManagerID: UUID(),
+                        assignedDriverIDs: [UUID()],
+                        assigneVehicleID: 3,
+                        pickupLocation: "IMT Manesar, Gurugram, Haryana",
+                        destination: "MIDC Pimpri, Pune, Maharashtra",
+                        estimatedArrivalDateTime: Date().addingTimeInterval(48*3600),
+                        totalDistance: 1420,
+                        totalTripDuration: Date().addingTimeInterval(20*3600),
+                        description: "Auto Parts, 3200 kg",
+                        scheduledDateTime: Date().addingTimeInterval(48*3600),
+                        createdAt: Date(),
+                        status: .scheduled
                 )
                 user = nil
                 role = nil

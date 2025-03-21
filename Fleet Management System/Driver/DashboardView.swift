@@ -5,147 +5,107 @@ struct DashboardView: View {
     @Binding var role : Role?
     @State private var showingProfile = false
     @State private var selectedFilter: TaskFilter = .assigned
-    @State private var trips: [Trips] = [
+    @State private var trips: [Trip] = [
         // Active Trip (only one allowed)
-        Trips(
-            tripId: "TRP-2024-001",
-            truckType: "Tata Prima LX 2823.K",
-            numberPlate: "MH 04 HJ 1234",
-            type: .active,
-            date: "Today",
-            details: "Electronics, 2500 kg",
-            pickup: Location(
-                name: "Amazon Warehouse",
-                address: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra"
-            ),
-            destination: Location(
-                name: "Amazon FC",
-                address: "Attibele Industrial Area, Hosur Road, Bangalore"
-            ),
-            distance: "985 km",
-            estimatedTime: "14 hours",
-            partner: Partner(
-                name: "Priya Sharma",
-                company: "Amazon Logistics",
-                contactNumber: "+91 98765 43210",
-                email: "priya.sharma@amazon.com"
-            )
+        
+        Trip(
+                    id: UUID(),
+                    tripID: 1,
+                    assignedByFleetManagerID: UUID(),
+                    assignedDriverIDs: [UUID()],
+                    assigneVehicleID: 1,
+                    pickupLocation: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra",
+                    destination: "Attibele Industrial Area, Hosur Road, Bangalore",
+                    estimatedArrivalDateTime: Date().addingTimeInterval(14*3600),
+                    totalDistance: 985,
+                    totalTripDuration: Date().addingTimeInterval(14*3600),
+                    description: "Electronics, 2500 kg",
+                    scheduledDateTime: Date(),
+                    status: .inProgress
         ),
+        
         
         // Upcoming Trips
-        Trips(
-            tripId: "TRP-2024-002",
-            truckType: "Ashok Leyland 2518",
-            numberPlate: "KA 01 AB 5678",
-            type: .assigned,
-            date: "Tomorrow - Mar 20, 2024",
-            details: "FMCG Goods, 1800 kg",
-            pickup: Location(
-                name: "Hindustan Unilever DC",
-                address: "SIPCOT Industrial Park, Chennai, Tamil Nadu"
-            ),
-            destination: Location(
-                name: "HUL Regional Center",
-                address: "Miyapur, Hyderabad, Telangana"
-            ),
-            distance: "635 km",
-            estimatedTime: "9 hours",
-            partner: Partner(
-                name: "Rahul Verma",
-                company: "Hindustan Unilever",
-                contactNumber: "+91 87654 32109",
-                email: "rahul.verma@hul.com"
-            )
-        ),
-        Trips(
-            tripId: "TRP-2024-003",
-            truckType: "BharatBenz 2823C",
-            numberPlate: "DL 01 HH 9876",
-            type: .assigned,
-            date: "Thursday - Mar 21, 2024",
-            details: "Auto Parts, 3200 kg",
-            pickup: Location(
-                name: "Maruti Suzuki Plant",
-                address: "IMT Manesar, Gurugram, Haryana"
-            ),
-            destination: Location(
-                name: "Tata Motors Factory",
-                address: "MIDC Pimpri, Pune, Maharashtra"
-            ),
-            distance: "1420 km",
-            estimatedTime: "20 hours",
-            partner: Partner(
-                name: "Amit Patel",
-                company: "Maruti Suzuki",
-                contactNumber: "+91 76543 21098",
-                email: "amit.patel@maruti.com"
-            )
+        Trip(
+                    id: UUID(),
+                    tripID: 2,
+                    assignedByFleetManagerID: UUID(),
+                    assignedDriverIDs: [UUID()],
+                    assigneVehicleID: 2,
+                    pickupLocation: "SIPCOT Industrial Park, Chennai, Tamil Nadu",
+                    destination: "Miyapur, Hyderabad, Telangana",
+                    estimatedArrivalDateTime: Date().addingTimeInterval(24*3600),
+                    totalDistance: 635,
+                    totalTripDuration: Date().addingTimeInterval(9*3600),
+                    description: "FMCG Goods, 1800 kg",
+                    scheduledDateTime: Date().addingTimeInterval(24*3600),
+                    status: .scheduled
         ),
         
+        Trip(
+                    id: UUID(),
+                    tripID: 3,
+                    assignedByFleetManagerID: UUID(),
+                    assignedDriverIDs: [UUID()],
+                    assigneVehicleID: 3,
+                    pickupLocation: "IMT Manesar, Gurugram, Haryana",
+                    destination: "MIDC Pimpri, Pune, Maharashtra",
+                    estimatedArrivalDateTime: Date().addingTimeInterval(48*3600),
+                    totalDistance: 1420,
+                    totalTripDuration: Date().addingTimeInterval(20*3600),
+                    description: "Auto Parts, 3200 kg",
+                    scheduledDateTime: Date().addingTimeInterval(48*3600),
+                    status: .scheduled
+                ),
+        
         // History Trips
-        Trips(
-            tripId: "TRP-2024-000",
-            truckType: "Tata Prima LX 2823.K",
-            numberPlate: "MH 04 HJ 1234",
-            type: .completed,
-            date: "Yesterday - Mar 18, 2024",
-            details: "Textiles, 1500 kg",
-            pickup: Location(
-                name: "Textile Hub",
-                address: "Tirupur Trade Centre, Tamil Nadu"
-            ),
-            destination: Location(
-                name: "Fashion Street DC",
-                address: "Linking Road, Mumbai, Maharashtra"
-            ),
-            distance: "1250 km",
-            estimatedTime: "18",
-            partner: Partner(
-                name: "Neha Gupta",
-                company: "Textile Hub",
-                contactNumber: "+91 65432 10987",
-                email: "neha.gupta@textilehub.com"
-            )
-        ),
-        Trips(
-            tripId: "TRP-2024-999",
-            truckType: "Ashok Leyland 2518",
-            numberPlate: "KA 01 AB 5678",
-            type: .completed,
-            date: "Mar 17, 2024",
-            details: "Perishables, 2200 kg",
-            pickup: Location(
-                name: "APMC Market",
-                address: "Vashi, Navi Mumbai, Maharashtra"
-            ),
-            destination: Location(
-                name: "Big Bazaar DC",
-                address: "Whitefield, Bangalore, Karnataka"
-            ),
-            distance: "985 km",
-            estimatedTime: "14",
-            partner: Partner(
-                name: "Vikram Singh",
-                company: "Big Bazaar",
-                contactNumber: "+91 54321 09876",
-                email: "vikram.singh@bigbazaar.com"
-            )
-        )
+        
+        Trip(
+                    id: UUID(),
+                    tripID: 0,
+                    assignedByFleetManagerID: UUID(),
+                    assignedDriverIDs: [UUID()],
+                    assigneVehicleID: 1,
+                    pickupLocation: "Tirupur Trade Centre, Tamil Nadu",
+                    destination: "Linking Road, Mumbai, Maharashtra",
+                    estimatedArrivalDateTime: Date().addingTimeInterval(-24*3600),
+                    totalDistance: 1250,
+                    totalTripDuration: Date().addingTimeInterval(18*3600),
+                    description: "Textiles, 1500 kg",
+                    scheduledDateTime: Date().addingTimeInterval(-48*3600),
+                    status: .completed
+                ),
+        
+        Trip(
+                    id: UUID(),
+                    tripID: 999,
+                    assignedByFleetManagerID: UUID(),
+                    assignedDriverIDs: [UUID()],
+                    assigneVehicleID: 2,
+                    pickupLocation: "Vashi, Navi Mumbai, Maharashtra",
+                    destination: "Whitefield, Bangalore, Karnataka",
+                    estimatedArrivalDateTime: Date().addingTimeInterval(-48*3600),
+                    totalDistance: 985,
+                    totalTripDuration: Date().addingTimeInterval(14*3600),
+                    description: "Perishables, 2200 kg",
+                    scheduledDateTime: Date().addingTimeInterval(-72*3600),
+                    status: .completed
+                )
     ]
     
-    var filteredTrips: [Trips] {
+    var filteredTrips: [Trip] {
         trips.filter { task in
             switch selectedFilter {
             case .assigned:
-                return task.type == .assigned
+                return task.status == .scheduled
             case .history:
-                return task.type == .completed
+                return task.status == .completed
             }
         }
     }
     
-    var activeTrip: Trips? {
-        trips.first { $0.type == .active }
+    var activeTrip: Trip? {
+        trips.first { $0.status == .inProgress }
     }
     
     var body: some View {
@@ -215,7 +175,7 @@ struct DashboardView: View {
                         
                         // Task list
                         VStack(spacing: 16) {
-                            ForEach(filteredTrips, id: \.tripId) { trip in
+                            ForEach(filteredTrips, id: \.id) { trip in
                                 TaskCard(task: trip)
                                     .shadow(radius: 2, x: 2, y: 2)
                             }
@@ -254,10 +214,10 @@ struct DashboardView: View {
 }
 struct DriverInfoCard: View {
     // Get the active trip to show current truck details
-    @Binding var trips: [Trips]
+    @Binding var trips: [Trip]
     
-    var currentTrip: Trips? {
-        trips.first { $0.type == .active }
+    var currentTrip: Trip? {
+        trips.first { $0.status == .inProgress }
     }
     
     var driverStatus: (text: String, color: Color) {
@@ -280,7 +240,7 @@ struct DriverInfoCard: View {
                 Text("Rajesh Kumar Singh")
                     .fontWeight(.medium)
                 if let activeTrip = currentTrip {
-                    Text("\(activeTrip.truckType) • \(activeTrip.numberPlate)")
+                    Text("\(activeTrip.assigneVehicleID)")
                         .font(.subheadline)
                         .foregroundColor(.textSecondary)
                 }
@@ -340,7 +300,7 @@ struct FilterButton: View {
 }
 
 struct TaskCard: View {
-    let task: Trips
+    let task: Trip
     @State private var showingTripOverview = false
     
     var body: some View {
@@ -350,7 +310,7 @@ struct TaskCard: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack{
-                            Text("Trip ID: \(task.tripId)")
+                            Text("Trip ID: \(task.tripID)")
                                 .font(.headline)
                                 .foregroundColor(.textPrimary)
                             Spacer()
@@ -360,21 +320,21 @@ struct TaskCard: View {
                         }
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(task.truckType)
-                                    .foregroundColor(.textSecondary)
-                                Text(task.numberPlate)
+                                //Text(task.truckType)
+                                    //.foregroundColor(.textSecondary)
+                                Text("\(task.assigneVehicleID)")
                                     .foregroundColor(.statusOrange)
                             }
                             .font(.subheadline)
                             Spacer()
-                            Text(task.type.rawValue)
+                            Text(task.status.rawValue)
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(task.type.color.opacity(0.2))
-                                .foregroundColor(task.type.color)
-                                .cornerRadius(4)
+                                //.background(task.status.color.opacity(0.2))
+                                //.foregroundColor(task.status.color)
+                                //.cornerRadius(4)
                         }
                     }
                     
@@ -383,32 +343,32 @@ struct TaskCard: View {
                 
                 // Task details
                 HStack {
-                    Text(task.date)
+                    Text("\(task.scheduledDateTime)")
                         .fontWeight(.medium)
-                    if !task.details.isEmpty {
-                        Text("•")
-                        Text(task.details)
+                    if let description = task.description, !description.isEmpty {
+                                            Text("•")
+                                            Text(description)
                     }
                 }
                 .font(.subheadline)
                 .foregroundColor(.textSecondary)
                 
-                if !task.pickup.address.isEmpty {
+                //if !task.pickup.address.isEmpty {
                     // Locations
-                    LocationView(location: task.pickup, type: .pickup)
-                    LocationView(location: task.destination, type: .destination)
+                    LocationView(location: Location(name: "Pickup", address: task.pickupLocation), type: .pickup)
+                    LocationView(location: Location(name: "Destination", address: task.destination), type: .destination)
                     
                     // Distance and time
                     HStack {
                         Image(systemName: "arrow.up.right")
                             .foregroundColor(.primaryGradientStart)
-                        Text(task.distance)
+                        Text("\(task.totalDistance)")
                         Text("-")
-                        Text(task.estimatedTime)
+                        Text("\(task.totalTripDuration)")
                     }
                     .font(.subheadline)
                     .foregroundColor(.textSecondary)
-                }
+                //}
             }
             .padding()
             .background(Color.white)
@@ -466,19 +426,16 @@ enum TripType: String {
     }
 }
 
-struct Trips {
-    let tripId: String
-    let truckType: String
-    let numberPlate: String
-    let type: TripType
-    let date: String
-    let details: String
-    let pickup: Location
-    let destination: Location
-    let distance: String
-    let estimatedTime: String
-    let partner: Partner
-}
+//struct Trips {
+//    let tripId: String
+//    let truckType: String
+//    let numberPlate: String
+//    let type: TripType
+//    let date: String
+//    let details: String
+//    let pickup: Location
+//    let destination: Location
+//    let distance: 
 
 struct Location {
     let name: String
@@ -499,10 +456,11 @@ struct NotificationButton: View {
     }
 }
 
-struct Partner {
-    let name: String
-    let company: String
-    let contactNumber: String
-    let email: String
-}
+//struct Partner {
+//    let name: String
+//    let company: String
+//    let contactNumber: String
+//    let email: String
+//}
+
 
