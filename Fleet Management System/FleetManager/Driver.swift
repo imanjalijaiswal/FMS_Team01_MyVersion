@@ -11,12 +11,12 @@ enum DriverStatus: String, Codable {
     case onTrip = "On Trip"
 }
 
-struct Driver: Identifiable, Equatable {
+struct Driver: Identifiable, Equatable,Codable {
     let id : UUID
     let fullName: String
     let totalTrips: Int
     let licenseNumber: String
-    let emailId: String
+    let email: String
     let driverID: String
     let phoneNumber: String
     let status: DriverStatus
@@ -46,7 +46,7 @@ class DriverViewModel: ObservableObject {
             id: UUID(), fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
-            emailId: driver.emailId,
+            email: driver.email,
             driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
             status: .available,
@@ -63,7 +63,7 @@ class DriverViewModel: ObservableObject {
             id: UUID(), fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
-            emailId: driver.emailId,
+            email: driver.email,
             driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
             status: .available,
@@ -333,8 +333,8 @@ struct StaffView: View {
             if viewModel.drivers.isEmpty {
                 // Add sample drivers with roles
                 let sampleDrivers = [
-                    Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
-                    Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
+                    Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", email: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
+                    Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", email: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
                 ]
                 viewModel.drivers = sampleDrivers
             }
@@ -446,7 +446,7 @@ struct DriverDetailView: View {
             Text("Are you sure you want to disable this driver? This action cannot be undone.")
         }
         .onAppear {
-            editedEmail = driver.emailId
+            editedEmail = driver.email
             editedPhone = driver.phoneNumber
         }
     }
@@ -529,7 +529,7 @@ struct AddDriverView: View {
                                 id: UUID(), fullName: fullName,
                                 totalTrips: 0,
                                 licenseNumber: licenseNumber,
-                                emailId: email,
+                                email: email,
                                 driverID: employeeId,
                                 phoneNumber: phone,
                                 status: .available,
