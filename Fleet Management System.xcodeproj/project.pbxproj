@@ -19,33 +19,9 @@
 		60A12F8E2D883A7600569683 /* Fleet Management System.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Fleet Management System.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		EFAF5F132D8D1C6E0023A1C2 /* Exceptions for "Fleet Management System" folder in "Fleet Management System" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"Data Controllers/ServerController.swift",
-			);
-			target = 60A12F8D2D883A7600569683 /* Fleet Management System */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		EFAF5F142D8D1C6E0023A1C2 /* Exceptions for "Fleet Management System" folder in "Copy Bundle Resources" phase from "Fleet Management System" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			buildPhase = 60A12F8C2D883A7600569683 /* Resources */;
-			membershipExceptions = (
-				"Data Controllers/ServerController.swift",
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		60A12F902D883A7600569683 /* Fleet Management System */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				EFAF5F132D8D1C6E0023A1C2 /* Exceptions for "Fleet Management System" folder in "Fleet Management System" target */,
-				EFAF5F142D8D1C6E0023A1C2 /* Exceptions for "Fleet Management System" folder in "Copy Bundle Resources" phase from "Fleet Management System" target */,
-			);
 			path = "Fleet Management System";
 			sourceTree = "<group>";
 		};

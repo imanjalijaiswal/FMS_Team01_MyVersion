@@ -1,6 +1,11 @@
 import SwiftUI
 import Foundation
 
+enum StaffRole {
+    case driver
+    case maintenance
+}
+
 enum DriverStatus: String, Codable {
     case available = "Available"
     case onTrip = "On Trip"
@@ -16,6 +21,7 @@ struct Driver: Identifiable, Equatable {
     let phoneNumber: String
     let status: DriverStatus
     let workingStatus: Bool
+    let role: StaffRole
     
     static func == (lhs: Driver, rhs: Driver) -> Bool {
         lhs.id == rhs.id
@@ -24,7 +30,8 @@ struct Driver: Identifiable, Equatable {
 
 class DriverViewModel: ObservableObject {
     @Published var drivers: [Driver] = []
-    @Published var assignedTrips: [AssignedTrip] = []
+    @Published var vehicles: [Vehicle] = []
+    @Published var trips: [Trip] = []
     
     func addDriver(_ driver: Driver) {
         drivers.append(driver)
@@ -39,7 +46,8 @@ class DriverViewModel: ObservableObject {
             driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
             status: .available,
-            workingStatus: false
+            workingStatus: false,
+            role: driver.role
         )
         
         drivers.removeAll { $0.id == driver.id }
@@ -55,11 +63,29 @@ class DriverViewModel: ObservableObject {
             driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
             status: .available,
-            workingStatus: true
+            workingStatus: true,
+            role: driver.role
         )
         
         drivers.removeAll { $0.id == driver.id }
         drivers.append(activeDriver)
+    }
+    
+    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
+        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
+            trips[index].status = newStatus
+        }
+    }
+    
+    func addTrip(_ trip: Trip) {
+        trips.append(trip)
+    }
+    
+    func getFilteredTrips(status: TripStatus?) -> [Trip] {
+        if let status = status {
+            return trips.filter { $0.status == status }
+        }
+        return trips
     }
     
     func sendWelcomeEmail(to email: String, password: String) {
@@ -132,19 +158,23 @@ struct DriverRowView: View {
     }
 }
 
-struct DriversView: View {
+struct StaffView: View {
     @StateObject private var viewModel = DriverViewModel()
-    
     @State private var searchText = ""
     @State private var selectedFilter = "All"
+    @State private var selectedRole = 0 // 0 for drivers, 1 for maintenance
     let filters = ["All", "Available", "On Trip", "Inactive"]
-    @State private var showingAddDriver = false
+    @State private var showingAddStaff = false
     
-    var filteredDrivers: [Driver] {
-        let searchResults = viewModel.drivers.filter { driver in
+    var filteredStaff: [Driver] {
+        let roleFiltered = viewModel.drivers.filter { driver in
+            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenance
+        }
+        
+        let searchResults = roleFiltered.filter { staff in
             searchText.isEmpty ||
-            driver.fullName.localizedCaseInsensitiveContains(searchText) ||
-            driver.driverID.localizedCaseInsensitiveContains(searchText)
+            staff.fullName.localizedCaseInsensitiveContains(searchText) ||
+            staff.driverID.localizedCaseInsensitiveContains(searchText)
         }
         
         switch selectedFilter {
@@ -161,8 +191,15 @@ struct DriversView: View {
     
     var body: some View {
         VStack(spacing: 16) {
+            // Role Picker
+            Picker("Staff Type", selection: $selectedRole) {
+                Text("Drivers").tag(0)
+                Text("Maintenance").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            
             SearchBar(text: $searchText)
-                .padding(.top, 8)
             
             FilterSection(
                 title: "",
@@ -172,9 +209,9 @@ struct DriversView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                    ForEach(filteredDrivers) { driver in
-                        DriverRowView(driver: driver, viewModel: viewModel)
-                        if driver != filteredDrivers.last {
+                    ForEach(filteredStaff) { staff in
+                        DriverRowView(driver: staff, viewModel: viewModel)
+                        if staff != filteredStaff.last {
                             Divider()
                                 .padding(.horizontal)
                         }
@@ -183,31 +220,30 @@ struct DriversView: View {
                 .padding(.horizontal)
             }
         }
-        .navigationTitle("Drivers")
+        .navigationTitle("Staff")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { showingAddDriver = true }) {
+                Button(action: { showingAddStaff = true }) {
                     Image(systemName: "plus")
+                        .foregroundColor(.primaryGradientEnd)
                 }
             }
         }
-        .sheet(isPresented: $showingAddDriver) {
-            AddDriverView(viewModel: viewModel)
+        .sheet(isPresented: $showingAddStaff) {
+            AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenance)
         }
+        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
         .onAppear {
             if viewModel.drivers.isEmpty {
-                viewModel.drivers = [
-                    Driver(fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true),
-                    Driver(fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true),
-                    Driver(fullName: "Mike Johnson", totalTrips: 156, licenseNumber: "DL345678", emailId: "mike@example.com", driverID: "EMP003", phoneNumber: "+1122334455", status: .available, workingStatus: true),
-                    Driver(fullName: "Sarah Wilson", totalTrips: 112, licenseNumber: "DL456789", emailId: "sarah@example.com", driverID: "EMP004", phoneNumber: "+2233445566", status: .available, workingStatus: true),
-                    Driver(fullName: "David Brown", totalTrips: 143, licenseNumber: "DL567890", emailId: "david@example.com", driverID: "EMP005", phoneNumber: "+3344556677", status: .available, workingStatus: true),
-                    Driver(fullName: "Emma Davis", totalTrips: 87, licenseNumber: "DL678901", emailId: "emma@example.com", driverID: "EMP006", phoneNumber: "+4455667788", status: .available, workingStatus: true),
-                    Driver(fullName: "James Wilson", totalTrips: 165, licenseNumber: "DL789012", emailId: "james@example.com", driverID: "EMP007", phoneNumber: "+5566778899", status: .available, workingStatus: true),
-                    Driver(fullName: "Linda Taylor", totalTrips: 134, licenseNumber: "DL890123", emailId: "linda@example.com", driverID: "EMP008", phoneNumber: "+6677889900", status: .available, workingStatus: true),
-                    Driver(fullName: "Robert Martin", totalTrips: 145, licenseNumber: "DL901234", emailId: "robert@example.com", driverID: "EMP009", phoneNumber: "+7788990011", status: .available, workingStatus: true),
-                    Driver(fullName: "Mary Anderson", totalTrips: 98, licenseNumber: "DL012345", emailId: "mary@example.com", driverID: "EMP010", phoneNumber: "+8899001122", status: .available, workingStatus: true)
+                // Add sample drivers with roles
+                let sampleDrivers = [
+                    Driver(fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
+                    Driver(fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver),
+                    // Add maintenance staff
+                    Driver(fullName: "Mike Tech", totalTrips: 0, licenseNumber: "", emailId: "mike.tech@example.com", driverID: "MECH001", phoneNumber: "+1122334455", status: .available, workingStatus: true, role: .maintenance),
+                    Driver(fullName: "Sarah Engineer", totalTrips: 0, licenseNumber: "", emailId: "sarah.eng@example.com", driverID: "MECH002", phoneNumber: "+2233445566", status: .available, workingStatus: true, role: .maintenance)
                 ]
+                viewModel.drivers = sampleDrivers
             }
         }
     }
@@ -278,12 +314,13 @@ struct DriverDetailView: View {
                     Button(action: {
                         viewModel.enableDriver(driver)
                         dismiss()
-                    }) {
-                        Text("Enable Driver")
-                            .foregroundColor(.green)
-                            .frame(maxWidth: .infinity)
-                            .multilineTextAlignment(.center)
-                    }
+                    })
+                    {
+                                Text("Enable Driver")
+                                    .foregroundColor(.blue)
+                                    .frame(maxWidth: .infinity)
+                                    .multilineTextAlignment(.center)
+                            }
                 }
             }
         }
@@ -321,10 +358,12 @@ struct DriverDetailView: View {
         }
     }
 }
+                        
 
 struct AddDriverView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: DriverViewModel
+    let staffRole: StaffRole
     
     @State private var employeeId = ""
     @State private var fullName = ""
@@ -402,7 +441,8 @@ struct AddDriverView: View {
                                 driverID: employeeId,
                                 phoneNumber: phone,
                                 status: .available,
-                                workingStatus: true
+                                workingStatus: true,
+                                role: staffRole
                             )
                             
                             viewModel.addDriver(newDriver)

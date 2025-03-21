@@ -16,26 +16,35 @@ import Foundation
 //    let licenseNumber: String
 //}
 
-//struct Vehicle: Identifiable, Codable  {
-//    let id: UUID
-//    let vehicleID: Int
-//    let make: String //company name
-//    let model: String
-//    let vinNumber: String
-//    let licenseNumber: String
-//    let fuelType: FuelType
-//    let loadCapacity: Float
-//    let insurancePolicyNumber: String
-//    var insuranceExpiryDate: Date
-//    let pucCertificateNumber: String
-//    var pucExpiryDate: Date
-//    let rcNumber: String
-//    var rcExpiryDate: Date
-//    var currentLocation: String
-//}
-
-
 enum FuelType: String, Codable {
     case diesel = "Diesel"
     case petrol = "Petrol"
+    case electric = "Electric"
+    case hybrid = "Hybrid"
+}
+
+enum VehicleStatus: String, Codable {
+    case available = "Available"
+    case inUse = "In Use"
+    case maintenance = "Maintenance"
+    case inactive = "Inactive"
+}
+
+struct Vehicle: Identifiable, Codable, Equatable{
+    let id: Int
+    let make: String //company name
+    let model: String
+    let vinNumber: String
+    let licenseNumber: String
+    let fuelType: FuelType
+    let loadCapacity: Float
+    let insurancePolicyNumber: String
+    var insuranceExpiryDate: Date
+    let pucCertificateNumber: String
+    var pucExpiryDate: Date
+    let rcNumber: String
+    var rcExpiryDate: Date
+    var currentCoordinate: String
+    var status: VehicleStatus
+    var activeStatus: Bool
 }
