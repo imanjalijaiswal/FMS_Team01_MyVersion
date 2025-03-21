@@ -29,9 +29,13 @@ struct Driver: Identifiable, Equatable {
 }
 
 class DriverViewModel: ObservableObject {
+    static let shared = DriverViewModel() // Singleton instance
+    
     @Published var drivers: [Driver] = []
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
+    
+    private init() {} // Private initializer to enforce singleton pattern
     
     func addDriver(_ driver: Driver) {
         drivers.append(driver)
@@ -76,9 +80,101 @@ class DriverViewModel: ObservableObject {
             trips[index].status = newStatus
         }
     }
+    func addVehicle(_ vehicle: Vehicle) {
+        vehicles.append(vehicle)
+    }
     
+    func removeVehicle(_ vehicle: Vehicle) {
+        let inactiveVehicle = Vehicle(
+            id: vehicle.id,
+            make: vehicle.make,
+            model: vehicle.model,
+            vinNumber: vehicle.vinNumber,
+            licenseNumber: vehicle.licenseNumber,
+            fuelType: vehicle.fuelType,
+            loadCapacity: vehicle.loadCapacity,
+            insurancePolicyNumber: vehicle.insurancePolicyNumber,
+            insuranceExpiryDate: vehicle.insuranceExpiryDate,
+            pucCertificateNumber: vehicle.pucCertificateNumber,
+            pucExpiryDate: vehicle.pucExpiryDate,
+            rcNumber: vehicle.rcNumber,
+            rcExpiryDate: vehicle.rcExpiryDate,
+            currentCoordinate: vehicle.currentCoordinate,
+            status: .inactive,
+            activeStatus: false
+        )
+        
+        vehicles.removeAll { $0.id == vehicle.id }
+        vehicles.append(inactiveVehicle)
+    }
+    
+    func enableVehicle(_ vehicle: Vehicle) {
+        let activeVehicle = Vehicle(
+            id: vehicle.id,
+            make: vehicle.make,
+            model: vehicle.model,
+            vinNumber: vehicle.vinNumber,
+            licenseNumber: vehicle.licenseNumber,
+            fuelType: vehicle.fuelType,
+            loadCapacity: vehicle.loadCapacity,
+            insurancePolicyNumber: vehicle.insurancePolicyNumber,
+            insuranceExpiryDate: vehicle.insuranceExpiryDate,
+            pucCertificateNumber: vehicle.pucCertificateNumber,
+            pucExpiryDate: vehicle.pucExpiryDate,
+            rcNumber: vehicle.rcNumber,
+            rcExpiryDate: vehicle.rcExpiryDate,
+            currentCoordinate: vehicle.currentCoordinate,
+            status: .available,
+            activeStatus: true
+        )
+        
+        vehicles.removeAll { $0.id == vehicle.id }
+        vehicles.append(activeVehicle)
+    }
     func addTrip(_ trip: Trip) {
         trips.append(trip)
+        // Update driver status to onTrip
+        for driverId in trip.assignedDriverIDs {
+            if let index = drivers.firstIndex(where: { $0.id == driverId }) {
+                let driver = drivers[index]
+                let updatedDriver = Driver(
+                    id: driver.id,
+                    fullName: driver.fullName,
+                    totalTrips: driver.totalTrips + 1,
+                    licenseNumber: driver.licenseNumber,
+                    emailId: driver.emailId,
+                    driverID: driver.driverID,
+                    phoneNumber: driver.phoneNumber,
+                    status: .onTrip,
+                    workingStatus: driver.workingStatus,
+                    role: driver.role
+                )
+                drivers[index] = updatedDriver
+            }
+        }
+        // Update vehicle status to inUse
+        if let index = vehicles.firstIndex(where: { $0.id == trip.assigneVehicleID }) {
+            let vehicle = vehicles[index]
+            let updatedVehicle = Vehicle(
+                id: vehicle.id,
+                make: vehicle.make,
+                model: vehicle.model,
+                vinNumber: vehicle.vinNumber,
+                licenseNumber: vehicle.licenseNumber,
+                fuelType: vehicle.fuelType,
+                loadCapacity: vehicle.loadCapacity,
+                insurancePolicyNumber: vehicle.insurancePolicyNumber,
+                insuranceExpiryDate: vehicle.insuranceExpiryDate,
+                pucCertificateNumber: vehicle.pucCertificateNumber,
+                pucExpiryDate: vehicle.pucExpiryDate,
+                rcNumber: vehicle.rcNumber,
+                rcExpiryDate: vehicle.rcExpiryDate,
+                currentCoordinate: vehicle.currentCoordinate,
+                status: .inUse,
+                activeStatus: vehicle.activeStatus
+            )
+            vehicles[index] = updatedVehicle
+        }
     }
     
     func getFilteredTrips(status: TripStatus?) -> [Trip] {
@@ -159,7 +255,7 @@ struct DriverRowView: View {
 }
 
 struct StaffView: View {
-    @StateObject private var viewModel = DriverViewModel()
+    @StateObject var viewModel = DriverViewModel.shared
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     @State private var selectedRole = 0 // 0 for drivers, 1 for maintenance
@@ -389,6 +485,7 @@ struct AddDriverView: View {
         NavigationView {
             Form {
                 Section("Driver Details") {
+
                     TextField("Full Name", text: $fullName)
                         .textContentType(.name)
                     TextField("Email", text: $email)

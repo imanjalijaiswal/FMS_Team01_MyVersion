@@ -1,66 +1,9 @@
 import SwiftUI
 import Foundation
 
-
-class VehicleViewModel: ObservableObject {
-    @Published var vehicles: [Vehicle] = []
-    
-    func addVehicle(_ vehicle: Vehicle) {
-        vehicles.append(vehicle)
-    }
-    
-    func removeVehicle(_ vehicle: Vehicle) {
-        let inactiveVehicle = Vehicle(
-            id: vehicle.id,
-            make: vehicle.make,
-            model: vehicle.model,
-            vinNumber: vehicle.vinNumber,
-            licenseNumber: vehicle.licenseNumber,
-            fuelType: vehicle.fuelType,
-            loadCapacity: vehicle.loadCapacity,
-            insurancePolicyNumber: vehicle.insurancePolicyNumber,
-            insuranceExpiryDate: vehicle.insuranceExpiryDate,
-            pucCertificateNumber: vehicle.pucCertificateNumber,
-            pucExpiryDate: vehicle.pucExpiryDate,
-            rcNumber: vehicle.rcNumber,
-            rcExpiryDate: vehicle.rcExpiryDate,
-            currentCoordinate: vehicle.currentCoordinate,
-            status: .inactive,
-            activeStatus: false
-        )
-        
-        vehicles.removeAll { $0.id == vehicle.id }
-        vehicles.append(inactiveVehicle)
-    }
-    
-    func enableVehicle(_ vehicle: Vehicle) {
-        let activeVehicle = Vehicle(
-            id: vehicle.id,
-            make: vehicle.make,
-            model: vehicle.model,
-            vinNumber: vehicle.vinNumber,
-            licenseNumber: vehicle.licenseNumber,
-            fuelType: vehicle.fuelType,
-            loadCapacity: vehicle.loadCapacity,
-            insurancePolicyNumber: vehicle.insurancePolicyNumber,
-            insuranceExpiryDate: vehicle.insuranceExpiryDate,
-            pucCertificateNumber: vehicle.pucCertificateNumber,
-            pucExpiryDate: vehicle.pucExpiryDate,
-            rcNumber: vehicle.rcNumber,
-            rcExpiryDate: vehicle.rcExpiryDate,
-            currentCoordinate: vehicle.currentCoordinate,
-            status: .available,
-            activeStatus: true
-        )
-        
-        vehicles.removeAll { $0.id == vehicle.id }
-        vehicles.append(activeVehicle)
-    }
-}
-
 struct VehicleRowView: View {
     let vehicle: Vehicle
-    @ObservedObject var viewModel: VehicleViewModel
+    @ObservedObject var viewModel: DriverViewModel
     
     var body: some View {
         NavigationLink(destination: VehicleDetailView(vehicle: vehicle, viewModel: viewModel)) {
@@ -125,7 +68,7 @@ struct VehicleRowView: View {
 
 struct VehicleDetailView: View {
     let vehicle: Vehicle
-    @ObservedObject var viewModel: VehicleViewModel
+    @ObservedObject var viewModel: DriverViewModel
     @Environment(\.dismiss) var dismiss
     @State private var isEditing = false
     @State private var insuranceExpiry = Date()
@@ -252,7 +195,7 @@ struct VehicleDetailView: View {
 }
 
 struct VehiclesView: View {
-    @StateObject private var viewModel = VehicleViewModel()
+    @StateObject private var viewModel = DriverViewModel.shared
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     let filters = ["All", "Available", "In Use", "Inactive"]
@@ -326,7 +269,7 @@ struct VehiclesView: View {
 
 struct VehicleDetailsView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: VehicleViewModel
+    @ObservedObject var viewModel: DriverViewModel
     
     @State private var model = ""
     @State private var make = ""

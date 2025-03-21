@@ -12,7 +12,7 @@ struct TripsView: View {
     @State private var showingAddNewTrip = false
     @State private var searchText = ""
     @State private var selectedFilter = "All"
-    @StateObject private var viewModel = DriverViewModel()
+    @StateObject private var viewModel = DriverViewModel.shared
     
     let filters = ["All", "Scheduled", "In Progress", "Completed"]
     
@@ -465,7 +465,8 @@ struct DriverSelectionView: View {
         viewModel.drivers.filter { driver in
             driver.workingStatus &&
             driver.status == .available &&
-            driver.role == .driver &&
+            driver.role == .driver
+            &&
             driver.id != excludeDriver?.id
         }
     }
