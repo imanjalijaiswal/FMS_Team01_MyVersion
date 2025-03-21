@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct FleetManagerDataModel : Identifiable, Codable{
+struct FleetManager : Identifiable, Codable{
     let id: UUID
     let managerID: Int
     let fullName: String

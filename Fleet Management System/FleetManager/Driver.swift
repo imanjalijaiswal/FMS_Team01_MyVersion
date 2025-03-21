@@ -8,7 +8,7 @@ enum DriverStatus: String, Codable {
 
 struct Driver: Identifiable, Equatable {
     let id = UUID()
-    let name: String
+    let fullName: String
     let totalTrips: Int
     let licenseNumber: String
     let emailId: String
@@ -32,7 +32,7 @@ class DriverViewModel: ObservableObject {
     
     func removeDriver(_ driver: Driver) {
         let inactiveDriver = Driver(
-            name: driver.name,
+            fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
             emailId: driver.emailId,
@@ -48,7 +48,7 @@ class DriverViewModel: ObservableObject {
     
     func enableDriver(_ driver: Driver) {
         let activeDriver = Driver(
-            name: driver.name,
+            fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
             emailId: driver.emailId,
@@ -86,7 +86,7 @@ struct DriverRowView: View {
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(driver.name)
+                    Text(driver.fullName)
                         .font(.callout)
                         .fontWeight(.medium)
                         .foregroundColor(driver.workingStatus ? .primary : .red)
@@ -143,7 +143,7 @@ struct DriversView: View {
     var filteredDrivers: [Driver] {
         let searchResults = viewModel.drivers.filter { driver in
             searchText.isEmpty ||
-            driver.name.localizedCaseInsensitiveContains(searchText) ||
+            driver.fullName.localizedCaseInsensitiveContains(searchText) ||
             driver.driverID.localizedCaseInsensitiveContains(searchText)
         }
         
@@ -197,16 +197,16 @@ struct DriversView: View {
         .onAppear {
             if viewModel.drivers.isEmpty {
                 viewModel.drivers = [
-                    Driver(name: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true),
-                    Driver(name: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true),
-                    Driver(name: "Mike Johnson", totalTrips: 156, licenseNumber: "DL345678", emailId: "mike@example.com", driverID: "EMP003", phoneNumber: "+1122334455", status: .available, workingStatus: true),
-                    Driver(name: "Sarah Wilson", totalTrips: 112, licenseNumber: "DL456789", emailId: "sarah@example.com", driverID: "EMP004", phoneNumber: "+2233445566", status: .available, workingStatus: true),
-                    Driver(name: "David Brown", totalTrips: 143, licenseNumber: "DL567890", emailId: "david@example.com", driverID: "EMP005", phoneNumber: "+3344556677", status: .available, workingStatus: true),
-                    Driver(name: "Emma Davis", totalTrips: 87, licenseNumber: "DL678901", emailId: "emma@example.com", driverID: "EMP006", phoneNumber: "+4455667788", status: .available, workingStatus: true),
-                    Driver(name: "James Wilson", totalTrips: 165, licenseNumber: "DL789012", emailId: "james@example.com", driverID: "EMP007", phoneNumber: "+5566778899", status: .available, workingStatus: true),
-                    Driver(name: "Linda Taylor", totalTrips: 134, licenseNumber: "DL890123", emailId: "linda@example.com", driverID: "EMP008", phoneNumber: "+6677889900", status: .available, workingStatus: true),
-                    Driver(name: "Robert Martin", totalTrips: 145, licenseNumber: "DL901234", emailId: "robert@example.com", driverID: "EMP009", phoneNumber: "+7788990011", status: .available, workingStatus: true),
-                    Driver(name: "Mary Anderson", totalTrips: 98, licenseNumber: "DL012345", emailId: "mary@example.com", driverID: "EMP010", phoneNumber: "+8899001122", status: .available, workingStatus: true)
+                    Driver(fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true),
+                    Driver(fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true),
+                    Driver(fullName: "Mike Johnson", totalTrips: 156, licenseNumber: "DL345678", emailId: "mike@example.com", driverID: "EMP003", phoneNumber: "+1122334455", status: .available, workingStatus: true),
+                    Driver(fullName: "Sarah Wilson", totalTrips: 112, licenseNumber: "DL456789", emailId: "sarah@example.com", driverID: "EMP004", phoneNumber: "+2233445566", status: .available, workingStatus: true),
+                    Driver(fullName: "David Brown", totalTrips: 143, licenseNumber: "DL567890", emailId: "david@example.com", driverID: "EMP005", phoneNumber: "+3344556677", status: .available, workingStatus: true),
+                    Driver(fullName: "Emma Davis", totalTrips: 87, licenseNumber: "DL678901", emailId: "emma@example.com", driverID: "EMP006", phoneNumber: "+4455667788", status: .available, workingStatus: true),
+                    Driver(fullName: "James Wilson", totalTrips: 165, licenseNumber: "DL789012", emailId: "james@example.com", driverID: "EMP007", phoneNumber: "+5566778899", status: .available, workingStatus: true),
+                    Driver(fullName: "Linda Taylor", totalTrips: 134, licenseNumber: "DL890123", emailId: "linda@example.com", driverID: "EMP008", phoneNumber: "+6677889900", status: .available, workingStatus: true),
+                    Driver(fullName: "Robert Martin", totalTrips: 145, licenseNumber: "DL901234", emailId: "robert@example.com", driverID: "EMP009", phoneNumber: "+7788990011", status: .available, workingStatus: true),
+                    Driver(fullName: "Mary Anderson", totalTrips: 98, licenseNumber: "DL012345", emailId: "mary@example.com", driverID: "EMP010", phoneNumber: "+8899001122", status: .available, workingStatus: true)
                 ]
             }
         }
@@ -231,7 +231,7 @@ struct DriverDetailView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.gray)
                     
-                    Text(driver.name)
+                    Text(driver.fullName)
                         .font(.title2)
                         .fontWeight(.semibold)
                 }
@@ -395,7 +395,7 @@ struct AddDriverView: View {
                     Button("Done") {
                         if isValidEmail(email) && isValidPhone(phone) {
                             let newDriver = Driver(
-                                name: fullName,
+                                fullName: fullName,
                                 totalTrips: 0,
                                 licenseNumber: licenseNumber,
                                 emailId: email,
