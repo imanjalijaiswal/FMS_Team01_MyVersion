@@ -391,6 +391,7 @@ struct AssignTripView: View {
                         viewModel.addTrip(newTrip)
                         showingAlert = true
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isFormValid)
                 }
                 
@@ -398,12 +399,14 @@ struct AssignTripView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                 }
             }
             .alert("Success", isPresented: $showingAlert) {
                 Button("OK") {
                     dismiss()
                 }
+                .foregroundColor(Color.primaryGradientEnd)
             } message: {
                 Text("Trip assigned successfully")
             }

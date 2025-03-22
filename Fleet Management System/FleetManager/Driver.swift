@@ -526,6 +526,7 @@ struct AddDriverView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -553,6 +554,7 @@ struct AddDriverView: View {
                             showPhoneError = !isValidPhone(phone)
                         }
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isValidEmail(email) || !isValidPhone(phone))
                 }
             }
