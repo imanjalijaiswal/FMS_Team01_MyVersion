@@ -1,7 +1,7 @@
 import SwiftUI
 import MapKit
 
-struct TripView: View {
+struct MapView: View {
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 52.2297, longitude: 21.0122),
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)

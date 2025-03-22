@@ -256,13 +256,6 @@ struct VehiclesView: View {
             VehicleDetailsView(viewModel: viewModel)
         }
         .onAppear {
-            if viewModel.vehicles.isEmpty {
-                viewModel.vehicles = [
-                    Vehicle(id: 1, make: "Tata Motors", model: "Tata Prima", vinNumber: "1HGCM82633A123456", licenseNumber: "TN01AB1234", fuelType: .diesel, loadCapacity: 25, insurancePolicyNumber: "INS123456", insuranceExpiryDate: Date(), pucCertificateNumber: "PUC123456", pucExpiryDate: Date(), rcNumber: "RC123456", rcExpiryDate: Date(), currentCoordinate: "Bangalore", status: .available, activeStatus: true),
-                    Vehicle(id: 2, make: "BharatBenz", model: "BharatBenz 3723R", vinNumber: "2FMZA52233B234567", licenseNumber: "KA02CD5678", fuelType: .diesel, loadCapacity: 37, insurancePolicyNumber: "INS234567", insuranceExpiryDate: Date(), pucCertificateNumber: "PUC234567", pucExpiryDate: Date(), rcNumber: "RC234567", rcExpiryDate: Date(), currentCoordinate: "Chennai", status: .available, activeStatus: true),
-                    Vehicle(id: 3, make: "Ashok Leyland", model: "Ashok Leyland 2820", vinNumber: "3VWFA21233M345678", licenseNumber: "MH03EF9012", fuelType: .diesel, loadCapacity: 28, insurancePolicyNumber: "INS345678", insuranceExpiryDate: Date(), pucCertificateNumber: "PUC345678", pucExpiryDate: Date(), rcNumber: "RC345678", rcExpiryDate: Date(), currentCoordinate: "Mumbai", status: .available, activeStatus: true)
-                ]
-            }
         }
     }
 }
@@ -357,7 +350,7 @@ struct VehicleDetailsView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
-                    }
+                    }.foregroundColor(Color.primaryGradientEnd)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -383,7 +376,7 @@ struct VehicleDetailsView: View {
                         
                         viewModel.addVehicle(newVehicle)
                         dismiss()
-                    }
+                    }.foregroundColor(Color.primaryGradientEnd)
                 }
             }
         }

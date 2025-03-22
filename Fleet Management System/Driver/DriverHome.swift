@@ -65,7 +65,7 @@ struct MainTabView: View {
                     Label("Dashboard", systemImage: "square.grid.2x2")
                 }
             
-            TripsView()
+            MapView()
                 .tabItem {
                     Label("Trip", systemImage: "map")
                 }

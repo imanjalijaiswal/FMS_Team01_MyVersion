@@ -8,7 +8,7 @@ struct ProfileView: View {
     let driver = DriverProfile(
         employeeId: "EMP-2024-001",
         fullName: "Rajesh Kumar Singh",
-        email: "rajesh.singh@driver.com",
+        email: "",
         phoneNumber: "+91 98765 43210",
         drivingLicense: "DL-01-2024-1234567" // Format: DL-{State Code}-{Year}-{7 digits}
     )
@@ -97,7 +97,7 @@ struct ProfileView: View {
                             
                             Divider()
                             
-                            InfoRow(title: "Email", value: driver.email)
+                            InfoRow(title: "Email", value: user?.email ?? "")
                             InfoRow(title: "Phone Number", value: driver.phoneNumber)
                         }
                         .padding()

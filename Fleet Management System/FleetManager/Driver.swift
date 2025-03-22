@@ -35,7 +35,20 @@ class DriverViewModel: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
     
-    private init() {} // Private initializer to enforce singleton pattern
+    private init() {
+        // Initialize with sample data
+        let sampleDrivers = [
+            Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", email: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
+            Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", email: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
+        ]
+        let sampleVehicles = [
+            Vehicle(id: 1, make: "Tata Motors", model: "Tata Prima", vinNumber: "1HGCM82633A123456", licenseNumber: "TN01AB1234", fuelType: .diesel, loadCapacity: 25, insurancePolicyNumber: "INS123456", insuranceExpiryDate: Date(), pucCertificateNumber: "PUC123456", pucExpiryDate: Date(), rcNumber: "RC123456", rcExpiryDate: Date(), currentCoordinate: "Bangalore", status: .available, activeStatus: true),
+            Vehicle(id: 2, make: "BharatBenz", model: "BharatBenz 3723R", vinNumber: "2FMZA52233B234567", licenseNumber: "KA02CD5678", fuelType: .diesel, loadCapacity: 37, insurancePolicyNumber: "INS234567", insuranceExpiryDate: Date(), pucCertificateNumber: "PUC234567", pucExpiryDate: Date(), rcNumber: "RC234567", rcExpiryDate: Date(), currentCoordinate: "Chennai", status: .available, activeStatus: true),
+            Vehicle(id: 3, make: "Ashok Leyland", model: "Ashok Leyland 2820", vinNumber: "3VWFA21233M345678", licenseNumber: "MH03EF9012", fuelType: .diesel, loadCapacity: 28, insurancePolicyNumber: "INS345678", insuranceExpiryDate: Date(), pucCertificateNumber: "PUC345678", pucExpiryDate: Date(), rcNumber: "RC345678", rcExpiryDate: Date(), currentCoordinate: "Mumbai", status: .available, activeStatus: true)
+        ]
+        vehicles = sampleVehicles
+        drivers = sampleDrivers
+    } // Private initializer to enforce singleton pattern
     
     func addDriver(_ driver: Driver) {
         drivers.append(driver)
@@ -328,16 +341,9 @@ struct StaffView: View {
         .sheet(isPresented: $showingAddStaff) {
             AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenancePersonal)
         }
-        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+        .background(.white)
         .onAppear {
-            if viewModel.drivers.isEmpty {
-                // Add sample drivers with roles
-                let sampleDrivers = [
-                    Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", email: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
-                    Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", email: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
-                ]
-                viewModel.drivers = sampleDrivers
-            }
+            // Empty onAppear since data is initialized in ViewModel
         }
     }
 }
@@ -520,6 +526,7 @@ struct AddDriverView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -547,6 +554,7 @@ struct AddDriverView: View {
                             showPhoneError = !isValidPhone(phone)
                         }
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isValidEmail(email) || !isValidPhone(phone))
                 }
             }
@@ -567,4 +575,9 @@ func isValidPhone(_ phone: String) -> Bool {
     let phoneRegEx = "^[0-9+][0-9]{9,14}$" // Allows + prefix and 10-15 digits
     let phonePred = NSPredicate(format:"SELF MATCHES %@", phoneRegEx)
     return phonePred.evaluate(with: phone)
+}
+
+
+#Preview{
+    StaffView()
 }
