@@ -12,7 +12,7 @@ struct TripsView: View {
     @State private var showingAddNewTrip = false
     @State private var searchText = ""
     @State private var selectedFilter = "All"
-    @StateObject private var viewModel = DriverViewModel()
+    @StateObject private var viewModel = DriverViewModel.shared
     
     let filters = ["All", "Scheduled", "In Progress", "Completed"]
     
@@ -410,6 +410,50 @@ struct AssignTripView: View {
         }
     }
 }
+struct DriversRowView: View {
+    let driver: Driver
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.blue)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(driver.fullName)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text("ID: \(driver.driverID)")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+
+                HStack {
+                    Label(driver.phoneNumber, systemImage: "phone.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+
+                }
+
+                HStack {
+                    Label("License: \(driver.licenseNumber)", systemImage: "car.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.blue)
+                    .font(.title2)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
 
 struct DriverSelectionView: View {
     @Environment(\.dismiss) var dismiss
@@ -419,34 +463,27 @@ struct DriverSelectionView: View {
     
     var availableDrivers: [Driver] {
         viewModel.drivers.filter { driver in
-            driver.workingStatus && 
-            driver.status == .available && 
-            driver.role == .driver &&
+            driver.workingStatus &&
+            driver.status == .available &&
+            driver.role == .driver
+            &&
             driver.id != excludeDriver?.id
         }
     }
     
     var body: some View {
         NavigationView {
-            List(availableDrivers) { driver in
-                Button(action: {
-                    selectedDriver = driver
-                    dismiss()
-                }) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(driver.fullName)
-                                .foregroundColor(.primary)
-                            Text(driver.driverID)
-                                .foregroundColor(.gray)
-                                .font(.caption)
-                        }
-                        
-                        Spacer()
-                        
-                        if selectedDriver?.id == driver.id {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
+            List {
+                if availableDrivers.isEmpty {
+                    Text("No available drivers")
+                        .foregroundColor(.gray)
+                } else {
+                    ForEach(availableDrivers) { driver in
+                        Button(action: {
+                            selectedDriver = driver
+                            dismiss()
+                        }) {
+                            DriversRowView(driver: driver, isSelected: selectedDriver?.id == driver.id)
                         }
                     }
                 }
@@ -693,7 +730,7 @@ struct VehicleSelectionView: View {
     
     var availableVehicles: [Vehicle] {
         viewModel.vehicles.filter { vehicle in
-            vehicle.status == .available
+            vehicle.status == .available && vehicle.activeStatus
         }
     }
     
@@ -704,22 +741,66 @@ struct VehicleSelectionView: View {
                     selectedVehicle = vehicle
                     dismiss()
                 }) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(vehicle.vinNumber)
-                                .foregroundColor(.primary)
+                    HStack(spacing: 12) {
+                        Image(systemName: "car.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.green)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(vehicle.model)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            
+                            Text("\(vehicle.make) • \(vehicle.licenseNumber)")
+                                .font(.subheadline)
                                 .foregroundColor(.gray)
-                                .font(.caption)
+                            
+                            HStack {
+                                Label("VIN: \(vehicle.vinNumber)", systemImage: "number")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                                
+                                Label("\(vehicle.loadCapacity) tons", systemImage: "scalemass")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            HStack {
+                                Label(vehicle.fuelType.rawValue, systemImage: "fuelpump.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                                
+                                Label(vehicle.currentCoordinate, systemImage: "location.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            HStack {
+                                Label("Insurance: \(vehicle.insurancePolicyNumber)", systemImage: "checkmark.shield.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                Spacer()
+                                
+                                Label("Expires: \(vehicle.insuranceExpiryDate.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
                         }
                         
                         Spacer()
                         
                         if selectedVehicle?.id == vehicle.id {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.title2)
                         }
                     }
+                    .padding(.vertical, 4)
                 }
             }
             .navigationTitle("Select Vehicle")

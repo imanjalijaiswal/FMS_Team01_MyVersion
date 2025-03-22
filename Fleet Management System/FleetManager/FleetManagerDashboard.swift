@@ -202,7 +202,7 @@ struct FleetManagerDashboardView: View {
     @Binding var user: AppUser?
     @Binding var role: Role?
     @State private var showingProfile = false
-    @StateObject private var viewModel = DriverViewModel()
+    @StateObject private var viewModel = DriverViewModel.shared
     
     var body: some View {
         ScrollView {

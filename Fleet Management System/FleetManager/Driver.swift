@@ -11,17 +11,17 @@ enum DriverStatus: String, Codable {
     case onTrip = "On Trip"
 }
 
-struct Driver: Identifiable, Equatable {
-    let id = UUID()
+struct Driver: Identifiable, Equatable,Codable {
+    let id : UUID
     let fullName: String
     let totalTrips: Int
     let licenseNumber: String
-    let emailId: String
+    let email: String
     let driverID: String
     let phoneNumber: String
     let status: DriverStatus
     let workingStatus: Bool
-    let role: StaffRole
+    let role: Role
     
     static func == (lhs: Driver, rhs: Driver) -> Bool {
         lhs.id == rhs.id
@@ -29,9 +29,13 @@ struct Driver: Identifiable, Equatable {
 }
 
 class DriverViewModel: ObservableObject {
+    static let shared = DriverViewModel() // Singleton instance
+    
     @Published var drivers: [Driver] = []
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
+    
+    private init() {} // Private initializer to enforce singleton pattern
     
     func addDriver(_ driver: Driver) {
         drivers.append(driver)
@@ -39,10 +43,10 @@ class DriverViewModel: ObservableObject {
     
     func removeDriver(_ driver: Driver) {
         let inactiveDriver = Driver(
-            fullName: driver.fullName,
+            id: UUID(), fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
-            emailId: driver.emailId,
+            email: driver.email,
             driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
             status: .available,
@@ -56,10 +60,10 @@ class DriverViewModel: ObservableObject {
     
     func enableDriver(_ driver: Driver) {
         let activeDriver = Driver(
-            fullName: driver.fullName,
+            id: UUID(), fullName: driver.fullName,
             totalTrips: driver.totalTrips,
             licenseNumber: driver.licenseNumber,
-            emailId: driver.emailId,
+            email: driver.email,
             driverID: driver.driverID,
             phoneNumber: driver.phoneNumber,
             status: .available,
@@ -76,9 +80,101 @@ class DriverViewModel: ObservableObject {
             trips[index].status = newStatus
         }
     }
+    func addVehicle(_ vehicle: Vehicle) {
+        vehicles.append(vehicle)
+    }
     
+    func removeVehicle(_ vehicle: Vehicle) {
+        let inactiveVehicle = Vehicle(
+            id: vehicle.id,
+            make: vehicle.make,
+            model: vehicle.model,
+            vinNumber: vehicle.vinNumber,
+            licenseNumber: vehicle.licenseNumber,
+            fuelType: vehicle.fuelType,
+            loadCapacity: vehicle.loadCapacity,
+            insurancePolicyNumber: vehicle.insurancePolicyNumber,
+            insuranceExpiryDate: vehicle.insuranceExpiryDate,
+            pucCertificateNumber: vehicle.pucCertificateNumber,
+            pucExpiryDate: vehicle.pucExpiryDate,
+            rcNumber: vehicle.rcNumber,
+            rcExpiryDate: vehicle.rcExpiryDate,
+            currentCoordinate: vehicle.currentCoordinate,
+            status: .inactive,
+            activeStatus: false
+        )
+        
+        vehicles.removeAll { $0.id == vehicle.id }
+        vehicles.append(inactiveVehicle)
+    }
+    
+    func enableVehicle(_ vehicle: Vehicle) {
+        let activeVehicle = Vehicle(
+            id: vehicle.id,
+            make: vehicle.make,
+            model: vehicle.model,
+            vinNumber: vehicle.vinNumber,
+            licenseNumber: vehicle.licenseNumber,
+            fuelType: vehicle.fuelType,
+            loadCapacity: vehicle.loadCapacity,
+            insurancePolicyNumber: vehicle.insurancePolicyNumber,
+            insuranceExpiryDate: vehicle.insuranceExpiryDate,
+            pucCertificateNumber: vehicle.pucCertificateNumber,
+            pucExpiryDate: vehicle.pucExpiryDate,
+            rcNumber: vehicle.rcNumber,
+            rcExpiryDate: vehicle.rcExpiryDate,
+            currentCoordinate: vehicle.currentCoordinate,
+            status: .available,
+            activeStatus: true
+        )
+        
+        vehicles.removeAll { $0.id == vehicle.id }
+        vehicles.append(activeVehicle)
+    }
     func addTrip(_ trip: Trip) {
         trips.append(trip)
+        // Update driver status to onTrip
+        for driverId in trip.assignedDriverIDs {
+            if let index = drivers.firstIndex(where: { $0.id == driverId }) {
+                let driver = drivers[index]
+                let updatedDriver = Driver(
+                    id: driver.id,
+                    fullName: driver.fullName,
+                    totalTrips: driver.totalTrips + 1,
+                    licenseNumber: driver.licenseNumber,
+                    email: driver.email,
+                    driverID: driver.driverID,
+                    phoneNumber: driver.phoneNumber,
+                    status: .onTrip,
+                    workingStatus: driver.workingStatus,
+                    role: driver.role
+                )
+                drivers[index] = updatedDriver
+            }
+        }
+        // Update vehicle status to inUse
+        if let index = vehicles.firstIndex(where: { $0.id == trip.assigneVehicleID }) {
+            let vehicle = vehicles[index]
+            let updatedVehicle = Vehicle(
+                id: vehicle.id,
+                make: vehicle.make,
+                model: vehicle.model,
+                vinNumber: vehicle.vinNumber,
+                licenseNumber: vehicle.licenseNumber,
+                fuelType: vehicle.fuelType,
+                loadCapacity: vehicle.loadCapacity,
+                insurancePolicyNumber: vehicle.insurancePolicyNumber,
+                insuranceExpiryDate: vehicle.insuranceExpiryDate,
+                pucCertificateNumber: vehicle.pucCertificateNumber,
+                pucExpiryDate: vehicle.pucExpiryDate,
+                rcNumber: vehicle.rcNumber,
+                rcExpiryDate: vehicle.rcExpiryDate,
+                currentCoordinate: vehicle.currentCoordinate,
+                status: .inUse,
+                activeStatus: vehicle.activeStatus
+            )
+            vehicles[index] = updatedVehicle
+        }
     }
     
     func getFilteredTrips(status: TripStatus?) -> [Trip] {
@@ -159,7 +255,7 @@ struct DriverRowView: View {
 }
 
 struct StaffView: View {
-    @StateObject private var viewModel = DriverViewModel()
+    @StateObject var viewModel = DriverViewModel.shared
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     @State private var selectedRole = 0 // 0 for drivers, 1 for maintenance
@@ -168,7 +264,7 @@ struct StaffView: View {
     
     var filteredStaff: [Driver] {
         let roleFiltered = viewModel.drivers.filter { driver in
-            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenance
+            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenancePersonal
         }
         
         let searchResults = roleFiltered.filter { staff in
@@ -230,18 +326,15 @@ struct StaffView: View {
             }
         }
         .sheet(isPresented: $showingAddStaff) {
-            AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenance)
+            AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenancePersonal)
         }
         .background(Color(red: 242/255, green: 242/255, blue: 247/255))
         .onAppear {
             if viewModel.drivers.isEmpty {
                 // Add sample drivers with roles
                 let sampleDrivers = [
-                    Driver(fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", emailId: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
-                    Driver(fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", emailId: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver),
-                    // Add maintenance staff
-                    Driver(fullName: "Mike Tech", totalTrips: 0, licenseNumber: "", emailId: "mike.tech@example.com", driverID: "MECH001", phoneNumber: "+1122334455", status: .available, workingStatus: true, role: .maintenance),
-                    Driver(fullName: "Sarah Engineer", totalTrips: 0, licenseNumber: "", emailId: "sarah.eng@example.com", driverID: "MECH002", phoneNumber: "+2233445566", status: .available, workingStatus: true, role: .maintenance)
+                    Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", email: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
+                    Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", email: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
                 ]
                 viewModel.drivers = sampleDrivers
             }
@@ -353,7 +446,7 @@ struct DriverDetailView: View {
             Text("Are you sure you want to disable this driver? This action cannot be undone.")
         }
         .onAppear {
-            editedEmail = driver.emailId
+            editedEmail = driver.email
             editedPhone = driver.phoneNumber
         }
     }
@@ -363,7 +456,7 @@ struct DriverDetailView: View {
 struct AddDriverView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: DriverViewModel
-    let staffRole: StaffRole
+    let staffRole: Role
     
     @State private var employeeId = ""
     @State private var fullName = ""
@@ -392,8 +485,7 @@ struct AddDriverView: View {
         NavigationView {
             Form {
                 Section("Driver Details") {
-                    TextField("Employee ID", text: $employeeId)
-                        .textContentType(.name)
+
                     TextField("Full Name", text: $fullName)
                         .textContentType(.name)
                     TextField("Email", text: $email)
@@ -434,10 +526,10 @@ struct AddDriverView: View {
                     Button("Done") {
                         if isValidEmail(email) && isValidPhone(phone) {
                             let newDriver = Driver(
-                                fullName: fullName,
+                                id: UUID(), fullName: fullName,
                                 totalTrips: 0,
                                 licenseNumber: licenseNumber,
-                                emailId: email,
+                                email: email,
                                 driverID: employeeId,
                                 phoneNumber: phone,
                                 status: .available,
