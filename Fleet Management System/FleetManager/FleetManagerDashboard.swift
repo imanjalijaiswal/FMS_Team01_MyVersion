@@ -216,75 +216,75 @@ struct FleetManagerDashboardView: View {
                     
                     ProgressBarView(
                         title: "Drivers",
-                        total: 15,
+                        total: viewModel.drivers.count,
                         items: [
-                            ("Available", 8, Color.mint),
-                            ("In Trip", 5, Color.primaryGradientEnd),
-                            ("Disabled", 2, Color.orange)
+                            ("Available", viewModel.drivers.filter{ $0.status == .available }.count, Color.mint),
+                            ("On Trip",viewModel.drivers.filter{$0.status == .onTrip }.count, Color.primaryGradientEnd),
+                            ("Disabled", viewModel.drivers.filter{$0.workingStatus == false}.count, Color.orange)
                         ]
                     )
                     
-                    ProgressBarView(
-                        title: "Maintenance",
-                        total: 4,
-                        items: [
-                            ("Completed", 2, Color.mint),
-                            ("In Progress", 2, Color.primaryGradientEnd)
-                        ]
-                    )
+//                    ProgressBarView(
+//                        title: "Maintenance",
+//                        total: 4,
+//                        items: [
+//                            ("Completed", 2, Color.mint),
+//                            ("In Progress", 2, Color.primaryGradientEnd)
+//                        ]
+//                    )
                     
                     ProgressBarView(
                         title: "Trucks",
-                        total: 15,
+                        total: viewModel.vehicles.count,
                         items: [
-                            ("Available", 8, Color.mint),
-                            ("Assigned", 5, Color.primaryGradientEnd),
-                            ("Disabled", 2, Color.orange)
+                            ("Available", viewModel.vehicles.filter { $0.status == .available }.count, Color.mint),
+                            ("In Use", viewModel.vehicles.filter { $0.status == .inUse }.count, Color.primaryGradientEnd),
+                            ("Disabled", viewModel.vehicles.filter { $0.status == .inactive }.count, Color.statusOrange)
                         ]
                     )
                 }
                 .padding(.horizontal)
                 
                 // Fleet Analytics Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Fleet Analytics")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primaryGradientStart)
-                    
-                    HStack(spacing: 16) {
-                        AnalyticsCard(
-                            title: "Fuel Consumed",
-                            value: "1250.5",
-                            unit: "L",
-                            change: 5.2
-                        )
-                        
-                        AnalyticsCard(
-                            title: "Maintenance Cost",
-                            value: "8500.0",
-                            unit: "USD",
-                            change: -2.1
-                        )
-                    }
-            }
-            .padding(.horizontal)
-                
-                // Recent Updates Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Recent Updates")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primaryGradientStart)
-                    
-                    UpdateCard(
-                        iconName: "wrench.fill",
-                        title: "Maintenance Updated",
-                        description: "Robert Brown updated maintenance status for TRK003",
-                        timeAgo: "51 sec. ago"
-                    )
-                }
-                .padding(.horizontal)
+//                VStack(alignment: .leading, spacing: 16) {
+//                    Text("Fleet Analytics")
+//                        .font(.title2)
+//                        .fontWeight(.bold)
+//                        .foregroundColor(.primaryGradientStart)
+//                    
+//                    HStack(spacing: 16) {
+//                        AnalyticsCard(
+//                            title: "Fuel Consumed",
+//                            value: "1250.5",
+//                            unit: "L",
+//                            change: 5.2
+//                        )
+//                        
+//                        AnalyticsCard(
+//                            title: "Maintenance Cost",
+//                            value: "8500.0",
+//                            unit: "USD",
+//                            change: -2.1
+//                        )
+//                    }
+//            }
+//            .padding(.horizontal)
+//                
+//                // Recent Updates Section
+//                VStack(alignment: .leading, spacing: 16) {
+//                    Text("Recent Updates")
+//                        .font(.title2)
+//                        .fontWeight(.bold)
+//                        .foregroundColor(.primaryGradientStart)
+//                    
+//                    UpdateCard(
+//                        iconName: "wrench.fill",
+//                        title: "Maintenance Updated",
+//                        description: "Robert Brown updated maintenance status for TRK003",
+//                        timeAgo: "51 sec. ago"
+//                    )
+//                }
+//                .padding(.horizontal)
             }
             .padding(.vertical)
         }
@@ -350,7 +350,7 @@ struct FilterChip: View {
                 .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
-                .background(isSelected ? Color.black : Color(.systemGray6))
+                .background(isSelected ? Color.primaryGradientStart : Color(.systemGray6))
                 .foregroundColor(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
@@ -421,7 +421,6 @@ struct FleetManagerTabBarView: View {
         .accentColor(.primaryGradientEnd)
     }
 }
-
-#Preview {
-    ContentView()
+#Preview{
+    TripsView()
 }

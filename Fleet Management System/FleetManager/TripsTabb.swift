@@ -85,7 +85,7 @@ struct TripsView: View {
                 }
             }
         }
-        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+        .background(.white)
     }
 }
 
@@ -815,4 +815,6 @@ struct VehicleSelectionView: View {
         }
     }
 }
+
+
 

@@ -207,7 +207,7 @@ class RemoteController:DatabaseAPIIntegrable{
             var driver : [Driver] = []
             for userRole in userRoles {
                 let response: Driver = try await client
-                    .from("Driver")
+                    .from("Drivers")
                     .select("*")
                     .eq("id", value: userRole.id)
                     .execute()
