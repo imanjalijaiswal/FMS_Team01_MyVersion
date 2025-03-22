@@ -10,7 +10,26 @@ import Foundation
 import Supabase
 import SwiftUI
 
-class RemoteController:DatabaseAPIIntegrable{
+class RemoteController: DatabaseAPIIntegrable{
+    func addNewDriverMetaData(by id: UUID, phoneNumber: String, fullName: String, employeeID: Int, licenseNumber: String) async throws -> Driver {
+        struct AddDriverParams: Encodable {
+            let p_id: UUID
+            let p_phone: String
+            let p_display_name: String
+            let p_employee_id: Int
+            let p_licenseNumber: String
+        }
+        
+        let params = AddDriverParams(p_id: id, p_phone: phoneNumber, p_display_name: fullName, p_employee_id: employeeID, p_licenseNumber: licenseNumber)
+        
+        let driver: Driver = try await client
+            .rpc("add_new_driver_meta_data",params: params)
+            .execute()
+            .value
+        
+        return driver
+    }
+    
     func assignNewTrip(assignedBy: UUID,
                        pickupCoordinates: (latitude: Double, longitude: Double),
                        destinationCoordinates: (latitude: Double, longitude: Double),
@@ -167,7 +186,9 @@ class RemoteController:DatabaseAPIIntegrable{
                     "p_rcexpirydate": ISO8601DateFormatter()
                         .string(from: vehicle.rcExpiryDate)
                  ])
+            .select()
             .execute()
+            .value
     }
     
     func getRegisteredVehicles() async throws -> [Vehicle] {
@@ -188,58 +209,19 @@ class RemoteController:DatabaseAPIIntegrable{
         return email
     }
     
-    func getManagerProfile(by id: UUID) async throws -> FleetManager {
-        let response: FleetManager = try await client
-            .from("FleetManager")
-            .select("*")
-            .eq("id", value: id)
+    func getFleetManager(by id: UUID) async throws -> FleetManager {
+        return try await client
+            .rpc("get_fleet_manager_data_for_id", params: ["p_id": id])
             .execute()
             .value
-        
-        let email: String = try await getUserEmail(by: id)
-        
-        return FleetManager(id: response.id, managerID: response.managerID, fullName: response.fullName,email: email, phoneNumber: response.phoneNumber)
     }
     
     
-    func getRegisteredDrivers(by userRoles: [UserRoles]) async throws -> [Driver] {
-        do {
-            var driver : [Driver] = []
-            for userRole in userRoles {
-                let response: Driver = try await client
-                    .from("Drivers")
-                    .select("*")
-                    .eq("id", value: userRole.id)
-                    .execute()
-                    .value
-                
-                let email: String = try await getUserEmail(by: userRole.id)
-                
-                driver.append(Driver(id: response.id, fullName: response.fullName, totalTrips: response.totalTrips, licenseNumber: response.licenseNumber, email: email, driverID: response.driverID, phoneNumber: response.phoneNumber, status: response.status, workingStatus: userRole.workingStatus, role: .driver))
-            }
-
-            
-            return driver
-        } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
-            throw error
-        }
-    }
-    
-    func getUsers(ofType type: Role) async throws -> [UserRoles] {
-        do {
-            let response: [UserRoles] = try await client
-                .from("UserRoles")
-                .select("*")
-                .eq("role", value: type.rawValue)
-                .execute()
-                .value
-            
-            return response
-        } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
-            throw error
-        }
+    func getRegisteredDrivers() async throws -> [Driver] {
+        return try await client
+            .rpc("get_registered_drivers")
+            .execute()
+            .value
     }
    
     private let client = AuthManager.shared.client

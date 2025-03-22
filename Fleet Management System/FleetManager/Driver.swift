@@ -11,22 +11,22 @@ enum DriverStatus: String, Codable {
     case onTrip = "On Trip"
 }
 
-struct Driver: Identifiable, Equatable,Codable {
-    let id : UUID
-    let fullName: String
-    let totalTrips: Int
-    let licenseNumber: String
-    let email: String
-    let driverID: String
-    let phoneNumber: String
-    let status: DriverStatus
-    let workingStatus: Bool
-    let role: Role
-    
-    static func == (lhs: Driver, rhs: Driver) -> Bool {
-        lhs.id == rhs.id
-    }
-}
+//struct Driver: Identifiable, Equatable,Codable {
+//    let id : UUID
+//    let fullName: String
+//    let totalTrips: Int
+//    let licenseNumber: String
+//    let email: String
+//    let driverID: String
+//    let phoneNumber: String
+//    let status: DriverStatus
+//    let workingStatus: Bool
+//    let role: Role
+//    
+//    static func == (lhs: Driver, rhs: Driver) -> Bool {
+//        lhs.id == rhs.id
+//    }
+//}
 
 class DriverViewModel: ObservableObject {
     static let shared = DriverViewModel() // Singleton instance

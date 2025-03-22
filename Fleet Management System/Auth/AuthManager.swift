@@ -9,24 +9,60 @@ import Foundation
 import Supabase
 import Auth
 
-struct AppUser: Equatable {
-   var id: String
-   var email: String?
-   var role: Role
-//   var workingStatus: Bool
-   
-   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
-       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
-   }
+protocol User: Codable, Equatable, Identifiable {
+    var meta_data: UserMetaData { get set }
+    
+    var id: UUID { get }
 }
 
-struct UserRoles:Codable{
-    var id : UUID
-    var role : Role
-    var workingStatus : Bool
-    var firstTimeLogin : Bool
-    var createdAt : Date
+struct UserMetaData: Codable, Equatable, Identifiable{
+    var id: UUID
+    var fullName: String
+    var email: String
+    var phone: String
+    var role: Role
+    var employeeID: Int
+    var firstTimeLogin: Bool
+    var createdAt: Date
+    var activeStatus: Bool
+    
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
+
+struct FleetManager: User {
+    var meta_data: UserMetaData
+    var id: UUID { meta_data.id }
+}
+
+struct Driver: User {
+    var meta_data: UserMetaData
+    var licenseNumber: String
+    var totalTrips: Int
+    var status: DriverStatus
+    
+    var id: UUID { meta_data.id }
+}
+
+//struct AppUser: Equatable {
+//   var id: String
+//   var email: String?
+//   var role: Role
+////   var workingStatus: Bool
+//   
+//   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
+//       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
+//   }
+//}
+//
+//struct UserRoles:Codable{
+//    var id : UUID
+//    var role : Role
+//    var workingStatus : Bool
+//    var firstTimeLogin : Bool
+//    var createdAt : Date
+//}
 
 enum Role:String,Codable{
     case fleetManager
@@ -76,7 +112,7 @@ class AuthManager{
     
     let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
 
-    func getCurrentSession() async throws -> AppUser? {
+    func getCurrentSession() async throws -> UserMetaData? {
         do {
             // Try to get the current session
             let session = try await client.auth.session
@@ -85,7 +121,7 @@ class AuthManager{
             // If 2FA is not required or has been completed, return the user
             if !AuthManager.is2FAEnabled || is2FACompleted {
                 let role = try await getUserRole(userId: userId)
-                return AppUser(id: userId, email: session.user.email, role: role)
+                return UserMetaData(id: userId, fullName: session.user.userMetadata., email: <#T##String#>, phone: <#T##String#>, role: <#T##Role#>, employeeID: <#T##Int#>, firstTimeLogin: <#T##Bool#>, createdAt: <#T##Date#>, activeStatus: <#T##Bool#>)
             } else {
                 // 2FA is required but not completed - force re-authentication
                 try await signOut()

@@ -9,11 +9,15 @@ import Foundation
 
 protocol DatabaseAPIIntegrable {
     //MARK: User APIs
-    func getManagerProfile(by id: UUID) async throws -> FleetManager
+    func getFleetManager(by id: UUID) async throws -> FleetManager
     
-    func getUsers(ofType type: Role) async throws -> [UserRoles]
+    func addNewDriverMetaData(by id: UUID,
+                   phoneNumber: String,
+                   fullName: String,
+                   employeeID: Int,
+                   licenseNumber: String) async throws -> Driver
     
-    func getRegisteredDrivers(by userRoles: [UserRoles]) async throws -> [Driver]
+    func getRegisteredDrivers() async throws -> [Driver]
     
     func getUserEmail(by id: UUID) async throws -> String
     

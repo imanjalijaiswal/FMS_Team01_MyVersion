@@ -7,10 +7,10 @@
 
 import Foundation
 
-struct FleetManager : Identifiable, Codable{
-    let id: UUID
-    let managerID: Int
-    let fullName: String
-    let email: String
-    let phoneNumber: String
-}
+//struct FleetManager : Identifiable, Codable{
+//    let id: UUID
+//    let managerID: Int
+//    let fullName: String
+//    let email: String
+//    let phoneNumber: String
+//}
