@@ -5,12 +5,19 @@ struct ProfileView: View {
     @Binding var user: AppUser?
     @Binding var role : Role?
     // Sample driver data with Indian standards
-    let driver = DriverProfile(
-        employeeId: "EMP-2024-001",
-        fullName: "Rajesh Kumar Singh",
-        email: "",
-        phoneNumber: "+91 98765 43210",
-        drivingLicense: "DL-01-2024-1234567" // Format: DL-{State Code}-{Year}-{7 digits}
+    let driver = Driver(meta_data: UserMetaData(id: UUID(),
+                                                fullName: "Rajesh Kumar Singh",
+                                                email: "driver@driver.com",
+                                                phone: "+910987654321",
+                                                role: .driver,
+                                                employeeID: 4,
+                                                firstTimeLogin: false,
+                                                createdAt: .now,
+                                                activeStatus: true),
+                        licenseNumber: "DL-01-2024-1234567",
+                        totalTrips: 9,
+                        status: .available
+//        drivingLicense: "DL-01-2024-1234567" // Format: DL-{State Code}-{Year}-{7 digits}
     )
     func signOut() {
         Task {
@@ -64,7 +71,7 @@ struct ProfileView: View {
                             .frame(width: 100, height: 100)
                             .foregroundColor(.primaryGradientStart)
                         
-                        Text(driver.fullName)
+                        Text(driver.meta_data.fullName)
                             .font(.title2)
                             .fontWeight(.bold)
                         
@@ -83,8 +90,8 @@ struct ProfileView: View {
                             
                             Divider()
                             
-                            InfoRow(title: "Employee ID", value: driver.employeeId)
-                            InfoRow(title: "Full Name", value: driver.fullName)
+                            InfoRow(title: "Employee ID", value: String(driver.employeeID))
+                            InfoRow(title: "Full Name", value: driver.meta_data.fullName)
                         }
                         .padding()
                         .background(Color.white)
@@ -97,8 +104,8 @@ struct ProfileView: View {
                             
                             Divider()
                             
-                            InfoRow(title: "Email", value: user?.email ?? "")
-                            InfoRow(title: "Phone Number", value: driver.phoneNumber)
+                            InfoRow(title: "Email", value: user?.meta_data.email ?? "")
+                            InfoRow(title: "Phone Number", value: driver.meta_data.phone)
                         }
                         .padding()
                         .background(Color.white)
@@ -111,7 +118,7 @@ struct ProfileView: View {
                             
                             Divider()
                             
-                            InfoRow(title: "Driving License", value: driver.drivingLicense)
+                            InfoRow(title: "Driving License", value: driver.licenseNumber)
                             Text("Format: DL-{State Code}-{Year}-{7 digits}")
                                 .font(.caption)
                                 .foregroundColor(.textSecondary)
@@ -165,12 +172,12 @@ struct InfoRow: View {
         }
     }
 }
-
-struct DriverProfile {
-    let employeeId: String
-    let fullName: String
-    let email: String
-    let phoneNumber: String
-    let drivingLicense: String
-}
+//
+//struct DriverProfile {
+//    let employeeId: String
+//    let fullName: String
+//    let email: String
+//    let phoneNumber: String
+//    let drivingLicense: String
+//}
 

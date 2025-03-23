@@ -65,7 +65,7 @@ class SignInViewModel: ObservableObject {
             }
             
             // Check if this is a first-time login
-            let isFirstTimeLogin = try await authManager.checkFirstTimeLogin(userId: authUser.id)
+            let isFirstTimeLogin = try await authManager.checkFirstTimeLogin(userId: authUser.id.uuidString)
             
             // Skip 2FA if it's a first-time login
             if isFirstTimeLogin {

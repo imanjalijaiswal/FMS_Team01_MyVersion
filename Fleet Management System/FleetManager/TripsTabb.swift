@@ -21,7 +21,7 @@ struct TripsView: View {
             if searchText.isEmpty { return true }
             
             let driverNames = trip.assignedDriverIDs.compactMap { driverId in
-                viewModel.drivers.first { $0.id == driverId }?.fullName
+                viewModel.drivers.first { $0.id == driverId }?.meta_data.fullName
             }.joined(separator: ", ")
             
             let vehicleNumber = viewModel.vehicles.first { $0.id == trip.assigneVehicleID }?.vinNumber ?? ""
@@ -96,7 +96,7 @@ struct TripCard: View {
     
     var driverNames: String {
         trip.assignedDriverIDs.compactMap { driverId in
-            viewModel.drivers.first { $0.id == driverId }?.fullName
+            viewModel.drivers.first { $0.id == driverId }?.meta_data.fullName
         }.joined(separator: ", ")
     }
     
@@ -331,7 +331,7 @@ struct AssignTripView: View {
                                 Text("Driver 1")
                                     .foregroundColor(.primary)
                                 Spacer()
-                                Text(selectedDriver1?.fullName ?? "Select Driver 1")
+                                Text(selectedDriver1?.meta_data.fullName ?? "Select Driver 1")
                                     .foregroundColor(.gray)
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
@@ -351,7 +351,7 @@ struct AssignTripView: View {
                                 Text("Driver 2 (Optional)")
                                     .foregroundColor(.primary)
                                 Spacer()
-                                Text(selectedDriver2?.fullName ?? "Select Driver 2")
+                                Text(selectedDriver2?.meta_data.fullName ?? "Select Driver 2")
                                     .foregroundColor(.gray)
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
@@ -424,16 +424,16 @@ struct DriversRowView: View {
                 .foregroundColor(.blue)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(driver.fullName)
+                Text(driver.meta_data.fullName)
                     .font(.headline)
                     .foregroundColor(.primary)
 
-                Text("ID: \(driver.driverID)")
+                Text("ID: \(driver.employeeID)")
                     .font(.subheadline)
                     .foregroundColor(.gray)
 
                 HStack {
-                    Label(driver.phoneNumber, systemImage: "phone.fill")
+                    Label(driver.meta_data.phone, systemImage: "phone.fill")
                         .font(.caption)
                         .foregroundColor(.gray)
 
@@ -466,7 +466,7 @@ struct DriverSelectionView: View {
     
     var availableDrivers: [Driver] {
         viewModel.drivers.filter { driver in
-            driver.workingStatus &&
+            driver.activeStatus &&
             driver.status == .available &&
             driver.role == .driver
             &&

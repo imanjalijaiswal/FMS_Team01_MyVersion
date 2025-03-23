@@ -25,8 +25,8 @@ enum FuelType: String, Codable {
 
 enum VehicleStatus: String, Codable {
     case available = "Available"
-    case inUse = "In Use"
-    case maintenance = "Maintenance"
+    case assigned = "Assigned"
+    case underMaintenance = "underMaintenance"
     case inactive = "Inactive"
 }
 

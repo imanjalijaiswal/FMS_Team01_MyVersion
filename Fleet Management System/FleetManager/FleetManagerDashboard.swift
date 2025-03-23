@@ -204,6 +204,31 @@ struct FleetManagerDashboardView: View {
     @State private var showingProfile = false
     @StateObject private var viewModel = DriverViewModel.shared
     
+    var availableDrivers: Int {
+        viewModel.drivers.filter { $0.status == .available }.count
+    }
+
+    var onTripDrivers: Int {
+        viewModel.drivers.filter { $0.status == .onTrip }.count
+    }
+    
+    var inactiveDrivers: Int {
+        viewModel.drivers.filter { !$0.activeStatus }.count
+    }
+    
+    var availableVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .available }.count
+    }
+    
+    var assignedVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .assigned }.count
+    }
+    
+    var inactiveVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .inactive }.count
+    }
+
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -218,9 +243,12 @@ struct FleetManagerDashboardView: View {
                         title: "Drivers",
                         total: viewModel.drivers.count,
                         items: [
-                            ("Available", viewModel.drivers.filter{ $0.status == .available }.count, Color.mint),
-                            ("On Trip",viewModel.drivers.filter{$0.status == .onTrip }.count, Color.primaryGradientEnd),
-                            ("Disabled", viewModel.drivers.filter{$0.workingStatus == false}.count, Color.orange)
+                            (DriverStatus.available.rawValue,
+                             availableDrivers,
+                             Color.mint),
+                            
+                            (DriverStatus.onTrip.rawValue, onTripDrivers, Color.primaryGradientEnd),
+                            (DriverStatus.inactive.rawValue, inactiveDrivers, Color.orange)
                         ]
                     )
                     
@@ -237,9 +265,9 @@ struct FleetManagerDashboardView: View {
                         title: "Trucks",
                         total: viewModel.vehicles.count,
                         items: [
-                            ("Available", viewModel.vehicles.filter { $0.status == .available }.count, Color.mint),
-                            ("In Use", viewModel.vehicles.filter { $0.status == .inUse }.count, Color.primaryGradientEnd),
-                            ("Disabled", viewModel.vehicles.filter { $0.status == .inactive }.count, Color.statusOrange)
+                            (VehicleStatus.available.rawValue, availableVehicles, Color.mint),
+                            (VehicleStatus.assigned.rawValue, assignedVehicles, Color.primaryGradientEnd),
+                            (VehicleStatus.inactive.rawValue, inactiveVehicles, Color.statusOrange)
                         ]
                     )
                 }
@@ -420,7 +448,4 @@ struct FleetManagerTabBarView: View {
         }
         .accentColor(.primaryGradientEnd)
     }
-}
-#Preview{
-    TripsView()
 }

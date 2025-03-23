@@ -198,7 +198,7 @@ struct VehiclesView: View {
     @StateObject private var viewModel = DriverViewModel.shared
     @State private var searchText = ""
     @State private var selectedFilter = "All"
-    let filters = ["All", "Available", "In Use", "Inactive"]
+    let filters = ["All", VehicleStatus.available.rawValue, VehicleStatus.assigned.rawValue, VehicleStatus.inactive.rawValue]
     @State private var showingAddVehicle = false
     
     var filteredVehicles: [Vehicle] {
@@ -209,11 +209,11 @@ struct VehiclesView: View {
         }
         
         switch selectedFilter {
-        case "Available":
+        case VehicleStatus.available.rawValue:
             return searchResults.filter { $0.status == .available && $0.activeStatus }
-        case "In Use":
-            return searchResults.filter { $0.status == .inUse }
-        case "Inactive":
+        case VehicleStatus.assigned.rawValue:
+            return searchResults.filter { $0.status == .assigned }
+        case VehicleStatus.inactive.rawValue:
             return searchResults.filter { !$0.activeStatus }
         default:
             return searchResults.filter { $0.activeStatus }
