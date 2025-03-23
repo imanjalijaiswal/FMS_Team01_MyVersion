@@ -12,7 +12,7 @@ struct TripsView: View {
     @State private var showingAddNewTrip = false
     @State private var searchText = ""
     @State private var selectedFilter = "All"
-    @StateObject private var viewModel = DriverViewModel.shared
+    @StateObject private var viewModel = IFEDataController.shared
     
     let filters = ["All", "Scheduled", "In Progress", "Completed"]
     
@@ -91,7 +91,7 @@ struct TripsView: View {
 
 struct TripCard: View {
     let trip: Trip
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @State private var showingStatusSheet = false
     
     var driverNames: String {
@@ -189,7 +189,7 @@ struct TripCard: View {
 
 struct AssignTripView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     
     @State private var pickupLocation = ""
     @State private var destination = ""
@@ -460,7 +460,7 @@ struct DriversRowView: View {
 
 struct DriverSelectionView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @Binding var selectedDriver: Driver?
     let excludeDriver: Driver?
     
@@ -728,7 +728,7 @@ struct StatusBadge: View {
 
 struct VehicleSelectionView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @Binding var selectedVehicle: Vehicle?
     
     var availableVehicles: [Vehicle] {

@@ -11,21 +11,29 @@ protocol DatabaseAPIIntegrable {
     //MARK: User APIs
     func getFleetManager(by id: UUID) async throws -> FleetManager
     
+    func createNewDriver(_ email: String, password: String) async throws -> UUID
+    
+    func updateUserPhone(by id: UUID, _ phone: String) async throws
+    
     func addNewDriverMetaData(by id: UUID,
                    phoneNumber: String,
                    fullName: String,
                    employeeID: Int,
                    licenseNumber: String) async throws -> Driver
     
+    func updateDriverStatus(by id: UUID, _ newStatus: DriverStatus) async throws
+    
     func getRegisteredDrivers() async throws -> [Driver]
     
     func getUserEmail(by id: UUID) async throws -> String
     
-    func updateUserWorkingStatus(by id: UUID, with status: Bool) async throws
+    func updateUserActiveStatus(by id: UUID, with status: Bool) async throws
+    
+    func getMaxEmployeeID(ofType type: Role) async throws -> Int
     
     
     //MARK: Vehicle APIs
-    func addNewVehicle(_ vehicle: Vehicle) async throws
+    func addNewVehicle(_ vehicle: Vehicle) async throws -> Int
     
     func getRegisteredVehicles() async throws -> [Vehicle]
     

@@ -139,10 +139,10 @@ struct AppUser: Codable, Equatable, Identifiable {
 //    var createdAt : Date
 //}
 
-enum Role:String,Codable{
-    case fleetManager
-    case driver
-//    case maintenancePersonal
+enum Role: String, Codable {
+    case fleetManager = "fleetManager"
+    case driver = "driver"
+    case maintenancePersonnel = "maintenancePersonnel"
 }
 
 //enum AuthError: Error {
@@ -185,7 +185,7 @@ class AuthManager{
         is2FACompleted = UserDefaults.standard.bool(forKey: twoFACompletedKey)
     }
     
-    let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
+    let client = SupabaseClient(supabaseURL: URL(string: "https://rhmhyrccjrgmgjyxgmlf.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJobWh5cmNjanJnbWdqeXhnbWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3Mjk0MTksImV4cCI6MjA1ODMwNTQxOX0.FtGNdVw_TBTUOGlUm8tH6EqZbvCCZsdxpd6LN91_Sho")
 
     func getCurrentSession() async throws -> AppUser? {
         do {
@@ -252,13 +252,13 @@ class AuthManager{
         switch type {
         case .driver:
             let driverData: Driver = try await client
-                .rpc("get_driver_data_for_id", params: ["p_id": id.uuidString])
+                .rpc("get_driver_data_by_id", params: ["p_id": id.uuidString])
                 .execute()
                 .value
             return AppUser(userData: .driver(driverData))
-        case .fleetManager:
+        case .fleetManager, .maintenancePersonnel:
             let managerData: FleetManager = try await client
-                .rpc("get_fleet_manager_data_for_id", params: ["p_id": id.uuidString])
+                .rpc("get_fleet_manager_data_by_id", params: ["p_id": id.uuidString])
                 .execute()
                 .value
             return AppUser(userData: .fleetManager(managerData))
@@ -273,11 +273,25 @@ class AuthManager{
         }
 
         do {
-            let userRole: Role = try await client
-                .rpc("get_user_role_by_id", params: ["p_id": userUUID])
-                .execute().value
+            struct UserRole: Codable {
+                let role: String
+            }
             
-            return userRole
+            let response = try await client
+                .from("UserRoles").select("role").eq("id", value: userUUID).single()
+                .execute()
+            
+            let userRole = try JSONDecoder().decode(UserRole.self, from: response.data)
+            if userRole.role == "driver" { return .driver }
+            else { return .fleetManager }
+//            print("JSON: \(json)")
+//            if let json = try? JSONSerialization.jsonObject(with: response.data, options: []) as? [String: Any] {
+//                   let roleString = json["role"] as? String
+//                   let role = Role(rawValue: roleString ?? "fleetManager")!
+//                    return role
+//                } else {
+//                    throw NSError(domain: "Invalid Role Data", code: 1, userInfo: nil)
+//                }
         } catch {
             print("Error fetching user role: \(error.localizedDescription)")
             throw error
@@ -297,9 +311,8 @@ class AuthManager{
 
         do {
             let firstTimeLoginStatus: Bool = try await client
-                .rpc("get_first_time_login_status_by_id", params: ["p_id": userUUID])
-                .execute()
-                .value
+                .rpc("get_user_first_time_login_status_by_id", params: ["p_id": userId])
+                .execute().value
             
             firstTimeLoginCache[userId] = firstTimeLoginStatus
             
@@ -317,15 +330,10 @@ class AuthManager{
         }
         
         do {
-            struct UpdateFTLSParams: Encodable {
-                let p_user_uuid: UUID
-                let p_new_status: Bool
-            }
-            
-            let params = UpdateFTLSParams(p_user_uuid: userUUID, p_new_status: firstTimeLogin)
-            
             try await client
-                .rpc("update_user_first_time_login_status_for_id", params: params)
+                .from("UserMetaData")
+                .update(["firstTimeLogin": firstTimeLogin])
+                .eq("id", value: userId)
                 .execute()
             
             // Update the cache
@@ -343,11 +351,10 @@ class AuthManager{
 
         do {
             return try await client
-                .rpc("get_user_active_status")
-                .execute()
-                .value
+                .rpc("get_user_active_status_by_id", params: ["p_id": userId])
+                .execute().value
         } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
+            print("Error fetching user active status: \(error.localizedDescription)")
             throw error
         }
     }
@@ -369,6 +376,7 @@ class AuthManager{
     }
     
     func verifyOTP(email: String, token: String) async throws -> Bool {
+        print("Token: \(token)")
         // Verify the OTP using the verifyOTP method
         do {
             try await client.auth.verifyOTP(
@@ -467,7 +475,9 @@ class AuthManager{
     // Enhanced sign-in method with 2FA support
     func signInWithEmailAndInitiate2FA(email: String, password: String) async throws -> AppUser? {
         do {
+            print("Attempting to sign in...")
             let authResponse = try await client.auth.signIn(email: email, password: password)
+//            print("Auth Response: \(authResponse)")
             
             // Get the user from the response
             let user = authResponse.user
@@ -480,7 +490,7 @@ class AuthManager{
                 throw AuthError.inactiveUser
             }
             
-            let userEmail = user.email
+//            let userEmail = user.email
             
             // Get user role
             let role = try await getUserRole(userId: userId)

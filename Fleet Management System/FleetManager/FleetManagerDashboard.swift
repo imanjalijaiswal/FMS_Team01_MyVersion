@@ -85,19 +85,21 @@ struct ProgressBarView: View {
                                     .foregroundColor(.gray)
             }
             
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    ForEach(items, id: \.0) { item in
-                        let width = CGFloat(item.1) / CGFloat(total) * geometry.size.width
-                        Rectangle()
-                            .fill(item.2)
-                            .frame(width: width)
-                    }
-                }
-                .frame(height: 8)
-                .clipShape(Capsule())
-            }
-            .frame(height: 8)
+                                GeometryReader { geometry in
+                                    let availableWidth = max(1, geometry.size.width) // Prevent zero width
+                                    HStack(spacing: 0) {
+                                        ForEach(items, id: \.0) { item in
+                                            let validValue = max(0, CGFloat(item.1)) // Ensure non-negative values
+                                            let width = total > 0 ? validValue / CGFloat(total) * availableWidth : 0
+                                            Rectangle()
+                                                .fill(item.2)
+                                                .frame(width: width)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                    .clipShape(Capsule())
+                                }
+                                .frame(height: 8)
             
             HStack(spacing: 16) {
                 ForEach(items, id: \.0) { item in
@@ -202,14 +204,14 @@ struct FleetManagerDashboardView: View {
     @Binding var user: AppUser?
     @Binding var role: Role?
     @State private var showingProfile = false
-    @StateObject private var viewModel = DriverViewModel.shared
+    @StateObject private var viewModel = IFEDataController.shared
     
     var availableDrivers: Int {
-        viewModel.drivers.filter { $0.status == .available }.count
+        viewModel.drivers.filter { $0.status == .available && $0.activeStatus}.count
     }
 
     var onTripDrivers: Int {
-        viewModel.drivers.filter { $0.status == .onTrip }.count
+        viewModel.drivers.filter { $0.status == .onTrip && $0.activeStatus}.count
     }
     
     var inactiveDrivers: Int {
@@ -217,15 +219,15 @@ struct FleetManagerDashboardView: View {
     }
     
     var availableVehicles: Int {
-        viewModel.vehicles.filter { $0.status == .available }.count
+        viewModel.vehicles.filter { $0.status == .available && $0.activeStatus }.count
     }
     
     var assignedVehicles: Int {
-        viewModel.vehicles.filter { $0.status == .assigned }.count
+        viewModel.vehicles.filter { $0.status == .assigned && $0.activeStatus}.count
     }
     
     var inactiveVehicles: Int {
-        viewModel.vehicles.filter { $0.status == .inactive }.count
+        viewModel.vehicles.filter { $0.activeStatus == false }.count
     }
 
     

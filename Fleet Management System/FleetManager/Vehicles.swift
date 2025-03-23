@@ -1,9 +1,9 @@
 import SwiftUI
 import Foundation
-
 struct VehicleRowView: View {
-    let vehicle: Vehicle
-    @ObservedObject var viewModel: DriverViewModel
+    var vehicle: Vehicle
+    @ObservedObject var viewModel: IFEDataController
+    @State private var address: String = "Fetching address..."
     
     var body: some View {
         NavigationLink(destination: VehicleDetailView(vehicle: vehicle, viewModel: viewModel)) {
@@ -30,11 +30,14 @@ struct VehicleRowView: View {
                             Image(systemName: "location.fill")
                                 .font(.caption2)
                                 .foregroundColor(.gray)
-                            Text(vehicle.currentCoordinate)
+                            
+                            // ✅ Correct usage: Text updates dynamically
+                            Text(address)
                                 .font(.caption)
                                 .foregroundColor(.gray)
+                                .multilineTextAlignment(.leading)
                         }
-                        
+                        Spacer()
                         if vehicle.status == .available && vehicle.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
@@ -58,6 +61,15 @@ struct VehicleRowView: View {
                     .font(.caption2)
                     .foregroundColor(.gray)
             }
+            .onAppear {
+                getAddress(from: vehicle.currentCoordinate) { result in
+                    if let result = result {
+                        address = result  // ✅ Updates UI when geocoding completes
+                    } else {
+                        address = "Address not found"
+                    }
+                }
+            }
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background(Color.white)
@@ -68,7 +80,7 @@ struct VehicleRowView: View {
 
 struct VehicleDetailView: View {
     let vehicle: Vehicle
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @Environment(\.dismiss) var dismiss
     @State private var isEditing = false
     @State private var insuranceExpiry = Date()
@@ -76,6 +88,7 @@ struct VehicleDetailView: View {
     @State private var rcExpiry = Date()
     @State private var showAlert = false
     @State private var showingDisableAlert = false
+    @State private var address: String = "Fetching address..."
     
     var body: some View {
         List {
@@ -92,7 +105,8 @@ struct VehicleDetailView: View {
                 InfoRow(title: "License Plate", value: vehicle.licenseNumber)
                 InfoRow(title: "Fuel Type", value: vehicle.fuelType.rawValue)
                 InfoRow(title: "Load Capacity", value: "\(vehicle.loadCapacity) tons")
-                InfoRow(title: "Current Location", value: vehicle.currentCoordinate)
+                // ✅ Display formatted address instead of raw coordinates
+                InfoRow(title: "Current Location", value: address)
             } header: {
                 Text("Vehicle Specifications")
             }
@@ -100,11 +114,7 @@ struct VehicleDetailView: View {
             Section {
                 InfoRow(title: "Policy Number", value: vehicle.insurancePolicyNumber)
                 if isEditing {
-                    DatePicker(
-                        "Insurance Expiry Date",
-                        selection: $insuranceExpiry,
-                        displayedComponents: .date
-                    )
+                    DatePicker("Insurance Expiry Date", selection: $insuranceExpiry, displayedComponents: .date)
                 } else {
                     InfoRow(title: "Expiry Date", value: vehicle.insuranceExpiryDate.formatted(date: .long, time: .omitted))
                 }
@@ -115,11 +125,7 @@ struct VehicleDetailView: View {
             Section {
                 InfoRow(title: "PUC Number", value: vehicle.pucCertificateNumber)
                 if isEditing {
-                    DatePicker(
-                        "PUC Expiry Date",
-                        selection: $pucExpiry,
-                        displayedComponents: .date
-                    )
+                    DatePicker("PUC Expiry Date", selection: $pucExpiry, displayedComponents: .date)
                 } else {
                     InfoRow(title: "Expiry Date", value: vehicle.pucExpiryDate.formatted(date: .long, time: .omitted))
                 }
@@ -130,11 +136,7 @@ struct VehicleDetailView: View {
             Section {
                 InfoRow(title: "RC Number", value: vehicle.rcNumber)
                 if isEditing {
-                    DatePicker(
-                        "RC Expiry Date",
-                        selection: $rcExpiry,
-                        displayedComponents: .date
-                    )
+                    DatePicker("RC Expiry Date", selection: $rcExpiry, displayedComponents: .date)
                 } else {
                     InfoRow(title: "Expiry Date", value: vehicle.rcExpiryDate.formatted(date: .long, time: .omitted))
                 }
@@ -171,6 +173,11 @@ struct VehicleDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(isEditing ? "Save" : "Edit") {
                     if isEditing {
+                        var newVehicle = vehicle
+                        newVehicle.pucExpiryDate = pucExpiry
+                        newVehicle.insuranceExpiryDate = insuranceExpiry
+                        newVehicle.rcExpiryDate = rcExpiry
+                        viewModel.updateVehicleExpiryDates(vehicle, with: newVehicle)
                         showAlert = true
                     }
                     isEditing.toggle()
@@ -190,12 +197,21 @@ struct VehicleDetailView: View {
             insuranceExpiry = vehicle.insuranceExpiryDate
             pucExpiry = vehicle.pucExpiryDate
             rcExpiry = vehicle.rcExpiryDate
+            
+            // ✅ Fetch address on appear
+            getAddress(from: vehicle.currentCoordinate) { result in
+                if let result = result {
+                    address = result
+                } else {
+                    address = "Address not found"
+                }
+            }
         }
     }
 }
 
 struct VehiclesView: View {
-    @StateObject private var viewModel = DriverViewModel.shared
+    @StateObject private var viewModel = IFEDataController.shared
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     let filters = ["All", VehicleStatus.available.rawValue, VehicleStatus.assigned.rawValue, VehicleStatus.inactive.rawValue]
@@ -262,7 +278,7 @@ struct VehiclesView: View {
 
 struct VehicleDetailsView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     
     @State private var model = ""
     @State private var make = ""
@@ -278,6 +294,7 @@ struct VehicleDetailsView: View {
     @State private var rcExpiryDate = Date()
     @State private var currentCoordinate = ""
     @State private var selectedLocation: String? = nil
+    @State private var selectedAdress: String? = nil
     
     var isFormValid: Bool {
         !model.isEmpty &&
@@ -315,6 +332,7 @@ struct VehicleDetailsView: View {
                         placeholder: "Current Location",
                         selectedLocation: $selectedLocation
                     )
+                    
                 }
                 
                 Section("Insurance Details") {
@@ -355,27 +373,36 @@ struct VehicleDetailsView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        let newVehicle = Vehicle(
-                            id: viewModel.vehicles.count + 1,
-                            make: make,
-                            model: model,
-                            vinNumber: vinNumber,
-                            licenseNumber: licenseNumber,
-                            fuelType: selectedFuelType,
-                            loadCapacity: Float(loadCapacity) ?? 0,
-                            insurancePolicyNumber: insurancePolicyNumber,
-                            insuranceExpiryDate: insuranceExpiryDate,
-                            pucCertificateNumber: pucCertificateNumber,
-                            pucExpiryDate: pucExpiryDate,
-                            rcNumber: rcNumber,
-                            rcExpiryDate: rcExpiryDate,
-                            currentCoordinate: currentCoordinate.isEmpty ? "Not Available" : currentCoordinate,
-                            status: .available,
-                            activeStatus: true
-                        )
+                        Task {
+                            if let coordinates = await getCoordinates(from: currentCoordinate) {
+                                print("Coordinates: \(coordinates)")
+                                selectedAdress = coordinates
+                                let newVehicle = Vehicle(
+                                    id: viewModel.vehicles.count + 1,
+                                    make: make,
+                                    model: model,
+                                    vinNumber: vinNumber,
+                                    licenseNumber: licenseNumber,
+                                    fuelType: selectedFuelType,
+                                    loadCapacity: Float(loadCapacity) ?? 0,
+                                    insurancePolicyNumber: insurancePolicyNumber,
+                                    insuranceExpiryDate: insuranceExpiryDate,
+                                    pucCertificateNumber: pucCertificateNumber,
+                                    pucExpiryDate: pucExpiryDate,
+                                    rcNumber: rcNumber,
+                                    rcExpiryDate: rcExpiryDate,
+                                    currentCoordinate: selectedAdress!.isEmpty ? "0, 0" : selectedAdress!,
+                                    status: .available,
+                                    activeStatus: true
+                                )
+                                
+                                viewModel.addVehicle(newVehicle)
+                                dismiss()
+                            } else {
+                                print("Failed to get coordinates")
+                            }
+                        }
                         
-                        viewModel.addVehicle(newVehicle)
-                        dismiss()
                     }.foregroundColor(Color.primaryGradientEnd)
                 }
             }

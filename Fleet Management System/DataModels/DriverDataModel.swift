@@ -31,7 +31,7 @@ enum VehicleStatus: String, Codable {
 }
 
 struct Vehicle: Identifiable, Codable, Equatable{
-    let id: Int
+    var id: Int
     let make: String //company name
     let model: String
     let vinNumber: String
