@@ -322,13 +322,13 @@ struct FleetManagerDashboardView: View {
         .navigationTitle("Fleet Manager")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    // Action for the bell button
-                }) {
-                    Image(systemName: "bell.fill")
-                        .font(.title2)
-                        .foregroundColor(.primaryGradientEnd)
-                }
+//                Button(action: {
+//                    // Action for the bell button
+//                }) {
+//                    Image(systemName: "bell.fill")
+//                        .font(.title2)
+//                        .foregroundColor(.primaryGradientEnd)
+//                }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {

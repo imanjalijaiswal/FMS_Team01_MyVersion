@@ -84,7 +84,7 @@ class RemoteController: DatabaseAPIIntegrable{
                        description: String,
                        totalDistance: Int,
                        totalTripDuration: (hours: Int, minutes: Int),
-                       scheduledDateTime: Date) async throws -> UUID {
+                       scheduledDateTime: Date) async throws -> Trip {
         struct AssignTripParams: Encodable {
             let p_assigned_by: String
             let p_pickup_location: String
@@ -111,24 +111,25 @@ class RemoteController: DatabaseAPIIntegrable{
                                       p_total_trip_duration: "\(totalTripDuration.hours) hours \(totalTripDuration.minutes) minutes",
                                       p_scheduled_date_time: ISO8601DateFormatter().string(from: scheduledDateTime))
         
-        let newTripUUID: UUID = try await client
+        let newTrip: Trip = try await client
             .rpc("assign_new_trip",params: params)
             .execute()
             .value
         
-        return newTripUUID
+        return newTrip
     }
     
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip] {
-        let response = try await client
+        let response: [Trip] = try await client
                 .rpc("get_assigned_trips_by_manager_id", params: [
                     "p_manager_id": id.uuidString
                 ])
                 .execute()
+                .value
 
-        let decodedTrips = try JSONDecoder().decode([Trip].self, from: response.data)
-
-        return decodedTrips
+//        let trips: [Trip] = try JSONDecoder().decode([Trip].self, from: response.data)
+//        return trips
+        return response
     }
     
     func getDriverTrips(by id: UUID) async throws -> [Trip] {

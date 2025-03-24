@@ -34,7 +34,7 @@ struct DriverView: View {
                         tripID: 3,
                         assignedByFleetManagerID: UUID(),
                         assignedDriverIDs: [UUID()],
-                        assigneVehicleID: 3,
+                        assignedVehicleID: 3,
                         pickupLocation: "IMT Manesar, Gurugram, Haryana",
                         destination: "MIDC Pimpri, Pune, Maharashtra",
                         estimatedArrivalDateTime: Date().addingTimeInterval(48*3600),

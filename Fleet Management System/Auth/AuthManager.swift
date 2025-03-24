@@ -112,6 +112,30 @@ struct AppUser: Codable, Equatable, Identifiable {
     
     var role: Role { return meta_data.role }
     
+    var licenseNumber: String? {
+        switch userData {
+        case .driver(let driver):
+            return driver.licenseNumber
+        default: return nil
+        }
+    }
+    
+    var totalTrips: Int? {
+        switch userData {
+        case .driver(let driver):
+            return driver.totalTrips
+        default: return nil
+        }
+    }
+    
+    var driverStatus: DriverStatus? {
+        switch userData {
+        case .driver(let driver):
+            return driver.status
+        default: return nil
+        }
+    }
+    
     var id: UUID {  return meta_data.id }
     
     var activeStatus: Bool { return meta_data.activeStatus }

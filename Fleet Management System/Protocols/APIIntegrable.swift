@@ -54,7 +54,7 @@ protocol DatabaseAPIIntegrable {
                        description: String,
                        totalDistance: Int,
                        totalTripDuration: (hours: Int, minutes: Int),
-                       scheduledDateTime: Date) async throws -> UUID
+                       scheduledDateTime: Date) async throws -> Trip
     
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip]
     

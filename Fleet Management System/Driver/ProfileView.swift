@@ -22,43 +22,41 @@ struct ProfileView: View {
     func signOut() {
         Task {
             do {
-                dismiss()
                 try await AuthManager.shared.signOut()
-//                let newTrip = Trips(
-//                    tripId: "TRP-2024-003",
-//                    truckType: "BharatBenz 2823C",
-//                    numberPlate: "DL 01 HH 9876",
-//                    type: .assigned,
-//                    date: "Thursday - Mar 21, 2024",
-//                    details: "Auto Parts, 3200 kg",
-//                    pickup: Location(
-//                        name: "Maruti Suzuki Plant",
-//                        address: "IMT Manesar, Gurugram, Haryana"
-//                    ),
-//                    destination: Location(
-//                        name: "Tata Motors Factory",
-//                        address: "MIDC Pimpri, Pune, Maharashtra"
-//                    ),
-//                    distance: "1420 km",
-//                    estimatedTime: "20 hours",
-//                    partner: Partner(
-//                        name: "Amit Patel",
-//                        company: "Maruti Suzuki",
-//                        contactNumber: "+91 76543 21098",
-//                        email: "amit.patel@maruti.com"
-//                    )
-//                )
                 DispatchQueue.main.async {
-                
+                    dismiss()
                     user = nil
                     role = nil
                 }
-
             } catch {
                 print("Error signing out: \(error)")
             }
         }
     }
+
+    var licenseInfoView: some View {
+        guard let user = user, user.role == .driver else { return AnyView(EmptyView()) }
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 12) {
+                Text("License Information")
+                    .font(.headline)
+
+                Divider()
+
+                InfoRow(title: "Driving License", value: user.licenseNumber!)
+                Text("Format: DL-{State Code}-{Year}-{7 digits}")
+                    .font(.caption)
+                    .foregroundColor(.textSecondary)
+                    .padding(.top, 4)
+            }
+            .padding()
+            .background(Color.white)
+            .cornerRadius(12)
+        )
+    }
+
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -71,7 +69,7 @@ struct ProfileView: View {
                             .frame(width: 100, height: 100)
                             .foregroundColor(.primaryGradientStart)
                         
-                        Text(driver.meta_data.fullName)
+                        Text(user?.meta_data.fullName ?? "")
                             .font(.title2)
                             .fontWeight(.bold)
                         
@@ -90,8 +88,8 @@ struct ProfileView: View {
                             
                             Divider()
                             
-                            InfoRow(title: "Employee ID", value: String(driver.employeeID))
-                            InfoRow(title: "Full Name", value: driver.meta_data.fullName)
+                            InfoRow(title: "Employee ID", value: String(user?.employeeID ?? 0))
+                            InfoRow(title: "Full Name", value: user?.meta_data.fullName ?? "")
                         }
                         .padding()
                         .background(Color.white)
@@ -105,28 +103,15 @@ struct ProfileView: View {
                             Divider()
                             
                             InfoRow(title: "Email", value: user?.meta_data.email ?? "")
-                            InfoRow(title: "Phone Number", value: driver.meta_data.phone)
+                            InfoRow(title: "Phone Number", value: user?.meta_data.phone ?? "")
                         }
                         .padding()
                         .background(Color.white)
                         .cornerRadius(12)
                         
                         // License Information Card
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("License Information")
-                                .font(.headline)
-                            
-                            Divider()
-                            
-                            InfoRow(title: "Driving License", value: driver.licenseNumber)
-                            Text("Format: DL-{State Code}-{Year}-{7 digits}")
-                                .font(.caption)
-                                .foregroundColor(.textSecondary)
-                                .padding(.top, 4)
-                        }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
+                        licenseInfoView
+                        
                         Button(action: signOut) {
                                     Text("Sign Out")
                                         .font(.title2)

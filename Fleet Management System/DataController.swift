@@ -7,10 +7,12 @@
 import SwiftUI
 import CoreLocation
 import SwiftSMTP
+import Auth
 
 
 class IFEDataController: ObservableObject {
     static let shared = IFEDataController() // Singleton instance
+    var user: AppUser?
     
     @Published var drivers: [Driver] = []
     @Published var vehicles: [Vehicle] = []
@@ -19,8 +21,19 @@ class IFEDataController: ObservableObject {
     
     init() {
         Task { @MainActor in
+            await fetchUser()
             await loadDrivers()
             await loadVehicles()
+            await loadTrips()
+        }
+    }
+    
+    @MainActor
+    private func fetchUser() async {
+        do {
+            user = try await AuthManager.shared.getCurrentSession()
+        } catch {
+            print("Error while fetching user: \(error.localizedDescription)")
         }
     }
     
@@ -39,6 +52,20 @@ class IFEDataController: ObservableObject {
             vehicles = try await remoteController.getRegisteredVehicles()
         } catch {
             print("Error while fetching registered vehicles: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func loadTrips() async {
+        do {
+            if let user = user {
+                if user.role == .fleetManager {
+                    print(user.id.uuidString)
+                    trips = try await remoteController.getManagerAssignedTrips(by: user.id)
+                }
+            }
+        } catch {
+            print("Error while fetching trips: \(error.localizedDescription)")
         }
     }
     
@@ -139,23 +166,60 @@ class IFEDataController: ObservableObject {
             }
         }
     }
+    
     func addTrip(_ trip: Trip) {
-        trips.append(trip)
-        // Update driver status to onTrip
-        for driverId in trip.assignedDriverIDs {
-            if let index = drivers.firstIndex(where: { $0.id == driverId }) {
-                var driver = drivers[index]
-//                driver.totalTrips += 1
-                driver.status = .onTrip
-                drivers[index] = driver
+        Task {
+            do {
+                print("Pickup location: \(trip.pickupLocation)\nDestination: \(trip.destination)")
+                let pickupComponents = trip.pickupLocation
+                    .split(separator: ",").map {
+                        $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                
+                let destinationComponent = trip.destination
+                    .split(separator: ",").map {
+                        $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                
+                print(pickupComponents, destinationComponent)
+                
+                if let pickupLatitude = Double(pickupComponents[0]), let pickupLongitude = Double(pickupComponents[1]), let destLatitude = Double(destinationComponent[0]), let destLongitude = Double(destinationComponent[1]) {
+                    let pickupCoordinates = (pickupLatitude, pickupLongitude)
+                    let destCoordinates = (destLatitude, destLongitude)
+                    
+                    let calendar = Calendar.current
+
+                    let hours: Int = calendar.component(.hour, from: trip.totalTripDuration)
+                    let minutes: Int = calendar.component(.minute, from: trip.totalTripDuration)
+
+                    let time = (hours: hours, minutes: minutes)
+                    
+                    let newTrip = try await remoteController.assignNewTrip(assignedBy: user!.id, pickupCoordinates: pickupCoordinates, destinationCoordinates: destCoordinates, assignedVehicleId: trip.assignedVehicleID, assignedDriverIDs: trip.assignedDriverIDs, estimatedDateTime: trip.estimatedArrivalDateTime, description: trip.description!, totalDistance: trip.totalDistance, totalTripDuration: time, scheduledDateTime: trip.scheduledDateTime)
+                    
+                    for driverId in newTrip.assignedDriverIDs {
+                        if let index = drivers.firstIndex(where: { $0.id == driverId }) {
+                            var driver = drivers[index]
+                            driver.status = .onTrip
+                            drivers[index] = driver
+                        }
+                    }
+                    // Update vehicle status to assigned
+                    if let index = vehicles.firstIndex(where: { $0.id == trip.assignedVehicleID }) {
+                        var vehicle = vehicles[index]
+                        vehicle.status = .assigned
+                        vehicles[index] = vehicle
+                    }
+                    
+                    trips.append(newTrip)
+                } else {
+                    print("Unable to parse the coordinates")
+                }
+            } catch {
+                print("Error assigning the new trip: \(error.localizedDescription)")
             }
         }
-        // Update vehicle status to inUse
-        if let index = vehicles.firstIndex(where: { $0.id == trip.assigneVehicleID }) {
-            var vehicle = vehicles[index]
-            vehicle.status = .assigned
-            vehicles[index] = vehicle
-        }
+//
+//        try await remoteController.a
     }
     
     func getFilteredTrips(status: TripStatus?) -> [Trip] {

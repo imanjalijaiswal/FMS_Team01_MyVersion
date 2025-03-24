@@ -14,7 +14,7 @@ struct Trip: Identifiable, Codable {
     var assignedByFleetManagerID: UUID      //initialize automatidally when fleet manager assignns the trip
     var assignedDriverIDs: [UUID]
     //var assigneVehicleID: Int
-    var assigneVehicleID: Int
+    var assignedVehicleID: Int
 
     var pickupLocation: String
     var destination: String
@@ -23,8 +23,8 @@ struct Trip: Identifiable, Codable {
     var totalTripDuration: Date
     var description: String?
     var scheduledDateTime: Date
-    var createdAt: Date = Date.now
-    var status: TripStatus = .scheduled
+    var createdAt: Date
+    var status: TripStatus
 }
 
 enum TripStatus: String, Codable {

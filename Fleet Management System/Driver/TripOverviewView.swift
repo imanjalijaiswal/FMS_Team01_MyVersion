@@ -304,7 +304,7 @@ struct VehicleDetailsCard: View {
                     Text("Vehicle ID")
                         .font(.caption)
                         .foregroundColor(.textSecondary)
-                    Text("\(task.assigneVehicleID)")
+                    Text("\(task.assignedVehicleID)")
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
@@ -383,7 +383,7 @@ struct StartTripButton: View {
         tripID: 1,
         assignedByFleetManagerID: UUID(),
         assignedDriverIDs: [UUID()],
-        assigneVehicleID: 1,
+        assignedVehicleID: 1,
         pickupLocation: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra",
         destination: "Attibele Industrial Area, Hosur Road, Bangalore",
         estimatedArrivalDateTime: Date().addingTimeInterval(14*3600),

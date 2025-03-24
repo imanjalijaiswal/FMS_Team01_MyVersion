@@ -24,7 +24,7 @@ struct TripsView: View {
                 viewModel.drivers.first { $0.id == driverId }?.meta_data.fullName
             }.joined(separator: ", ")
             
-            let vehicleNumber = viewModel.vehicles.first { $0.id == trip.assigneVehicleID }?.vinNumber ?? ""
+            let vehicleNumber = viewModel.vehicles.first { $0.id == trip.assignedVehicleID }?.vinNumber ?? ""
             
             return driverNames.localizedCaseInsensitiveContains(searchText) ||
                    vehicleNumber.localizedCaseInsensitiveContains(searchText) ||
@@ -93,7 +93,8 @@ struct TripCard: View {
     let trip: Trip
     @ObservedObject var viewModel: IFEDataController
     @State private var showingStatusSheet = false
-    
+    @State private var pickupAddress: String = "Fetching address..."
+    @State private var destinationAddress: String = "Fetching address..."
     var driverNames: String {
         trip.assignedDriverIDs.compactMap { driverId in
             viewModel.drivers.first { $0.id == driverId }?.meta_data.fullName
@@ -101,7 +102,7 @@ struct TripCard: View {
     }
     
     var vehicleNumber: String {
-        viewModel.vehicles.first { $0.id == trip.assigneVehicleID }?.vinNumber ?? "Unknown Vehicle"
+        viewModel.vehicles.first { $0.id == trip.assignedVehicleID }?.vinNumber ?? "Unknown Vehicle"
     }
     
     var body: some View {
@@ -125,8 +126,8 @@ struct TripCard: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
-                LocationRow(title: "From", location: trip.pickupLocation)
-                LocationRow(title: "To", location: trip.destination)
+                LocationRow(title: "From", location: pickupAddress)
+                LocationRow(title: "To", location: destinationAddress)
             }
             
             if let description = trip.description {
@@ -150,6 +151,22 @@ struct TripCard: View {
                 Label("ETA: \(trip.estimatedArrivalDateTime.formatted(date: .abbreviated, time: .shortened))", systemImage: "clock")
                     .font(.caption)
                     .foregroundColor(.gray)
+            }
+        }
+        .onAppear {
+            getAddress(from: trip.destination) { result in
+                if let result = result {
+                    destinationAddress = result
+                } else {
+                    destinationAddress = "Address not found"
+                }
+            }
+            getAddress(from: trip.pickupLocation) { result in
+                if let result = result {
+                    pickupAddress = result
+                } else {
+                    pickupAddress = "Address not found"
+                }
             }
         }
         .padding()
@@ -208,7 +225,8 @@ struct AssignTripView: View {
     @State private var showDriver2Selection = false
     @State private var tripDescription = ""
     @State private var totalDistance = ""
-    
+    @State private var pickupAddress: String = "Fetching address..."
+    @State private var destinationAddress: String = "Fetching address..."
     var isFormValid: Bool {
         !pickupLocation.isEmpty &&
         !destination.isEmpty &&
@@ -372,24 +390,32 @@ struct AssignTripView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        let newTrip = Trip(
-                            id: UUID(),
-                            tripID: Int.random(in: 1000...9999),
-                            assignedByFleetManagerID: UUID(),
-                            assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
-                            assigneVehicleID: selectedVehicle?.id ?? 0,
-                            pickupLocation: pickupLocation,
-                            destination: destination,
-                            estimatedArrivalDateTime: estimatedArrivalDateTime,
-                            totalDistance: Int(totalDistance) ?? 0,
-                            totalTripDuration: estimatedArrivalDateTime,
-                            description: tripDescription.isEmpty ? nil : tripDescription,
-                            scheduledDateTime: scheduledDateTime,
-                            status: .scheduled
-                        )
-                        
-                        viewModel.addTrip(newTrip)
-                        showingAlert = true
+                        Task{
+                            if let pickupCoordinate = await getCoordinates(from: selectedStartLocation ?? ""){
+                                selectedStartLocation = pickupCoordinate
+                                if let destinationCoordinate = await getCoordinates(from: selectedEndLocation ?? ""){
+                                    selectedEndLocation = destinationCoordinate
+                                    let newTrip = Trip(
+                                        id: UUID(),
+                                        tripID: Int.random(in: 1000...9999),
+                                        assignedByFleetManagerID: UUID(),
+                                        assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
+                                        assignedVehicleID: selectedVehicle?.id ?? 0,
+                                        pickupLocation: selectedStartLocation ?? "0,0",
+                                        destination: selectedEndLocation ?? "0,0",
+                                        estimatedArrivalDateTime: estimatedArrivalDateTime,
+                                        totalDistance: Int(totalDistance) ?? 0,
+                                        totalTripDuration: estimatedArrivalDateTime,
+                                        description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
+                                        scheduledDateTime: scheduledDateTime, createdAt: .now,
+                                        status: .scheduled
+                                    )
+                                    
+                                    viewModel.addTrip(newTrip)
+                                    showingAlert = true
+                                }
+                            }
+                        }
                     }
                     .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isFormValid)

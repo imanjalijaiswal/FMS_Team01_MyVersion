@@ -8,89 +8,89 @@ struct DashboardView: View {
     @State private var trips: [Trip] = [
         // Active Trip (only one allowed)
         
-        Trip(
-                    id: UUID(),
-                    tripID: 1,
-                    assignedByFleetManagerID: UUID(),
-                    assignedDriverIDs: [UUID()],
-                    assigneVehicleID: 1,
-                    pickupLocation: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra",
-                    destination: "Attibele Industrial Area, Hosur Road, Bangalore",
-                    estimatedArrivalDateTime: Date().addingTimeInterval(14*3600),
-                    totalDistance: 985,
-                    totalTripDuration: Date().addingTimeInterval(14*3600),
-                    description: "Electronics, 2500 kg",
-                    scheduledDateTime: Date(),
-                    status: .inProgress
-        ),
+//        Trip(
+//                    id: UUID(),
+//                    tripID: 1,
+//                    assignedByFleetManagerID: UUID(),
+//                    assignedDriverIDs: [UUID()],
+//                    assigneVehicleID: 1,
+//                    pickupLocation: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra",
+//                    destination: "Attibele Industrial Area, Hosur Road, Bangalore",
+//                    estimatedArrivalDateTime: Date().addingTimeInterval(14*3600),
+//                    totalDistance: 985,
+//                    totalTripDuration: Date().addingTimeInterval(14*3600),
+//                    description: "Electronics, 2500 kg",
+//                    scheduledDateTime: Date(),
+//                    status: .inProgress
+//        ),
         
         
         // Upcoming Trips
-        Trip(
-                    id: UUID(),
-                    tripID: 2,
-                    assignedByFleetManagerID: UUID(),
-                    assignedDriverIDs: [UUID()],
-                    assigneVehicleID: 2,
-                    pickupLocation: "SIPCOT Industrial Park, Chennai, Tamil Nadu",
-                    destination: "Miyapur, Hyderabad, Telangana",
-                    estimatedArrivalDateTime: Date().addingTimeInterval(24*3600),
-                    totalDistance: 635,
-                    totalTripDuration: Date().addingTimeInterval(9*3600),
-                    description: "FMCG Goods, 1800 kg",
-                    scheduledDateTime: Date().addingTimeInterval(24*3600),
-                    status: .scheduled
-        ),
+//        Trip(
+//                    id: UUID(),
+//                    tripID: 2,
+//                    assignedByFleetManagerID: UUID(),
+//                    assignedDriverIDs: [UUID()],
+//                    assigneVehicleID: 2,
+//                    pickupLocation: "SIPCOT Industrial Park, Chennai, Tamil Nadu",
+//                    destination: "Miyapur, Hyderabad, Telangana",
+//                    estimatedArrivalDateTime: Date().addingTimeInterval(24*3600),
+//                    totalDistance: 635,
+//                    totalTripDuration: Date().addingTimeInterval(9*3600),
+//                    description: "FMCG Goods, 1800 kg",
+//                    scheduledDateTime: Date().addingTimeInterval(24*3600),
+//                    status: .scheduled
+//        ),
         
-        Trip(
-                    id: UUID(),
-                    tripID: 3,
-                    assignedByFleetManagerID: UUID(),
-                    assignedDriverIDs: [UUID()],
-                    assigneVehicleID: 3,
-                    pickupLocation: "IMT Manesar, Gurugram, Haryana",
-                    destination: "MIDC Pimpri, Pune, Maharashtra",
-                    estimatedArrivalDateTime: Date().addingTimeInterval(48*3600),
-                    totalDistance: 1420,
-                    totalTripDuration: Date().addingTimeInterval(20*3600),
-                    description: "Auto Parts, 3200 kg",
-                    scheduledDateTime: Date().addingTimeInterval(48*3600),
-                    status: .scheduled
-                ),
+//        Trip(
+//                    id: UUID(),
+//                    tripID: 3,
+//                    assignedByFleetManagerID: UUID(),
+//                    assignedDriverIDs: [UUID()],
+//                    assigneVehicleID: 3,
+//                    pickupLocation: "IMT Manesar, Gurugram, Haryana",
+//                    destination: "MIDC Pimpri, Pune, Maharashtra",
+//                    estimatedArrivalDateTime: Date().addingTimeInterval(48*3600),
+//                    totalDistance: 1420,
+//                    totalTripDuration: Date().addingTimeInterval(20*3600),
+//                    description: "Auto Parts, 3200 kg",
+//                    scheduledDateTime: Date().addingTimeInterval(48*3600),
+//                    status: .scheduled
+//                ),
         
         // History Trips
-        
-        Trip(
-                    id: UUID(),
-                    tripID: 0,
-                    assignedByFleetManagerID: UUID(),
-                    assignedDriverIDs: [UUID()],
-                    assigneVehicleID: 1,
-                    pickupLocation: "Tirupur Trade Centre, Tamil Nadu",
-                    destination: "Linking Road, Mumbai, Maharashtra",
-                    estimatedArrivalDateTime: Date().addingTimeInterval(-24*3600),
-                    totalDistance: 1250,
-                    totalTripDuration: Date().addingTimeInterval(18*3600),
-                    description: "Textiles, 1500 kg",
-                    scheduledDateTime: Date().addingTimeInterval(-48*3600),
-                    status: .completed
-                ),
-        
-        Trip(
-                    id: UUID(),
-                    tripID: 999,
-                    assignedByFleetManagerID: UUID(),
-                    assignedDriverIDs: [UUID()],
-                    assigneVehicleID: 2,
-                    pickupLocation: "Vashi, Navi Mumbai, Maharashtra",
-                    destination: "Whitefield, Bangalore, Karnataka",
-                    estimatedArrivalDateTime: Date().addingTimeInterval(-48*3600),
-                    totalDistance: 985,
-                    totalTripDuration: Date().addingTimeInterval(14*3600),
-                    description: "Perishables, 2200 kg",
-                    scheduledDateTime: Date().addingTimeInterval(-72*3600),
-                    status: .completed
-                )
+//        
+//        Trip(
+//                    id: UUID(),
+//                    tripID: 0,
+//                    assignedByFleetManagerID: UUID(),
+//                    assignedDriverIDs: [UUID()],
+//                    assigneVehicleID: 1,
+//                    pickupLocation: "Tirupur Trade Centre, Tamil Nadu",
+//                    destination: "Linking Road, Mumbai, Maharashtra",
+//                    estimatedArrivalDateTime: Date().addingTimeInterval(-24*3600),
+//                    totalDistance: 1250,
+//                    totalTripDuration: Date().addingTimeInterval(18*3600),
+//                    description: "Textiles, 1500 kg",
+//                    scheduledDateTime: Date().addingTimeInterval(-48*3600),
+//                    status: .completed
+//                ),
+//        
+//        Trip(
+//                    id: UUID(),
+//                    tripID: 999,
+//                    assignedByFleetManagerID: UUID(),
+//                    assignedDriverIDs: [UUID()],
+//                    assigneVehicleID: 2,
+//                    pickupLocation: "Vashi, Navi Mumbai, Maharashtra",
+//                    destination: "Whitefield, Bangalore, Karnataka",
+//                    estimatedArrivalDateTime: Date().addingTimeInterval(-48*3600),
+//                    totalDistance: 985,
+//                    totalTripDuration: Date().addingTimeInterval(14*3600),
+//                    description: "Perishables, 2200 kg",
+//                    scheduledDateTime: Date().addingTimeInterval(-72*3600),
+//                    status: .completed
+//                )
     ]
     
     var filteredTrips: [Trip] {
@@ -187,13 +187,13 @@ struct DashboardView: View {
             .navigationBarTitle("Hello, Rajesh", displayMode: .large)// Empty title to prevent double title
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        // Action for the bell button
-                    }) {
-                        Image(systemName: "bell.fill")
-                            .font(.title2)
-                            .foregroundColor(.primaryGradientStart)
-                    }
+//                    Button(action: {
+//                        // Action for the bell button
+//                    }) {
+//                        Image(systemName: "bell.fill")
+//                            .font(.title2)
+//                            .foregroundColor(.primaryGradientStart)
+//                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
@@ -240,7 +240,7 @@ struct DriverInfoCard: View {
                 Text("Rajesh Kumar Singh")
                     .fontWeight(.medium)
                 if let activeTrip = currentTrip {
-                    Text("\(activeTrip.assigneVehicleID)")
+                    Text("\(activeTrip.assignedVehicleID)")
                         .font(.subheadline)
                         .foregroundColor(.textSecondary)
                 }
@@ -322,7 +322,7 @@ struct TaskCard: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 //Text(task.truckType)
                                     //.foregroundColor(.textSecondary)
-                                Text("\(task.assigneVehicleID)")
+                                Text("\(task.assignedVehicleID)")
                                     .foregroundColor(.statusOrange)
                             }
                             .font(.subheadline)
