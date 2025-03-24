@@ -6,13 +6,13 @@
 //
 import SwiftUI
 import MapKit
-
+import CoreLocation
 
 struct TripsView: View {
     @State private var showingAddNewTrip = false
     @State private var searchText = ""
     @State private var selectedFilter = "All"
-    @StateObject private var viewModel = DriverViewModel.shared
+    @StateObject private var viewModel = IFEDataController.shared
     
     let filters = ["All", "Scheduled", "In Progress", "Completed"]
     
@@ -21,10 +21,10 @@ struct TripsView: View {
             if searchText.isEmpty { return true }
             
             let driverNames = trip.assignedDriverIDs.compactMap { driverId in
-                viewModel.drivers.first { $0.id == driverId }?.fullName
+                viewModel.drivers.first { $0.id == driverId }?.meta_data.fullName
             }.joined(separator: ", ")
             
-            let vehicleNumber = viewModel.vehicles.first { $0.id == trip.assigneVehicleID }?.vinNumber ?? ""
+            let vehicleNumber = viewModel.vehicles.first { $0.id == trip.assignedVehicleID }?.vinNumber ?? ""
             
             return driverNames.localizedCaseInsensitiveContains(searchText) ||
                    vehicleNumber.localizedCaseInsensitiveContains(searchText) ||
@@ -85,23 +85,24 @@ struct TripsView: View {
                 }
             }
         }
-        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+        .background(.white)
     }
 }
 
 struct TripCard: View {
     let trip: Trip
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @State private var showingStatusSheet = false
-    
+    @State private var pickupAddress: String = "Fetching address..."
+    @State private var destinationAddress: String = "Fetching address..."
     var driverNames: String {
         trip.assignedDriverIDs.compactMap { driverId in
-            viewModel.drivers.first { $0.id == driverId }?.fullName
+            viewModel.drivers.first { $0.id == driverId }?.meta_data.fullName
         }.joined(separator: ", ")
     }
     
     var vehicleNumber: String {
-        viewModel.vehicles.first { $0.id == trip.assigneVehicleID }?.vinNumber ?? "Unknown Vehicle"
+        viewModel.vehicles.first { $0.id == trip.assignedVehicleID }?.vinNumber ?? "Unknown Vehicle"
     }
     
     var body: some View {
@@ -125,8 +126,8 @@ struct TripCard: View {
             Divider()
             
             VStack(alignment: .leading, spacing: 8) {
-                LocationRow(title: "From", location: trip.pickupLocation)
-                LocationRow(title: "To", location: trip.destination)
+                LocationRow(title: "From", location: pickupAddress)
+                LocationRow(title: "To", location: destinationAddress)
             }
             
             if let description = trip.description {
@@ -150,6 +151,22 @@ struct TripCard: View {
                 Label("ETA: \(trip.estimatedArrivalDateTime.formatted(date: .abbreviated, time: .shortened))", systemImage: "clock")
                     .font(.caption)
                     .foregroundColor(.gray)
+            }
+        }
+        .onAppear {
+            getAddress(from: trip.destination) { result in
+                if let result = result {
+                    destinationAddress = result
+                } else {
+                    destinationAddress = "Address not found"
+                }
+            }
+            getAddress(from: trip.pickupLocation) { result in
+                if let result = result {
+                    pickupAddress = result
+                } else {
+                    pickupAddress = "Address not found"
+                }
             }
         }
         .padding()
@@ -189,7 +206,7 @@ struct TripCard: View {
 
 struct AssignTripView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     
     @State private var pickupLocation = ""
     @State private var destination = ""
@@ -208,14 +225,13 @@ struct AssignTripView: View {
     @State private var showDriver2Selection = false
     @State private var tripDescription = ""
     @State private var totalDistance = ""
-    
+    @State private var pickupAddress: String = "Fetching address..."
+    @State private var destinationAddress: String = "Fetching address..."
     var isFormValid: Bool {
         !pickupLocation.isEmpty &&
         !destination.isEmpty &&
         selectedVehicle != nil &&
-        selectedDriver1 != nil &&
-        !totalDistance.isEmpty &&
-        Int(totalDistance) != nil
+        selectedDriver1 != nil
     }
     
     var body: some View {
@@ -252,9 +268,16 @@ struct AssignTripView: View {
                         if showScheduledDatePicker {
                             DatePicker(
                                 "Scheduled Date & Time",
-                                selection: $scheduledDateTime
+                                selection: $scheduledDateTime,
+                                in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...,
+                                displayedComponents: [.date, .hourAndMinute]
                             )
                             .datePickerStyle(.graphical)
+                            .onAppear {
+                                // Ensure the default selected date is also tomorrow
+                                scheduledDateTime = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+
+                            }
                         }
                     }
                     .padding()
@@ -279,22 +302,21 @@ struct AssignTripView: View {
                         if showEstimatedDatePicker {
                             DatePicker(
                                 "Estimated Arrival",
-                                selection: $estimatedArrivalDateTime
+                                selection: $estimatedArrivalDateTime,
+                                in: Calendar.current.date(byAdding: .hour, value: 1, to: scheduledDateTime)!...,
+                                displayedComponents: [.date, .hourAndMinute]
                             )
                             .datePickerStyle(.graphical)
+                            .onAppear {
+                                // Ensure the default selected date is also tomorrow
+                                estimatedArrivalDateTime = Calendar.current.date(byAdding: .hour, value: 1, to: scheduledDateTime) ?? Date()
+                            }
                         }
+
                     }
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
-
-                    // Total Distance
-                    TextField("Total Distance (km)", text: $totalDistance)
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
 
                     // Description
                     TextField("Trip Description (Optional)", text: $tripDescription)
@@ -331,7 +353,7 @@ struct AssignTripView: View {
                                 Text("Driver 1")
                                     .foregroundColor(.primary)
                                 Spacer()
-                                Text(selectedDriver1?.fullName ?? "Select Driver 1")
+                                Text(selectedDriver1?.meta_data.fullName ?? "Select Driver 1")
                                     .foregroundColor(.gray)
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
@@ -351,7 +373,7 @@ struct AssignTripView: View {
                                 Text("Driver 2 (Optional)")
                                     .foregroundColor(.primary)
                                 Spacer()
-                                Text(selectedDriver2?.fullName ?? "Select Driver 2")
+                                Text(selectedDriver2?.meta_data.fullName ?? "Select Driver 2")
                                     .foregroundColor(.gray)
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
@@ -372,25 +394,37 @@ struct AssignTripView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        let newTrip = Trip(
-                            id: UUID(),
-                            tripID: Int.random(in: 1000...9999),
-                            assignedByFleetManagerID: UUID(),
-                            assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
-                            assigneVehicleID: selectedVehicle?.id ?? 0,
-                            pickupLocation: pickupLocation,
-                            destination: destination,
-                            estimatedArrivalDateTime: estimatedArrivalDateTime,
-                            totalDistance: Int(totalDistance) ?? 0,
-                            totalTripDuration: estimatedArrivalDateTime,
-                            description: tripDescription.isEmpty ? nil : tripDescription,
-                            scheduledDateTime: scheduledDateTime,
-                            status: .scheduled
-                        )
-                        
-                        viewModel.addTrip(newTrip)
-                        showingAlert = true
+                        Task{
+                            if let pickupCoordinate = await getCoordinates(from: selectedStartLocation ?? ""){
+                                selectedStartLocation = pickupCoordinate
+                                if let destinationCoordinate = await getCoordinates(from: selectedEndLocation ?? ""){
+                                    selectedEndLocation = destinationCoordinate
+                                    if let distance = calculateDistance(from: selectedStartLocation ?? "", to: selectedEndLocation ?? "") {
+                                        print("Distance: \(distance / 1000) km") // Convert meters to kilometers
+                                        let newTrip = Trip(
+                                            id: UUID(),
+                                            tripID: Int.random(in: 1000...9999),
+                                            assignedByFleetManagerID: UUID(),
+                                            assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
+                                            assignedVehicleID: selectedVehicle?.id ?? 0,
+                                            pickupLocation: selectedStartLocation ?? "0,0",
+                                            destination: selectedEndLocation ?? "0,0",
+                                            estimatedArrivalDateTime: estimatedArrivalDateTime,
+                                            totalDistance: Int(distance/1000),
+                                            totalTripDuration: estimatedArrivalDateTime,
+                                            description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
+                                            scheduledDateTime: scheduledDateTime, createdAt: .now,
+                                            status: .scheduled
+                                        )
+                                        
+                                        viewModel.addTrip(newTrip)
+                                        showingAlert = true
+                                    }
+                                }
+                            }
+                        }
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isFormValid)
                 }
                 
@@ -398,18 +432,42 @@ struct AssignTripView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                 }
             }
             .alert("Success", isPresented: $showingAlert) {
                 Button("OK") {
                     dismiss()
                 }
+                .foregroundColor(Color.primaryGradientEnd)
             } message: {
                 Text("Trip assigned successfully")
             }
         }
     }
 }
+
+
+func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
+    let startComponents = startCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+    let endComponents = endCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+
+    guard startComponents.count == 2, endComponents.count == 2,
+          let startLatitude = Double(startComponents[0]),
+          let startLongitude = Double(startComponents[1]),
+          let endLatitude = Double(endComponents[0]),
+          let endLongitude = Double(endComponents[1]) else {
+        print("Invalid coordinate format")
+        return nil
+    }
+
+    let startLocation = CLLocation(latitude: startLatitude, longitude: startLongitude)
+    let endLocation = CLLocation(latitude: endLatitude, longitude: endLongitude)
+
+    let distanceInMeters = startLocation.distance(from: endLocation) // Distance in meters
+    return distanceInMeters
+}
+
 struct DriversRowView: View {
     let driver: Driver
     let isSelected: Bool
@@ -421,16 +479,16 @@ struct DriversRowView: View {
                 .foregroundColor(.blue)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(driver.fullName)
+                Text(driver.meta_data.fullName)
                     .font(.headline)
                     .foregroundColor(.primary)
 
-                Text("ID: \(driver.driverID)")
+                Text("ID: \(driver.employeeID)")
                     .font(.subheadline)
                     .foregroundColor(.gray)
 
                 HStack {
-                    Label(driver.phoneNumber, systemImage: "phone.fill")
+                    Label(driver.meta_data.phone, systemImage: "phone.fill")
                         .font(.caption)
                         .foregroundColor(.gray)
 
@@ -457,13 +515,13 @@ struct DriversRowView: View {
 
 struct DriverSelectionView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @Binding var selectedDriver: Driver?
     let excludeDriver: Driver?
     
     var availableDrivers: [Driver] {
         viewModel.drivers.filter { driver in
-            driver.workingStatus &&
+            driver.activeStatus &&
             driver.status == .available &&
             driver.role == .driver
             &&
@@ -725,7 +783,7 @@ struct StatusBadge: View {
 
 struct VehicleSelectionView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     @Binding var selectedVehicle: Vehicle?
     
     var availableVehicles: [Vehicle] {
@@ -815,4 +873,6 @@ struct VehicleSelectionView: View {
         }
     }
 }
+
+
 

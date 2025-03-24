@@ -9,8 +9,72 @@ import Foundation
 
 import Supabase
 import SwiftUI
+import Auth
+import SwiftSMTP
 
-class RemoteController:DatabaseAPIIntegrable{
+extension Date {
+    func formatDateForSupabase() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        return formatter.string(from: self)
+    }
+}
+
+class RemoteController: DatabaseAPIIntegrable{
+    func updateDriverStatus(by id: UUID, _ newStatus: DriverStatus) async throws {
+        try await client
+            .rpc("update_driver_status_by_id", params: [
+                "p_id": id.uuidString,
+                "p_new_status": newStatus.rawValue
+            ])
+            .execute()
+    }
+    
+    func updateUserPhone(by id: UUID, _ phone: String) async throws {
+        try await client
+            .rpc("update_user_phone_by_id", params: [
+                "p_id": id.uuidString,
+                "p_phone": phone
+            ])
+            .execute()
+    }
+    
+    func createNewDriver(_ email: String, password: String) async throws -> UUID {
+        let authResponse = try await client.auth.signUp(email: email, password: password)
+        // Step 2: Extract user ID
+        let userId = authResponse.user.id
+        return userId
+    }
+    
+    func getMaxEmployeeID(ofType type: Role) async throws -> Int {
+        return try await client
+            .rpc("get_max_employee_id_of_type", params: ["p_type": type])
+            .execute().value
+    }
+    
+    func addNewDriverMetaData(by id: UUID, phoneNumber: String, fullName: String, employeeID: Int, licenseNumber: String) async throws -> Driver {
+        struct AddDriverParams: Encodable {
+            let p_id: UUID
+            let p_phone: String
+            let p_display_name: String
+            let p_employee_id: Int
+            let p_created_at: String
+            let p_license_number: String
+        }
+        
+        let params = AddDriverParams(p_id: id, p_phone: phoneNumber, p_display_name: fullName,
+                                     p_employee_id: employeeID,
+                                     p_created_at: ISO8601DateFormatter().string(from: .now),
+                                     p_license_number: licenseNumber)
+        
+        let driver: Driver = try await client
+            .rpc("add_new_driver",params: params)
+            .execute()
+            .value
+        
+        return driver
+    }
+    
     func assignNewTrip(assignedBy: UUID,
                        pickupCoordinates: (latitude: Double, longitude: Double),
                        destinationCoordinates: (latitude: Double, longitude: Double),
@@ -20,7 +84,7 @@ class RemoteController:DatabaseAPIIntegrable{
                        description: String,
                        totalDistance: Int,
                        totalTripDuration: (hours: Int, minutes: Int),
-                       scheduledDateTime: Date) async throws -> UUID {
+                       scheduledDateTime: Date) async throws -> Trip {
         struct AssignTripParams: Encodable {
             let p_assigned_by: String
             let p_pickup_location: String
@@ -47,55 +111,57 @@ class RemoteController:DatabaseAPIIntegrable{
                                       p_total_trip_duration: "\(totalTripDuration.hours) hours \(totalTripDuration.minutes) minutes",
                                       p_scheduled_date_time: ISO8601DateFormatter().string(from: scheduledDateTime))
         
-        let newTripUUID: UUID = try await client
+        let newTrip: Trip = try await client
             .rpc("assign_new_trip",params: params)
             .execute()
             .value
         
-        return newTripUUID
+        return newTrip
     }
     
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip] {
-        let response = try await client
+        let response: [Trip] = try await client
                 .rpc("get_assigned_trips_by_manager_id", params: [
                     "p_manager_id": id.uuidString
                 ])
                 .execute()
+                .value
 
-        let decodedTrips = try JSONDecoder().decode([Trip].self, from: response.data)
-
-        return decodedTrips
+//        let trips: [Trip] = try JSONDecoder().decode([Trip].self, from: response.data)
+//        return trips
+        return response
     }
     
     func getDriverTrips(by id: UUID) async throws -> [Trip] {
-        let response = try await client
-                .rpc("get_assigned_trip_for_driver_id", params: [
+        let response: [Trip] = try await client
+                .rpc("get_assigned_trips_for_driver_id", params: [
                     "p_driver_id": id.uuidString
                 ])
                 .execute()
+                .value
 
-        let decodedTrips = try JSONDecoder().decode([Trip].self, from: response.data)
+//        let decodedTrips = try JSONDecoder().decode([Trip].self, from: response.data)
 
-        return decodedTrips
+        return response
     }
     
     func updateVehicleExpiry(by id: Int, with expiry: (puc: Date, insurance: Date, registration: Date)) async throws {
         struct UpdateVehicleRegistrationParams: Encodable {
-            let p_registered_id: Int
-            let p_insurance_expiry_date: String
-            let p_puc_expiry_date: String
-            let p_rc_expiry_date: String
+            let p_id: Int
+            let p_new_insurance_expiry_date: String
+            let p_new_puc_expiry_date: String
+            let p_new_rc_expiry_date: String
         }
         
         let params = UpdateVehicleRegistrationParams(
-            p_registered_id: id,
-            p_insurance_expiry_date: ISO8601DateFormatter().string(from: expiry.insurance),
-            p_puc_expiry_date: ISO8601DateFormatter().string(from: expiry.puc),
-            p_rc_expiry_date: ISO8601DateFormatter().string(from: expiry.registration)
+            p_id: id,
+            p_new_insurance_expiry_date: ISO8601DateFormatter().string(from: expiry.insurance),
+            p_new_puc_expiry_date: ISO8601DateFormatter().string(from: expiry.puc),
+            p_new_rc_expiry_date: ISO8601DateFormatter().string(from: expiry.registration)
         )
         
         try await client
-            .rpc("update_registered_vehicle_for_id",params: params)
+            .rpc("update_vehicle_expiry_by_id",params: params)
             .execute()
     }
     
@@ -117,12 +183,12 @@ class RemoteController:DatabaseAPIIntegrable{
     
     func updateVehicleActiveStatus(by id: Int, with status: Bool) async throws {
         struct UpdateVehicleActiveStatusParams: Encodable {
-            let p_vehicle_id: Int
+            let p_id: Int
             let p_new_status: Bool
         }
         
         let params = UpdateVehicleActiveStatusParams(
-            p_vehicle_id: id,
+            p_id: id,
             p_new_status: status
         )
         
@@ -131,7 +197,7 @@ class RemoteController:DatabaseAPIIntegrable{
             .execute()
     }
     
-    func updateUserWorkingStatus(by id: UUID, with status: Bool) async throws {
+    func updateUserActiveStatus(by id: UUID, with status: Bool) async throws {
         struct UpdateUserStatusParams: Encodable {
             let p_user_uuid: String
             let p_new_status: Bool
@@ -143,106 +209,87 @@ class RemoteController:DatabaseAPIIntegrable{
         )
 
         try await client
-            .rpc("update_user_working_status_for_id", params: params)
+            .rpc("update_user_active_status_by_id", params: params)
             .execute()
     }
     
-    func addNewVehicle(_ vehicle: Vehicle) async throws {
-        try await client
-            .rpc("add_new_vehicle",
-                 params: [
-                    "p_make": vehicle.make,
-                    "p_model": vehicle.model,
-                    "p_vinNumber": vehicle.vinNumber,
-                    "p_licenseNumber": vehicle.licenseNumber,
-                    "p_fuelType": vehicle.fuelType.rawValue,
-                    "p_loadcapacity": String(vehicle.loadCapacity),
-                    "p_insurancepolicynumber": vehicle.insurancePolicyNumber,
-                    "p_insuranceexpirydate": ISO8601DateFormatter()
-                        .string(from: vehicle.insuranceExpiryDate),
-                    "p_puccertificatenumber": vehicle.pucCertificateNumber,
-                    "p_pucexpirydate": ISO8601DateFormatter()
-                        .string(from: vehicle.pucExpiryDate),
-                    "p_rcnumber": vehicle.rcNumber,
-                    "p_rcexpirydate": ISO8601DateFormatter()
-                        .string(from: vehicle.rcExpiryDate)
-                 ])
+    func addNewVehicle(_ vehicle: Vehicle) async throws -> Int {
+        struct AddNewVehicleParams: Encodable {
+            let p_make: String
+            let p_model: String
+            let p_vinNumber: String
+            let p_licenseNumber: String
+            let p_fuelType: String
+            let p_loadCapacity: String
+            let p_insurancePolicyNumber: String
+            let p_insuranceExpiryDate: String
+            let p_pucCertificateNumber: String
+            let p_pucExpiryDate: String
+            let p_rcNumber: String
+            let p_rcExpiryDate: String
+            let p_currentCoordinate: String
+        }
+        
+        let insuranceExpiryDate = vehicle.insuranceExpiryDate.formatDateForSupabase()
+        let pucExpiryDate = vehicle.pucExpiryDate.formatDateForSupabase()
+        let rcExpiryDate = vehicle.rcExpiryDate.formatDateForSupabase()
+        
+        let params = AddNewVehicleParams(p_make: vehicle.make, p_model: vehicle.model,
+                                         p_vinNumber: vehicle.vinNumber, p_licenseNumber: vehicle.licenseNumber,
+                                         p_fuelType: vehicle.fuelType.rawValue,
+                                         p_loadCapacity: String(vehicle.loadCapacity),
+                                         p_insurancePolicyNumber: vehicle.insurancePolicyNumber,
+                                         p_insuranceExpiryDate: insuranceExpiryDate,
+                                         p_pucCertificateNumber: vehicle.pucCertificateNumber,
+                                         p_pucExpiryDate: pucExpiryDate,
+                                         p_rcNumber: vehicle.rcNumber,
+                                         p_rcExpiryDate: rcExpiryDate,
+                                         p_currentCoordinate: vehicle.currentCoordinate)
+        return try await client
+            .rpc("add_new_vehicle", params: params)
             .execute()
+            .value
     }
     
     func getRegisteredVehicles() async throws -> [Vehicle] {
-        let vehicles: [Vehicle] = try await client
-            .rpc("get_registered_vehicles")
-            .execute()
-            .value
+        let response = try await client
+                .rpc("get_regsitered_vehicles")
+                .execute()
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
         
+        let vehicles = try decoder.decode([Vehicle].self, from: response.data)
         return vehicles
     }
     
     func getUserEmail(by id: UUID) async throws -> String {
         let email: String = try await client
-            .rpc("get_user_email_by_id", params: ["p_user_uuid": id])
+            .from("auth.users")
+            .select("email")
+            .eq("id", value: id.uuidString)
+            .limit(1)
             .execute()
             .value
         
         return email
     }
     
-    func getManagerProfile(by id: UUID) async throws -> FleetManager {
-        let response: FleetManager = try await client
-            .from("FleetManager")
-            .select("*")
-            .eq("id", value: id)
+    func getFleetManager(by id: UUID) async throws -> FleetManager {
+        return try await client
+            .rpc("get_fleet_manager_data_by_id", params: ["p_id": id])
             .execute()
             .value
-        
-        let email: String = try await getUserEmail(by: id)
-        
-        return FleetManager(id: response.id, managerID: response.managerID, fullName: response.fullName,email: email, phoneNumber: response.phoneNumber)
     }
     
     
-    func getRegisteredDrivers(by userRoles: [UserRoles]) async throws -> [Driver] {
-        do {
-            var driver : [Driver] = []
-            for userRole in userRoles {
-                let response: Driver = try await client
-                    .from("Driver")
-                    .select("*")
-                    .eq("id", value: userRole.id)
-                    .execute()
-                    .value
-                
-                let email: String = try await getUserEmail(by: userRole.id)
-                
-                driver.append(Driver(id: response.id, fullName: response.fullName, totalTrips: response.totalTrips, licenseNumber: response.licenseNumber, email: email, driverID: response.driverID, phoneNumber: response.phoneNumber, status: response.status, workingStatus: userRole.workingStatus, role: .driver))
-            }
-
-            
-            return driver
-        } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
-            throw error
-        }
-    }
-    
-    func getUsers(ofType type: Role) async throws -> [UserRoles] {
-        do {
-            let response: [UserRoles] = try await client
-                .from("UserRoles")
-                .select("*")
-                .eq("role", value: type.rawValue)
-                .execute()
-                .value
-            
-            return response
-        } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
-            throw error
-        }
+    func getRegisteredDrivers() async throws -> [Driver] {
+        return try await client
+            .rpc("get_registered_drivers")
+            .execute()
+            .value
     }
    
     private let client = AuthManager.shared.client
-    
     static let shared = RemoteController()
 }

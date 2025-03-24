@@ -85,19 +85,21 @@ struct ProgressBarView: View {
                                     .foregroundColor(.gray)
             }
             
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    ForEach(items, id: \.0) { item in
-                        let width = CGFloat(item.1) / CGFloat(total) * geometry.size.width
-                        Rectangle()
-                            .fill(item.2)
-                            .frame(width: width)
-                    }
-                }
-                .frame(height: 8)
-                .clipShape(Capsule())
-            }
-            .frame(height: 8)
+                                GeometryReader { geometry in
+                                    let availableWidth = max(1, geometry.size.width) // Prevent zero width
+                                    HStack(spacing: 0) {
+                                        ForEach(items, id: \.0) { item in
+                                            let validValue = max(0, CGFloat(item.1)) // Ensure non-negative values
+                                            let width = total > 0 ? validValue / CGFloat(total) * availableWidth : 0
+                                            Rectangle()
+                                                .fill(item.2)
+                                                .frame(width: width)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                    .clipShape(Capsule())
+                                }
+                                .frame(height: 8)
             
             HStack(spacing: 16) {
                 ForEach(items, id: \.0) { item in
@@ -202,7 +204,32 @@ struct FleetManagerDashboardView: View {
     @Binding var user: AppUser?
     @Binding var role: Role?
     @State private var showingProfile = false
-    @StateObject private var viewModel = DriverViewModel.shared
+    @StateObject private var viewModel = IFEDataController.shared
+    
+    var availableDrivers: Int {
+        viewModel.drivers.filter { $0.status == .available && $0.activeStatus}.count
+    }
+
+    var onTripDrivers: Int {
+        viewModel.drivers.filter { $0.status == .onTrip && $0.activeStatus}.count
+    }
+    
+    var inactiveDrivers: Int {
+        viewModel.drivers.filter { !$0.activeStatus }.count
+    }
+    
+    var availableVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .available && $0.activeStatus }.count
+    }
+    
+    var assignedVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .assigned && $0.activeStatus}.count
+    }
+    
+    var inactiveVehicles: Int {
+        viewModel.vehicles.filter { $0.activeStatus == false }.count
+    }
+
     
     var body: some View {
         ScrollView {
@@ -216,75 +243,78 @@ struct FleetManagerDashboardView: View {
                     
                     ProgressBarView(
                         title: "Drivers",
-                        total: 15,
+                        total: viewModel.drivers.count,
                         items: [
-                            ("Available", 8, Color.mint),
-                            ("In Trip", 5, Color.primaryGradientEnd),
-                            ("Disabled", 2, Color.orange)
+                            (DriverStatus.available.rawValue,
+                             availableDrivers,
+                             Color.mint),
+                            
+                            (DriverStatus.onTrip.rawValue, onTripDrivers, Color.primaryGradientEnd),
+                            (DriverStatus.inactive.rawValue, inactiveDrivers, Color.orange)
                         ]
                     )
                     
-                    ProgressBarView(
-                        title: "Maintenance",
-                        total: 4,
-                        items: [
-                            ("Completed", 2, Color.mint),
-                            ("In Progress", 2, Color.primaryGradientEnd)
-                        ]
-                    )
+//                    ProgressBarView(
+//                        title: "Maintenance",
+//                        total: 4,
+//                        items: [
+//                            ("Completed", 2, Color.mint),
+//                            ("In Progress", 2, Color.primaryGradientEnd)
+//                        ]
+//                    )
                     
                     ProgressBarView(
                         title: "Trucks",
-                        total: 15,
+                        total: viewModel.vehicles.count,
                         items: [
-                            ("Available", 8, Color.mint),
-                            ("Assigned", 5, Color.primaryGradientEnd),
-                            ("Disabled", 2, Color.orange)
+                            (VehicleStatus.available.rawValue, availableVehicles, Color.mint),
+                            (VehicleStatus.assigned.rawValue, assignedVehicles, Color.primaryGradientEnd),
+                            (VehicleStatus.inactive.rawValue, inactiveVehicles, Color.statusOrange)
                         ]
                     )
                 }
                 .padding(.horizontal)
                 
                 // Fleet Analytics Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Fleet Analytics")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primaryGradientStart)
-                    
-                    HStack(spacing: 16) {
-                        AnalyticsCard(
-                            title: "Fuel Consumed",
-                            value: "1250.5",
-                            unit: "L",
-                            change: 5.2
-                        )
-                        
-                        AnalyticsCard(
-                            title: "Maintenance Cost",
-                            value: "8500.0",
-                            unit: "USD",
-                            change: -2.1
-                        )
-                    }
-            }
-            .padding(.horizontal)
-                
-                // Recent Updates Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Recent Updates")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primaryGradientStart)
-                    
-                    UpdateCard(
-                        iconName: "wrench.fill",
-                        title: "Maintenance Updated",
-                        description: "Robert Brown updated maintenance status for TRK003",
-                        timeAgo: "51 sec. ago"
-                    )
-                }
-                .padding(.horizontal)
+//                VStack(alignment: .leading, spacing: 16) {
+//                    Text("Fleet Analytics")
+//                        .font(.title2)
+//                        .fontWeight(.bold)
+//                        .foregroundColor(.primaryGradientStart)
+//                    
+//                    HStack(spacing: 16) {
+//                        AnalyticsCard(
+//                            title: "Fuel Consumed",
+//                            value: "1250.5",
+//                            unit: "L",
+//                            change: 5.2
+//                        )
+//                        
+//                        AnalyticsCard(
+//                            title: "Maintenance Cost",
+//                            value: "8500.0",
+//                            unit: "USD",
+//                            change: -2.1
+//                        )
+//                    }
+//            }
+//            .padding(.horizontal)
+//                
+//                // Recent Updates Section
+//                VStack(alignment: .leading, spacing: 16) {
+//                    Text("Recent Updates")
+//                        .font(.title2)
+//                        .fontWeight(.bold)
+//                        .foregroundColor(.primaryGradientStart)
+//                    
+//                    UpdateCard(
+//                        iconName: "wrench.fill",
+//                        title: "Maintenance Updated",
+//                        description: "Robert Brown updated maintenance status for TRK003",
+//                        timeAgo: "51 sec. ago"
+//                    )
+//                }
+//                .padding(.horizontal)
             }
             .padding(.vertical)
         }
@@ -292,13 +322,13 @@ struct FleetManagerDashboardView: View {
         .navigationTitle("Fleet Manager")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    // Action for the bell button
-                }) {
-                    Image(systemName: "bell.fill")
-                        .font(.title2)
-                        .foregroundColor(.primaryGradientEnd)
-                }
+//                Button(action: {
+//                    // Action for the bell button
+//                }) {
+//                    Image(systemName: "bell.fill")
+//                        .font(.title2)
+//                        .foregroundColor(.primaryGradientEnd)
+//                }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
@@ -350,7 +380,7 @@ struct FilterChip: View {
                 .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
-                .background(isSelected ? Color.black : Color(.systemGray6))
+                .background(isSelected ? Color.primaryGradientStart : Color(.systemGray6))
                 .foregroundColor(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
@@ -420,8 +450,4 @@ struct FleetManagerTabBarView: View {
         }
         .accentColor(.primaryGradientEnd)
     }
-}
-
-#Preview {
-    ContentView()
 }

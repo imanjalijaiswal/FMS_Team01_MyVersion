@@ -193,8 +193,8 @@ struct PasswordResetView: View {
             do {
                 // Update password and mark first login as completed
                 try await viewModel.updatePasswordAndFirstTimeLoginStatus(
-                    userId: currentUser.id,
-                    email: currentUser.email ?? "",
+                    userId: currentUser.id.uuidString,
+                    email: currentUser.meta_data.email,
                     newPassword: newPassword
                 )
                 
@@ -224,10 +224,3 @@ struct PasswordResetView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
-
-#Preview {
-    PasswordResetView(
-        user: .constant(AppUser(id: "123", email: "test@example.com", role: .driver)),
-        isFirstTimeLogin: .constant(true)
-    )
-} 

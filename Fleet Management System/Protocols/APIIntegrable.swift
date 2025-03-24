@@ -9,19 +9,31 @@ import Foundation
 
 protocol DatabaseAPIIntegrable {
     //MARK: User APIs
-    func getManagerProfile(by id: UUID) async throws -> FleetManager
+    func getFleetManager(by id: UUID) async throws -> FleetManager
     
-    func getUsers(ofType type: Role) async throws -> [UserRoles]
+    func createNewDriver(_ email: String, password: String) async throws -> UUID
     
-    func getRegisteredDrivers(by userRoles: [UserRoles]) async throws -> [Driver]
+    func updateUserPhone(by id: UUID, _ phone: String) async throws
+    
+    func addNewDriverMetaData(by id: UUID,
+                   phoneNumber: String,
+                   fullName: String,
+                   employeeID: Int,
+                   licenseNumber: String) async throws -> Driver
+    
+    func updateDriverStatus(by id: UUID, _ newStatus: DriverStatus) async throws
+    
+    func getRegisteredDrivers() async throws -> [Driver]
     
     func getUserEmail(by id: UUID) async throws -> String
     
-    func updateUserWorkingStatus(by id: UUID, with status: Bool) async throws
+    func updateUserActiveStatus(by id: UUID, with status: Bool) async throws
+    
+    func getMaxEmployeeID(ofType type: Role) async throws -> Int
     
     
     //MARK: Vehicle APIs
-    func addNewVehicle(_ vehicle: Vehicle) async throws
+    func addNewVehicle(_ vehicle: Vehicle) async throws -> Int
     
     func getRegisteredVehicles() async throws -> [Vehicle]
     
@@ -42,7 +54,7 @@ protocol DatabaseAPIIntegrable {
                        description: String,
                        totalDistance: Int,
                        totalTripDuration: (hours: Int, minutes: Int),
-                       scheduledDateTime: Date) async throws -> UUID
+                       scheduledDateTime: Date) async throws -> Trip
     
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip]
     

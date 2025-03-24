@@ -26,16 +26,16 @@ class TwoFactorViewModel: ObservableObject {
         
         do {
             // Generate and send code via AuthManager
-            if let email = authenticatedUser.email {
-                try await authManager.generateAndSend2FACode(email: email)
-                self.isLoading = false
-                self.hasSentCode = true
-                self.errorMessage = "Verification code sent to \(email)"
-            } else {
-                self.isLoading = false
-                self.errorMessage = "User email not available"
-                throw NSError(domain: "TwoFactorError", code: 1, userInfo: [NSLocalizedDescriptionKey: "User email not available"])
-            }
+            let email = authenticatedUser.meta_data.email //{
+            try await authManager.generateAndSend2FACode(email: email)
+            self.isLoading = false
+            self.hasSentCode = true
+            self.errorMessage = "Verification code sent to \(email)"
+//            } else {
+//                self.isLoading = false
+//                self.errorMessage = "User email not available"
+//                throw NSError(domain: "TwoFactorError", code: 1, userInfo: [NSLocalizedDescriptionKey: "User email not available"])
+//            }
         } catch {
             self.isLoading = false
             self.errorMessage = "Failed to send verification code: \(error.localizedDescription)"
@@ -45,10 +45,11 @@ class TwoFactorViewModel: ObservableObject {
     
     // Verify the entered code
     func verifyCode() async -> Bool {
-        guard let email = authenticatedUser.email else {
-            errorMessage = "User email not available"
-            return false
-        }
+//        let email = authenticatedUser.meta_data.email else {
+//            errorMessage = "User email not available"
+//            return false
+//        }
+        let email = authenticatedUser.meta_data.email
         
         do {
             // Use Supabase's OTP verification

@@ -145,10 +145,3 @@ struct TwoFactorView: View {
         }
     }
 }
-
-#Preview {
-    TwoFactorView(
-        authenticatedUser: AppUser(id: "1", email: "test@example.com", role: .driver),
-        user: .constant(nil)
-    )
-} 

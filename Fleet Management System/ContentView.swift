@@ -22,12 +22,12 @@ struct ContentView: View {
                 PasswordResetView(user: $user, isFirstTimeLogin: $isFirstTimeLogin)
             } else if let user = user {
                 switch user.role {
-                case .fleetManager:
+                case .fleetManager, .maintenancePersonnel:
                     FleetManagerView(user: $user, role: $role)
                 case .driver:
                     DriverView(user: $user, role: $role)
-                case .maintenancePersonal:
-                    MaintenanceView(user: $user, role: $role)
+//                case .maintenancePersonal:
+//                    MaintenanceView(user: $user, role: $role)
                 }
             } else {
                 LoginFormView(user: $user)
@@ -41,7 +41,7 @@ struct ContentView: View {
                 
                 // Check if it's first-time login only if we have a valid user
                 if let currentUser = user {
-                    isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id)
+                    isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id.uuidString)
                 }
                 
                 isLoading = false
@@ -61,7 +61,7 @@ struct ContentView: View {
                 
                 // Check first-time login status for the new user
                 if let newUser = newUser {
-                    isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: newUser.id)
+                    isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: newUser.id.uuidString)
                 }
             }
         }

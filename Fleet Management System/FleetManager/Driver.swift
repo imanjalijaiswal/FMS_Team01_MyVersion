@@ -9,193 +9,13 @@ enum StaffRole {
 enum DriverStatus: String, Codable {
     case available = "Available"
     case onTrip = "On Trip"
+    case inactive = "Inactive"
 }
 
-struct Driver: Identifiable, Equatable,Codable {
-    let id : UUID
-    let fullName: String
-    let totalTrips: Int
-    let licenseNumber: String
-    let email: String
-    let driverID: String
-    let phoneNumber: String
-    let status: DriverStatus
-    let workingStatus: Bool
-    let role: Role
-    
-    static func == (lhs: Driver, rhs: Driver) -> Bool {
-        lhs.id == rhs.id
-    }
-}
-
-class DriverViewModel: ObservableObject {
-    static let shared = DriverViewModel() // Singleton instance
-    
-    @Published var drivers: [Driver] = []
-    @Published var vehicles: [Vehicle] = []
-    @Published var trips: [Trip] = []
-    
-    private init() {} // Private initializer to enforce singleton pattern
-    
-    func addDriver(_ driver: Driver) {
-        drivers.append(driver)
-    }
-    
-    func removeDriver(_ driver: Driver) {
-        let inactiveDriver = Driver(
-            id: UUID(), fullName: driver.fullName,
-            totalTrips: driver.totalTrips,
-            licenseNumber: driver.licenseNumber,
-            email: driver.email,
-            driverID: driver.driverID,
-            phoneNumber: driver.phoneNumber,
-            status: .available,
-            workingStatus: false,
-            role: driver.role
-        )
-        
-        drivers.removeAll { $0.id == driver.id }
-        drivers.append(inactiveDriver)
-    }
-    
-    func enableDriver(_ driver: Driver) {
-        let activeDriver = Driver(
-            id: UUID(), fullName: driver.fullName,
-            totalTrips: driver.totalTrips,
-            licenseNumber: driver.licenseNumber,
-            email: driver.email,
-            driverID: driver.driverID,
-            phoneNumber: driver.phoneNumber,
-            status: .available,
-            workingStatus: true,
-            role: driver.role
-        )
-        
-        drivers.removeAll { $0.id == driver.id }
-        drivers.append(activeDriver)
-    }
-    
-    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
-        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
-            trips[index].status = newStatus
-        }
-    }
-    func addVehicle(_ vehicle: Vehicle) {
-        vehicles.append(vehicle)
-    }
-    
-    func removeVehicle(_ vehicle: Vehicle) {
-        let inactiveVehicle = Vehicle(
-            id: vehicle.id,
-            make: vehicle.make,
-            model: vehicle.model,
-            vinNumber: vehicle.vinNumber,
-            licenseNumber: vehicle.licenseNumber,
-            fuelType: vehicle.fuelType,
-            loadCapacity: vehicle.loadCapacity,
-            insurancePolicyNumber: vehicle.insurancePolicyNumber,
-            insuranceExpiryDate: vehicle.insuranceExpiryDate,
-            pucCertificateNumber: vehicle.pucCertificateNumber,
-            pucExpiryDate: vehicle.pucExpiryDate,
-            rcNumber: vehicle.rcNumber,
-            rcExpiryDate: vehicle.rcExpiryDate,
-            currentCoordinate: vehicle.currentCoordinate,
-            status: .inactive,
-            activeStatus: false
-        )
-        
-        vehicles.removeAll { $0.id == vehicle.id }
-        vehicles.append(inactiveVehicle)
-    }
-    
-    func enableVehicle(_ vehicle: Vehicle) {
-        let activeVehicle = Vehicle(
-            id: vehicle.id,
-            make: vehicle.make,
-            model: vehicle.model,
-            vinNumber: vehicle.vinNumber,
-            licenseNumber: vehicle.licenseNumber,
-            fuelType: vehicle.fuelType,
-            loadCapacity: vehicle.loadCapacity,
-            insurancePolicyNumber: vehicle.insurancePolicyNumber,
-            insuranceExpiryDate: vehicle.insuranceExpiryDate,
-            pucCertificateNumber: vehicle.pucCertificateNumber,
-            pucExpiryDate: vehicle.pucExpiryDate,
-            rcNumber: vehicle.rcNumber,
-            rcExpiryDate: vehicle.rcExpiryDate,
-            currentCoordinate: vehicle.currentCoordinate,
-            status: .available,
-            activeStatus: true
-        )
-        
-        vehicles.removeAll { $0.id == vehicle.id }
-        vehicles.append(activeVehicle)
-    }
-    func addTrip(_ trip: Trip) {
-        trips.append(trip)
-        // Update driver status to onTrip
-        for driverId in trip.assignedDriverIDs {
-            if let index = drivers.firstIndex(where: { $0.id == driverId }) {
-                let driver = drivers[index]
-                let updatedDriver = Driver(
-                    id: driver.id,
-                    fullName: driver.fullName,
-                    totalTrips: driver.totalTrips + 1,
-                    licenseNumber: driver.licenseNumber,
-                    email: driver.email,
-                    driverID: driver.driverID,
-                    phoneNumber: driver.phoneNumber,
-                    status: .onTrip,
-                    workingStatus: driver.workingStatus,
-                    role: driver.role
-                )
-                drivers[index] = updatedDriver
-            }
-        }
-        // Update vehicle status to inUse
-        if let index = vehicles.firstIndex(where: { $0.id == trip.assigneVehicleID }) {
-            let vehicle = vehicles[index]
-            let updatedVehicle = Vehicle(
-                id: vehicle.id,
-                make: vehicle.make,
-                model: vehicle.model,
-                vinNumber: vehicle.vinNumber,
-                licenseNumber: vehicle.licenseNumber,
-                fuelType: vehicle.fuelType,
-                loadCapacity: vehicle.loadCapacity,
-                insurancePolicyNumber: vehicle.insurancePolicyNumber,
-                insuranceExpiryDate: vehicle.insuranceExpiryDate,
-                pucCertificateNumber: vehicle.pucCertificateNumber,
-                pucExpiryDate: vehicle.pucExpiryDate,
-                rcNumber: vehicle.rcNumber,
-                rcExpiryDate: vehicle.rcExpiryDate,
-                currentCoordinate: vehicle.currentCoordinate,
-                status: .inUse,
-                activeStatus: vehicle.activeStatus
-            )
-            vehicles[index] = updatedVehicle
-        }
-    }
-    
-    func getFilteredTrips(status: TripStatus?) -> [Trip] {
-        if let status = status {
-            return trips.filter { $0.status == status }
-        }
-        return trips
-    }
-    
-    func sendWelcomeEmail(to email: String, password: String) {
-        print("Sending welcome email to: \(email)")
-        print("Email content: Welcome to Fleet Management System!")
-        print("Your login credentials are:")
-        print("Email: \(email)")
-        print("Password: \(password)")
-    }
-}
 
 struct DriverRowView: View {
     let driver: Driver
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     
     var body: some View {
         NavigationLink(destination: DriverDetailView(driver: driver, viewModel: viewModel)) {
@@ -208,22 +28,22 @@ struct DriverRowView: View {
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(driver.fullName)
+                    Text(driver.meta_data.fullName)
                         .font(.callout)
                         .fontWeight(.medium)
-                        .foregroundColor(driver.workingStatus ? .primary : .red)
+                        .foregroundColor(driver.activeStatus ? .primary : .red)
                     
                     HStack(spacing: 12) {
                         HStack(spacing: 4) {
                             Image(systemName: "phone.fill")
                                 .font(.caption2)
                                 .foregroundColor(.gray)
-                            Text(driver.phoneNumber)
+                            Text(driver.meta_data.phone)
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
-                        
-                        if driver.workingStatus {
+                        Spacer()
+                        if driver.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
                                     .fill((driver.status == .available) ? Color.green : Color.gray)
@@ -255,33 +75,34 @@ struct DriverRowView: View {
 }
 
 struct StaffView: View {
-    @StateObject var viewModel = DriverViewModel.shared
+    @StateObject var viewModel = IFEDataController.shared
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     @State private var selectedRole = 0 // 0 for drivers, 1 for maintenance
-    let filters = ["All", "Available", "On Trip", "Inactive"]
+    let filters = ["All", DriverStatus.available.rawValue, DriverStatus.onTrip.rawValue, DriverStatus.inactive.rawValue]
     @State private var showingAddStaff = false
     
     var filteredStaff: [Driver] {
         let roleFiltered = viewModel.drivers.filter { driver in
-            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenancePersonal
+//            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenancePersonal
+            true
         }
-        
+
         let searchResults = roleFiltered.filter { staff in
             searchText.isEmpty ||
-            staff.fullName.localizedCaseInsensitiveContains(searchText) ||
-            staff.driverID.localizedCaseInsensitiveContains(searchText)
+            staff.meta_data.fullName.localizedCaseInsensitiveContains(searchText) ||
+            String(staff.employeeID).localizedCaseInsensitiveContains(searchText)
         }
         
         switch selectedFilter {
-        case "Available":
-            return searchResults.filter { $0.status == .available && $0.workingStatus }
-        case "On Trip":
-            return searchResults.filter { $0.status == .onTrip && $0.workingStatus }
-        case "Inactive":
-            return searchResults.filter { !$0.workingStatus }
+        case DriverStatus.available.rawValue:
+            return searchResults.filter { $0.status == .available && $0.activeStatus }
+        case DriverStatus.onTrip.rawValue:
+            return searchResults.filter { $0.status == .onTrip && $0.activeStatus }
+        case DriverStatus.inactive.rawValue:
+            return searchResults.filter { !$0.activeStatus }
         default:
-            return searchResults.filter { $0.workingStatus }
+            return searchResults.filter { $0.activeStatus }
         }
     }
     
@@ -290,7 +111,7 @@ struct StaffView: View {
             // Role Picker
             Picker("Staff Type", selection: $selectedRole) {
                 Text("Drivers").tag(0)
-                Text("Maintenance").tag(1)
+//                Text("Maintenance").tag(1)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -326,32 +147,23 @@ struct StaffView: View {
             }
         }
         .sheet(isPresented: $showingAddStaff) {
-            AddDriverView(viewModel: viewModel, staffRole: selectedRole == 0 ? .driver : .maintenancePersonal)
+            AddDriverView(viewModel: viewModel, staffRole: .driver)
         }
-        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+        .background(.white)
         .onAppear {
-            if viewModel.drivers.isEmpty {
-                // Add sample drivers with roles
-                let sampleDrivers = [
-                    Driver(id: UUID(), fullName: "John Doe", totalTrips: 125, licenseNumber: "DL123456", email: "john@example.com", driverID: "EMP001", phoneNumber: "+1234567890", status: .available, workingStatus: true, role: .driver),
-                    Driver(id: UUID(), fullName: "Jane Smith", totalTrips: 98, licenseNumber: "DL789012", email: "jane@example.com", driverID: "EMP002", phoneNumber: "+0987654321", status: .available, workingStatus: true, role: .driver)
-                ]
-                viewModel.drivers = sampleDrivers
-            }
+            // Empty onAppear since data is initialized in ViewModel
         }
     }
 }
 
 struct DriverDetailView: View {
     @Environment(\.dismiss) var dismiss
-    let driver: Driver
-    @ObservedObject var viewModel: DriverViewModel
+    @State var driver: Driver
+    @ObservedObject var viewModel: IFEDataController
     @State private var isEditing = false
-    @State private var editedEmail = ""
     @State private var editedPhone = ""
     @State private var showEmailError = false
     @State private var showingDisableAlert = false
-    
     var body: some View {
         List {
             Section {
@@ -360,7 +172,7 @@ struct DriverDetailView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.gray)
                     
-                    Text(driver.fullName)
+                    Text(driver.meta_data.fullName)
                         .font(.title2)
                         .fontWeight(.semibold)
                 }
@@ -371,45 +183,40 @@ struct DriverDetailView: View {
             }
             
             Section("Driver Info") {
-                InfoRow(title: "Employee ID", value: driver.driverID)
+                InfoRow(title: "Employee ID", value: String(driver.employeeID))
                 InfoRow(title: "License Number", value: driver.licenseNumber)
                 InfoRow(title: "Total Trips", value: "\(driver.totalTrips)")
             }
             
             Section("Contact") {
+                InfoRow(title: "Email", value: driver.meta_data.email)
                 if isEditing {
-                    TextField("Email", text: $editedEmail)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .autocapitalization(.none)
-                    if showEmailError {
-                        Text("Invalid email address")
-                            .foregroundColor(.red)
-                    }
                     TextField("Phone", text: $editedPhone)
                         .keyboardType(.phonePad)
+                    
                 } else {
-                    InfoRow(title: "Email", value: editedEmail)
                     InfoRow(title: "Phone", value: editedPhone)
                 }
             }
             
             Section {
-                if driver.workingStatus {
+                if driver.activeStatus {
                     Button(action: {
                         showingDisableAlert = true
                     }) {
-                        Text("Disable Driver")
-                            .foregroundColor(.red)
+                        Text("Make Inactive")
+                            .foregroundColor(driver.status == .onTrip ? .gray : .red)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
                     }
+                    .disabled(driver.status == .onTrip)
                 } else {
                     Button(action: {
                         viewModel.enableDriver(driver)
                         dismiss()
                     })
                     {
-                                Text("Enable Driver")
+                                Text("Make Active")
                                     .foregroundColor(.blue)
                                     .frame(maxWidth: .infinity)
                                     .multilineTextAlignment(.center)
@@ -424,30 +231,27 @@ struct DriverDetailView: View {
                 Button(isEditing ? "Save" : "Edit") {
                     withAnimation {
                         if isEditing {
-                            if isValidEmail(editedEmail) {
-                                isEditing.toggle()
-                            } else {
-                                showEmailError = true
-                            }
+                            viewModel.updateDriverPhone(driver, with: editedPhone)
+                            isEditing.toggle()
                         } else {
                             isEditing.toggle()
                         }
                     }
                 }
+                
             }
         }
-        .alert("Disable Driver", isPresented: $showingDisableAlert) {
+        .alert("Make Driver Inactive", isPresented: $showingDisableAlert) {
             Button("Cancel", role: .cancel) { }
-            Button("Disable", role: .destructive) {
+            Button("Inactive", role: .destructive) {
                 viewModel.removeDriver(driver)
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to disable this driver? This action cannot be undone.")
+            Text("Are you sure you want to make this driver as Inactive?")
         }
         .onAppear {
-            editedEmail = driver.email
-            editedPhone = driver.phoneNumber
+            editedPhone = driver.meta_data.phone
         }
     }
 }
@@ -455,7 +259,7 @@ struct DriverDetailView: View {
 
 struct AddDriverView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: DriverViewModel
+    @ObservedObject var viewModel: IFEDataController
     let staffRole: Role
     
     @State private var employeeId = ""
@@ -520,33 +324,37 @@ struct AddDriverView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         if isValidEmail(email) && isValidPhone(phone) {
-                            let newDriver = Driver(
-                                id: UUID(), fullName: fullName,
-                                totalTrips: 0,
-                                licenseNumber: licenseNumber,
-                                email: email,
-                                driverID: employeeId,
-                                phoneNumber: phone,
-                                status: .available,
-                                workingStatus: true,
-                                role: staffRole
-                            )
-                            
-                            viewModel.addDriver(newDriver)
-                            viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
-                            
-                            showEmailError = false
-                            dismiss()
+                            let newDriver = Driver(meta_data: UserMetaData(id: UUID(),
+                                                                           fullName: fullName,
+                                                                           email: email,
+                                                                           phone: phone,
+                                                                           role: .driver,
+                                                                           employeeID: Int(employeeId) ?? -1,
+                                                                           firstTimeLogin: true,
+                                                                           createdAt: .now,
+                                                                           activeStatus: true),
+                                                   licenseNumber: licenseNumber,
+                                                   totalTrips: 0,
+                                                   status: .available)
+                            Task {
+                                await viewModel.addDriver(newDriver, password: generatedPassword)
+                                viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
+                                
+                                showEmailError = false
+                                dismiss()
+                            }
                         } else {
                             showEmailError = !isValidEmail(email)
                             showPhoneError = !isValidPhone(phone)
                         }
                     }
+                    .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isValidEmail(email) || !isValidPhone(phone))
                 }
             }
@@ -567,4 +375,9 @@ func isValidPhone(_ phone: String) -> Bool {
     let phoneRegEx = "^[0-9+][0-9]{9,14}$" // Allows + prefix and 10-15 digits
     let phonePred = NSPredicate(format:"SELF MATCHES %@", phoneRegEx)
     return phonePred.evaluate(with: phone)
+}
+
+
+#Preview{
+    StaffView()
 }
