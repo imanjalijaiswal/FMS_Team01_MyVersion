@@ -342,10 +342,9 @@ struct AddDriverView: View {
                                                    licenseNumber: licenseNumber,
                                                    totalTrips: 0,
                                                    status: .available)
-                            //TODO: add new driver to database and auto set employeeID
                             Task {
                                 await viewModel.addDriver(newDriver, password: generatedPassword)
-                                await viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
+                                viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
                                 
                                 showEmailError = false
                                 dismiss()

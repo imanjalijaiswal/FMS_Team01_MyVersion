@@ -6,6 +6,9 @@
 //
 import SwiftUI
 import CoreLocation
+import SwiftSMTP
+
+
 class IFEDataController: ObservableObject {
     static let shared = IFEDataController() // Singleton instance
     
@@ -163,11 +166,41 @@ class IFEDataController: ObservableObject {
     }
     
     func sendWelcomeEmail(to email: String, password: String) {
-        print("Sending welcome email to: \(email)")
-        print("Email content: Welcome to Fleet Management System!")
-        print("Your login credentials are:")
-        print("Email: \(email)")
-        print("Password: \(password)")
+        let smtp = SMTP(
+            hostname: "smtp.gmail.com",  // Google's SMTP server
+            email: "infleetexpress@gmail.com",
+            password: "tpko cqtp oajo dflz" // Use App Password, not your actual password
+        )
+        
+        let sender = Mail.User(name: "InFleet Express", email: "infleetexpress@gmail.com")
+        let recipient = Mail.User(email: email)
+        
+        let email = Mail(
+                from: sender,
+                to: [recipient],
+                subject: "Welcome to InFleet Express",
+                text: """
+                Hello,
+
+                Here are your login details:
+
+                Email: \(email)
+                Password: \(password)
+
+                Please keep this information secure.
+
+                Regards,
+                InFleet Express Team
+                """
+            )
+        
+        smtp.send(email) { error in
+            if let error = error {
+                print("Failed to send email: \(error.localizedDescription)")
+            } else {
+                print("Email sent successfully")
+            }
+        }
     }
     
     func updateDriverPhone(_ driver: Driver,with phone: String) {

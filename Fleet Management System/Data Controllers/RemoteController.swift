@@ -10,6 +10,7 @@ import Foundation
 import Supabase
 import SwiftUI
 import Auth
+import SwiftSMTP
 
 extension Date {
     func formatDateForSupabase() -> String {
