@@ -5,20 +5,20 @@ struct ProfileView: View {
     @Binding var user: AppUser?
     @Binding var role : Role?
     // Sample driver data with Indian standards
-    let driver = Driver(meta_data: UserMetaData(id: UUID(),
-                                                fullName: "Rajesh Kumar Singh",
-                                                email: "driver@driver.com",
-                                                phone: "+910987654321",
-                                                role: .driver,
-                                                employeeID: 4,
-                                                firstTimeLogin: false,
-                                                createdAt: .now,
-                                                activeStatus: true),
-                        licenseNumber: "DL-01-2024-1234567",
-                        totalTrips: 9,
-                        status: .available
+//    let driver = Driver(meta_data: UserMetaData(id: UUID(),
+//                                                fullName: "Rajesh Kumar Singh",
+//                                                email: "driver@driver.com",
+//                                                phone: "+910987654321",
+//                                                role: .driver,
+//                                                employeeID: 4,
+//                                                firstTimeLogin: false,
+//                                                createdAt: .now,
+//                                                activeStatus: true),
+//                        licenseNumber: "DL-01-2024-1234567",
+//                        totalTrips: 9,
+//                        status: .available
 //        drivingLicense: "DL-01-2024-1234567" // Format: DL-{State Code}-{Year}-{7 digits}
-    )
+//    )
     func signOut() {
         Task {
             do {

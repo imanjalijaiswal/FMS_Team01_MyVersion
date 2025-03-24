@@ -306,14 +306,6 @@ struct AssignTripView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
 
-                    // Total Distance
-                    TextField("Total Distance (km)", text: $totalDistance)
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-
                     // Description
                     TextField("Trip Description (Optional)", text: $tripDescription)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -395,24 +387,27 @@ struct AssignTripView: View {
                                 selectedStartLocation = pickupCoordinate
                                 if let destinationCoordinate = await getCoordinates(from: selectedEndLocation ?? ""){
                                     selectedEndLocation = destinationCoordinate
-                                    let newTrip = Trip(
-                                        id: UUID(),
-                                        tripID: Int.random(in: 1000...9999),
-                                        assignedByFleetManagerID: UUID(),
-                                        assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
-                                        assignedVehicleID: selectedVehicle?.id ?? 0,
-                                        pickupLocation: selectedStartLocation ?? "0,0",
-                                        destination: selectedEndLocation ?? "0,0",
-                                        estimatedArrivalDateTime: estimatedArrivalDateTime,
-                                        totalDistance: Int(totalDistance) ?? 0,
-                                        totalTripDuration: estimatedArrivalDateTime,
-                                        description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
-                                        scheduledDateTime: scheduledDateTime, createdAt: .now,
-                                        status: .scheduled
-                                    )
-                                    
-                                    viewModel.addTrip(newTrip)
-                                    showingAlert = true
+                                    if let distance = calculateDistance(from: selectedStartLocation!, to: selectedEndLocation!) {
+                                        print("Distance: \(distance / 1000) km") // Convert meters to kilometers
+                                        let newTrip = Trip(
+                                            id: UUID(),
+                                            tripID: Int.random(in: 1000...9999),
+                                            assignedByFleetManagerID: UUID(),
+                                            assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
+                                            assignedVehicleID: selectedVehicle?.id ?? 0,
+                                            pickupLocation: selectedStartLocation ?? "0,0",
+                                            destination: selectedEndLocation ?? "0,0",
+                                            estimatedArrivalDateTime: estimatedArrivalDateTime,
+                                            totalDistance: Int(distance) ?? 0,
+                                            totalTripDuration: estimatedArrivalDateTime,
+                                            description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
+                                            scheduledDateTime: scheduledDateTime, createdAt: .now,
+                                            status: .scheduled
+                                        )
+                                        
+                                        viewModel.addTrip(newTrip)
+                                        showingAlert = true
+                                    }
                                 }
                             }
                         }
@@ -439,6 +434,28 @@ struct AssignTripView: View {
         }
     }
 }
+import CoreLocation
+
+func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
+    let startComponents = startCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+    let endComponents = endCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+
+    guard startComponents.count == 2, endComponents.count == 2,
+          let startLatitude = Double(startComponents[0]),
+          let startLongitude = Double(startComponents[1]),
+          let endLatitude = Double(endComponents[0]),
+          let endLongitude = Double(endComponents[1]) else {
+        print("Invalid coordinate format")
+        return nil
+    }
+
+    let startLocation = CLLocation(latitude: startLatitude, longitude: startLongitude)
+    let endLocation = CLLocation(latitude: endLatitude, longitude: endLongitude)
+
+    let distanceInMeters = startLocation.distance(from: endLocation) // Distance in meters
+    return distanceInMeters
+}
+
 struct DriversRowView: View {
     let driver: Driver
     let isSelected: Bool

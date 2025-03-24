@@ -17,14 +17,21 @@ class IFEDataController: ObservableObject {
     @Published var drivers: [Driver] = []
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
+    @Published var tripsForDriver: [Trip] = []
     let remoteController = RemoteController.shared
     
     init() {
         Task { @MainActor in
             await fetchUser()
-            await loadDrivers()
-            await loadVehicles()
-            await loadTrips()
+            if let user = user {
+                if user.role == .driver {
+                    await loadTripsForDriver()
+                } else {
+                    await loadDrivers()
+                    await loadVehicles()
+                    await loadTrips()
+                }
+            }
         }
     }
     
@@ -66,6 +73,20 @@ class IFEDataController: ObservableObject {
             }
         } catch {
             print("Error while fetching trips: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    func loadTripsForDriver() async {
+        do {
+            if let user = user {
+                if user.role == .driver{
+                    print(user.id.uuidString)
+                    tripsForDriver = try await remoteController.getDriverTrips(by: user.id)
+                }
+            }
+        }catch {
+            print("Error while fetching trips for driver : \(error.localizedDescription)")
         }
     }
     

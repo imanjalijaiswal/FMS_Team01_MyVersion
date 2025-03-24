@@ -1,100 +1,16 @@
 import SwiftUI
 
 struct DashboardView: View {
+    @State var remoteController = RemoteController.shared
+    @StateObject private var viewModel = IFEDataController.shared
     @Binding var user: AppUser?
     @Binding var role : Role?
     @State private var showingProfile = false
     @State private var selectedFilter: TaskFilter = .assigned
-    @State private var trips: [Trip] = [
-        // Active Trip (only one allowed)
-        
-//        Trip(
-//                    id: UUID(),
-//                    tripID: 1,
-//                    assignedByFleetManagerID: UUID(),
-//                    assignedDriverIDs: [UUID()],
-//                    assigneVehicleID: 1,
-//                    pickupLocation: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra",
-//                    destination: "Attibele Industrial Area, Hosur Road, Bangalore",
-//                    estimatedArrivalDateTime: Date().addingTimeInterval(14*3600),
-//                    totalDistance: 985,
-//                    totalTripDuration: Date().addingTimeInterval(14*3600),
-//                    description: "Electronics, 2500 kg",
-//                    scheduledDateTime: Date(),
-//                    status: .inProgress
-//        ),
-        
-        
-        // Upcoming Trips
-//        Trip(
-//                    id: UUID(),
-//                    tripID: 2,
-//                    assignedByFleetManagerID: UUID(),
-//                    assignedDriverIDs: [UUID()],
-//                    assigneVehicleID: 2,
-//                    pickupLocation: "SIPCOT Industrial Park, Chennai, Tamil Nadu",
-//                    destination: "Miyapur, Hyderabad, Telangana",
-//                    estimatedArrivalDateTime: Date().addingTimeInterval(24*3600),
-//                    totalDistance: 635,
-//                    totalTripDuration: Date().addingTimeInterval(9*3600),
-//                    description: "FMCG Goods, 1800 kg",
-//                    scheduledDateTime: Date().addingTimeInterval(24*3600),
-//                    status: .scheduled
-//        ),
-        
-//        Trip(
-//                    id: UUID(),
-//                    tripID: 3,
-//                    assignedByFleetManagerID: UUID(),
-//                    assignedDriverIDs: [UUID()],
-//                    assigneVehicleID: 3,
-//                    pickupLocation: "IMT Manesar, Gurugram, Haryana",
-//                    destination: "MIDC Pimpri, Pune, Maharashtra",
-//                    estimatedArrivalDateTime: Date().addingTimeInterval(48*3600),
-//                    totalDistance: 1420,
-//                    totalTripDuration: Date().addingTimeInterval(20*3600),
-//                    description: "Auto Parts, 3200 kg",
-//                    scheduledDateTime: Date().addingTimeInterval(48*3600),
-//                    status: .scheduled
-//                ),
-        
-        // History Trips
-//        
-//        Trip(
-//                    id: UUID(),
-//                    tripID: 0,
-//                    assignedByFleetManagerID: UUID(),
-//                    assignedDriverIDs: [UUID()],
-//                    assigneVehicleID: 1,
-//                    pickupLocation: "Tirupur Trade Centre, Tamil Nadu",
-//                    destination: "Linking Road, Mumbai, Maharashtra",
-//                    estimatedArrivalDateTime: Date().addingTimeInterval(-24*3600),
-//                    totalDistance: 1250,
-//                    totalTripDuration: Date().addingTimeInterval(18*3600),
-//                    description: "Textiles, 1500 kg",
-//                    scheduledDateTime: Date().addingTimeInterval(-48*3600),
-//                    status: .completed
-//                ),
-//        
-//        Trip(
-//                    id: UUID(),
-//                    tripID: 999,
-//                    assignedByFleetManagerID: UUID(),
-//                    assignedDriverIDs: [UUID()],
-//                    assigneVehicleID: 2,
-//                    pickupLocation: "Vashi, Navi Mumbai, Maharashtra",
-//                    destination: "Whitefield, Bangalore, Karnataka",
-//                    estimatedArrivalDateTime: Date().addingTimeInterval(-48*3600),
-//                    totalDistance: 985,
-//                    totalTripDuration: Date().addingTimeInterval(14*3600),
-//                    description: "Perishables, 2200 kg",
-//                    scheduledDateTime: Date().addingTimeInterval(-72*3600),
-//                    status: .completed
-//                )
-    ]
+    //@State private var viewModel.tripsForDriver: [Trip] = []
     
     var filteredTrips: [Trip] {
-        trips.filter { task in
+        viewModel.tripsForDriver.filter { task in
             switch selectedFilter {
             case .assigned:
                 return task.status == .scheduled
@@ -105,7 +21,7 @@ struct DashboardView: View {
     }
     
     var activeTrip: Trip? {
-        trips.first { $0.status == .inProgress }
+        viewModel.tripsForDriver.first { $0.status == .inProgress }
     }
     
     var body: some View {
@@ -212,56 +128,6 @@ struct DashboardView: View {
         }
     }
 }
-struct DriverInfoCard: View {
-    // Get the active trip to show current truck details
-    @Binding var trips: [Trip]
-    
-    var currentTrip: Trip? {
-        trips.first { $0.status == .inProgress }
-    }
-    
-    var driverStatus: (text: String, color: Color) {
-        if currentTrip != nil {
-            return ("IN TRIP", .statusOrange)
-        } else {
-            return ("AVAILABLE", .statusGreen)
-        }
-    }
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image("driver_avatar")
-                .resizable()
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.white, lineWidth: 2))
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Rajesh Kumar Singh")
-                    .fontWeight(.medium)
-                if let activeTrip = currentTrip {
-                    Text("\(activeTrip.assignedVehicleID)")
-                        .font(.subheadline)
-                        .foregroundColor(.textSecondary)
-                }
-            }
-            
-            Spacer()
-            
-            Text(driverStatus.text)
-                .font(.caption)
-                .fontWeight(.medium)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(driverStatus.color.opacity(0.2))
-                .foregroundColor(driverStatus.color)
-                .cornerRadius(4)
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-    }
-}
 
 struct TaskFilterView: View {
     @Binding var selectedFilter: TaskFilter
@@ -355,8 +221,8 @@ struct TaskCard: View {
                 
                 //if !task.pickup.address.isEmpty {
                     // Locations
-                    LocationView(location: Location(name: "Pickup", address: task.pickupLocation), type: .pickup)
-                    LocationView(location: Location(name: "Destination", address: task.destination), type: .destination)
+                LocationViewWrapper(coordinate: task.pickupLocation, type: .pickup)
+                LocationViewWrapper(coordinate: task.destination, type: .destination)
                     
                     // Distance and time
                     HStack {
@@ -380,7 +246,22 @@ struct TaskCard: View {
         }
     }
 }
+struct LocationViewWrapper: View {
+    let coordinate: String
+    let type: LocationType
+    @State private var address: String = "Loading..."
 
+    var body: some View {
+        LocationView(location: Location(name: type == .pickup ? "Pickup" : "Destination", address: address), type: type)
+            .onAppear {
+                getAddress(from: coordinate) { fetchedAddress in
+                    DispatchQueue.main.async {
+                        self.address = fetchedAddress ?? "Unknown Location"
+                    }
+                }
+            }
+    }
+}
 struct LocationView: View {
     let location: Location
     let type: LocationType
@@ -426,16 +307,6 @@ enum TripType: String {
     }
 }
 
-//struct Trips {
-//    let tripId: String
-//    let truckType: String
-//    let numberPlate: String
-//    let type: TripType
-//    let date: String
-//    let details: String
-//    let pickup: Location
-//    let destination: Location
-//    let distance: 
 
 struct Location {
     let name: String

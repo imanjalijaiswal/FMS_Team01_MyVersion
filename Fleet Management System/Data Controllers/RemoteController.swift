@@ -133,15 +133,16 @@ class RemoteController: DatabaseAPIIntegrable{
     }
     
     func getDriverTrips(by id: UUID) async throws -> [Trip] {
-        let response = try await client
-                .rpc("get_assigned_trip_for_driver_id", params: [
+        let response: [Trip] = try await client
+                .rpc("get_assigned_trips_for_driver_id", params: [
                     "p_driver_id": id.uuidString
                 ])
                 .execute()
+                .value
 
-        let decodedTrips = try JSONDecoder().decode([Trip].self, from: response.data)
+//        let decodedTrips = try JSONDecoder().decode([Trip].self, from: response.data)
 
-        return decodedTrips
+        return response
     }
     
     func updateVehicleExpiry(by id: Int, with expiry: (puc: Date, insurance: Date, registration: Date)) async throws {
