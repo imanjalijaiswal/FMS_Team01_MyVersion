@@ -52,6 +52,20 @@ struct VehicleRowView: View {
                             .background(Color.green.opacity(0.1))
                             .cornerRadius(8)
                         }
+                        else if vehicle.status == .assigned && vehicle.activeStatus {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.statusOrange)
+                                    .frame(width: 4, height: 4)
+                                Text(vehicle.status.rawValue)
+                                    .font(.caption)
+                                    .foregroundColor(.statusOrange)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
                 }
                 
@@ -186,10 +200,19 @@ struct VehicleDetailView: View {
         }
         .alert("Disable Vehicle", isPresented: $showingDisableAlert) {
             Button("Cancel", role: .cancel) { }
-            Button("Disable", role: .destructive) {
+            Button(action: {
                 viewModel.removeVehicle(vehicle)
                 dismiss()
+            }) {
+                Text("Disable")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(vehicle.status == .assigned ? Color.gray.opacity(0.2) : Color.red)
+                    .foregroundColor(vehicle.status == .assigned ? Color.gray : Color.white)
+                    .cornerRadius(8)
             }
+            .disabled(vehicle.status == .assigned)
+
         } message: {
             Text("Are you sure you want to disable this vehicle? This action cannot be undone.")
         }

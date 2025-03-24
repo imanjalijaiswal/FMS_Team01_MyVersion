@@ -164,7 +164,6 @@ struct DriverDetailView: View {
     @State private var editedPhone = ""
     @State private var showEmailError = false
     @State private var showingDisableAlert = false
-    
     var body: some View {
         List {
             Section {
@@ -206,10 +205,11 @@ struct DriverDetailView: View {
                         showingDisableAlert = true
                     }) {
                         Text("Make Inactive")
-                            .foregroundColor(.red)
+                            .foregroundColor(driver.status == .onTrip ? .gray : .red)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
                     }
+                    .disabled(driver.status == .onTrip)
                 } else {
                     Button(action: {
                         viewModel.enableDriver(driver)

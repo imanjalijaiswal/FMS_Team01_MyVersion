@@ -6,7 +6,7 @@
 //
 import SwiftUI
 import MapKit
-
+import CoreLocation
 
 struct TripsView: View {
     @State private var showingAddNewTrip = false
@@ -231,9 +231,7 @@ struct AssignTripView: View {
         !pickupLocation.isEmpty &&
         !destination.isEmpty &&
         selectedVehicle != nil &&
-        selectedDriver1 != nil &&
-        !totalDistance.isEmpty &&
-        Int(totalDistance) != nil
+        selectedDriver1 != nil
     }
     
     var body: some View {
@@ -270,9 +268,16 @@ struct AssignTripView: View {
                         if showScheduledDatePicker {
                             DatePicker(
                                 "Scheduled Date & Time",
-                                selection: $scheduledDateTime
+                                selection: $scheduledDateTime,
+                                in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...,
+                                displayedComponents: [.date, .hourAndMinute]
                             )
                             .datePickerStyle(.graphical)
+                            .onAppear {
+                                // Ensure the default selected date is also tomorrow
+                                scheduledDateTime = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+
+                            }
                         }
                     }
                     .padding()
@@ -297,10 +302,17 @@ struct AssignTripView: View {
                         if showEstimatedDatePicker {
                             DatePicker(
                                 "Estimated Arrival",
-                                selection: $estimatedArrivalDateTime
+                                selection: $estimatedArrivalDateTime,
+                                in: Calendar.current.date(byAdding: .hour, value: 1, to: scheduledDateTime)!...,
+                                displayedComponents: [.date, .hourAndMinute]
                             )
                             .datePickerStyle(.graphical)
+                            .onAppear {
+                                // Ensure the default selected date is also tomorrow
+                                estimatedArrivalDateTime = Calendar.current.date(byAdding: .hour, value: 1, to: scheduledDateTime) ?? Date()
+                            }
                         }
+
                     }
                     .padding()
                     .background(Color(.systemGray6))
@@ -387,7 +399,7 @@ struct AssignTripView: View {
                                 selectedStartLocation = pickupCoordinate
                                 if let destinationCoordinate = await getCoordinates(from: selectedEndLocation ?? ""){
                                     selectedEndLocation = destinationCoordinate
-                                    if let distance = calculateDistance(from: selectedStartLocation!, to: selectedEndLocation!) {
+                                    if let distance = calculateDistance(from: selectedStartLocation ?? "", to: selectedEndLocation ?? "") {
                                         print("Distance: \(distance / 1000) km") // Convert meters to kilometers
                                         let newTrip = Trip(
                                             id: UUID(),
@@ -398,7 +410,7 @@ struct AssignTripView: View {
                                             pickupLocation: selectedStartLocation ?? "0,0",
                                             destination: selectedEndLocation ?? "0,0",
                                             estimatedArrivalDateTime: estimatedArrivalDateTime,
-                                            totalDistance: Int(distance) ?? 0,
+                                            totalDistance: Int(distance/1000),
                                             totalTripDuration: estimatedArrivalDateTime,
                                             description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
                                             scheduledDateTime: scheduledDateTime, createdAt: .now,
@@ -434,7 +446,7 @@ struct AssignTripView: View {
         }
     }
 }
-import CoreLocation
+
 
 func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
     let startComponents = startCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
