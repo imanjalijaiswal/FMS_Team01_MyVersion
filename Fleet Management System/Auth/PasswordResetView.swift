@@ -146,32 +146,60 @@ struct PasswordResetView: View {
             
             // Success message overlay
             if showSuccess {
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
+                Color.white.ignoresSafeArea()
                 
-                VStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.green)
-                    
-                    Text("Password reset successful!")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.top)
-                    
-                    Button("Continue") {
-                        // Continue to the main app
-                        navigateToMainApp()
+                VStack(spacing: 20) {
+                    // Close button
+                    HStack {
+                        Button(action: {
+                            navigateToMainApp()
+                        }) {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.gray)
+                                .padding()
+                        }
+                        Spacer()
                     }
-                    .padding()
-                    .background(Color.white)
-                    .foregroundColor(.blue)
-                    .cornerRadius(10)
-                    .padding(.top, 20)
+                    
+                    Spacer()
+                    
+                    Text("Password Updated!")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Your password has been successfully updated. You can now log in with your new password.")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    // Green checkmark circle
+                    ZStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 80, height: 80)
+                        
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 40, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.vertical, 30)
+                    
+                    Button(action: {
+                        navigateToMainApp()
+                    }) {
+                        Text("Continue")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(red: 52/255, green: 120/255, blue: 120/255))
+                            .cornerRadius(10)
+                    }
+                    .padding(.horizontal, 40)
+                    
+                    Spacer()
                 }
-                .padding(30)
-                .background(Color.gray.opacity(0.9))
-                .cornerRadius(20)
             }
         }
     }
