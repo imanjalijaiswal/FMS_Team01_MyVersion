@@ -14,6 +14,11 @@ struct PasswordResetView: View {
     @State private var isLoading = false
     @State private var showSuccess = false
     
+    private var isPasswordValid: Bool {
+        !newPassword.isEmpty && !confirmPassword.isEmpty && 
+        newPassword == confirmPassword && newPassword.count >= 8
+    }
+    
     var body: some View {
         ZStack {
             Color.white.ignoresSafeArea()
@@ -64,6 +69,12 @@ struct PasswordResetView: View {
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    
+                    // Password requirements hint
+                    Text("Password must be at least 8 characters")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.leading, 4)
                 }
                 .padding(.horizontal)
                 
@@ -107,10 +118,10 @@ struct PasswordResetView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(isLoading ? Color.gray : Color.primaryGradientStart)
+                    .background(isLoading ? Color.gray : (isPasswordValid ? Color.primaryGradientStart : Color.gray.opacity(0.5)))
                     .cornerRadius(12)
                 }
-                .disabled(isLoading)
+                .disabled(isLoading || !isPasswordValid)
                 .padding(.horizontal)
                 
                 // Show error message if reset fails
@@ -170,8 +181,8 @@ struct PasswordResetView: View {
             return
         }
         
-        guard newPassword.count >= 6 else {
-            errorMessage = "⚠️ Password must be at least 6 characters."
+        guard newPassword.count >= 8 else {
+            errorMessage = "⚠️ Password must be at least 8 characters."
             return
         }
         

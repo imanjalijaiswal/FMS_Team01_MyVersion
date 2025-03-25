@@ -119,14 +119,34 @@ struct ForgotPasswordView: View {
             .padding(.horizontal)
             .padding(.top, 20)
             
-            // Request OTP Button
-            actionButton(
-                title: "Send Verification Code",
-                isLoading: isLoading,
-                loadingTitle: "Sending...",
-                action: requestOTP
-            )
+            // Send Verification Code Button
+            Button(action: requestOTP) {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    Text(isLoading ? "Sending..." : "Send Verification Code")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    Group {
+                        if isLoading {
+                            Color.gray
+                        } else if viewModel.email.isEmpty {
+                            Color.gray.opacity(0.5)
+                        } else {
+                            Color.primaryGradientStart
+                        }
+                    }
+                )
+                .cornerRadius(12)
+            }
             .disabled(isLoading || viewModel.email.isEmpty)
+            .padding(.horizontal)
         }
     }
     
@@ -156,13 +176,33 @@ struct ForgotPasswordView: View {
             .padding(.top, 20)
             
             // Verify OTP Button
-            actionButton(
-                title: "Verify Code",
-                isLoading: isLoading,
-                loadingTitle: "Verifying...",
-                action: verifyOTP
-            )
+            Button(action: verifyOTP) {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    Text(isLoading ? "Verifying..." : "Verify Code")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    Group {
+                        if isLoading {
+                            Color.gray
+                        } else if !viewModel.isValidOTP {
+                            Color.gray.opacity(0.5)
+                        } else {
+                            Color.primaryGradientStart
+                        }
+                    }
+                )
+                .cornerRadius(12)
+            }
             .disabled(isLoading || !viewModel.isValidOTP)
+            .padding(.horizontal)
             
             // Resend Code with Timer
             Button(action: {
@@ -203,6 +243,12 @@ struct ForgotPasswordView: View {
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
+                
+                // Password requirements hint
+                Text("Password must be at least 8 characters")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.leading, 4)
             }
             .padding(.horizontal)
             .padding(.top, 20)
@@ -234,13 +280,33 @@ struct ForgotPasswordView: View {
             .padding(.top, 10)
             
             // Update Password Button
-            actionButton(
-                title: "Update Password",
-                isLoading: isLoading,
-                loadingTitle: "Updating...",
-                action: updatePassword
-            )
-            .disabled(isLoading || viewModel.newPassword.isEmpty || viewModel.confirmPassword.isEmpty)
+            Button(action: updatePassword) {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    Text(isLoading ? "Updating..." : "Update Password")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(
+                    Group {
+                        if isLoading {
+                            Color.gray
+                        } else if !viewModel.isPasswordValid {
+                            Color.gray.opacity(0.5)
+                        } else {
+                            Color.primaryGradientStart
+                        }
+                    }
+                )
+                .cornerRadius(12)
+            }
+            .disabled(isLoading || !viewModel.isPasswordValid)
+            .padding(.horizontal)
         }
     }
     
@@ -284,18 +350,6 @@ struct ForgotPasswordView: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(
-                Group {
-                    if isLoading {
-                        Color.gray
-                    } else if !viewModel.isValidOTP && title == "Verify Code" {
-                        Color.gray.opacity(0.5)
-                    } else {
-                        Color.primaryGradientStart
-                    }
-                }
-            )
-            .cornerRadius(12)
         }
         .padding(.horizontal)
     }
@@ -344,9 +398,16 @@ struct ForgotPasswordView: View {
         errorMessage = nil
         isLoading = true
         
+        // Validate password length
+        if viewModel.newPassword.count < 8 {
+            errorMessage = "⚠️ Password must be at least 8 characters."
+            isLoading = false
+            return
+        }
+        
         // Validate passwords match
         if viewModel.newPassword != viewModel.confirmPassword {
-            errorMessage = "Passwords do not match"
+            errorMessage = "⚠️ Passwords do not match."
             isLoading = false
             return
         }

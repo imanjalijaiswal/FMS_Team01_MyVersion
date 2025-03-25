@@ -18,6 +18,11 @@ class ForgotPasswordViewModel: ObservableObject {
         otpCode.count == 6 && otpCode.allSatisfy { $0.isNumber }
     }
     
+    var isPasswordValid: Bool {
+        !newPassword.isEmpty && !confirmPassword.isEmpty && 
+        newPassword == confirmPassword && newPassword.count >= 8
+    }
+    
     enum PasswordResetStep {
         case emailEntry
         case otpVerification
