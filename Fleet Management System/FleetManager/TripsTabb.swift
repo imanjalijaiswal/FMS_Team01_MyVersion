@@ -518,32 +518,63 @@ struct DriverSelectionView: View {
     @ObservedObject var viewModel: IFEDataController
     @Binding var selectedDriver: Driver?
     let excludeDriver: Driver?
+    @State private var searchText = ""
     
     var availableDrivers: [Driver] {
-        viewModel.drivers.filter { driver in
+        let drivers = viewModel.drivers.filter { driver in
             driver.activeStatus &&
             driver.status == .available &&
-            driver.role == .driver
-            &&
+            driver.role == .driver &&
             driver.id != excludeDriver?.id
+        }
+        
+        if searchText.isEmpty {
+            return drivers
+        }
+        
+        return drivers.filter { driver in
+            driver.meta_data.fullName.lowercased().contains(searchText.lowercased()) ||
+            String( driver.employeeID).contains(searchText) ||
+            driver.meta_data.phone.contains(searchText) ||
+            driver.licenseNumber.lowercased().contains(searchText.lowercased())
         }
     }
     
     var body: some View {
         NavigationView {
-            List {
+            VStack {
+                SearchBar(text: $searchText)
+                    .padding(.vertical, 8)
+                
                 if availableDrivers.isEmpty {
-                    Text("No available drivers")
-                        .foregroundColor(.gray)
-                } else {
-                    ForEach(availableDrivers) { driver in
-                        Button(action: {
-                            selectedDriver = driver
-                            dismiss()
-                        }) {
-                            DriversRowView(driver: driver, isSelected: selectedDriver?.id == driver.id)
-                        }
+                    VStack(spacing: 20) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text(searchText.isEmpty ? "No available drivers" : "No matching drivers")
+                            .font(.headline)
+                            .foregroundColor(.gray)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(availableDrivers) { driver in
+                                Button(action: {
+                                    selectedDriver = driver
+                                    dismiss()
+                                }) {
+                                    DriversRowView(driver: driver, isSelected: selectedDriver?.id == driver.id)
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal)
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(10)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .background(Color.white)
                 }
             }
             .navigationTitle("Select Driver")
@@ -553,8 +584,11 @@ struct DriverSelectionView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(.primaryGradientEnd)
                 }
             }
+            .toolbarBackground(Color(.white), for: .navigationBar)
+            .background(Color.white)
         }
     }
 }
@@ -572,6 +606,10 @@ struct LocationSearchBar: View {
             HStack {
                 TextField(placeholder, text: $text)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding(8)
+                    .background(Color.white)
+                    .cornerRadius(8)
+                    .shadow(radius: 2)
                     .onChange(of: text, initial: false) { oldValue, newValue in
                         searchCompleter.search(with: newValue)
                         showResults = !newValue.isEmpty
@@ -781,84 +819,139 @@ struct StatusBadge: View {
     }
 }
 
+//VehicleSelectionView
+struct VehicleCardContent: View {
+    let vehicle: Vehicle
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "car.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.green)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack{
+                    VStack(alignment: .leading, spacing: 4){
+                        Text(vehicle.model)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text("\(vehicle.make) • \(vehicle.licenseNumber)")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                    
+                    Label(vehicle.currentCoordinate, systemImage: "location.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.trailing, 5)
+                }
+                
+                // Fuel and Weight
+        
+                    Label(vehicle.fuelType.rawValue, systemImage: "fuelpump.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+               
+                    
+                    Label("\(Int(vehicle.loadCapacity)) tons", systemImage: "scalemass.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                
+                // Insurance Info
+                
+                VStack(alignment: .leading, spacing: 4){
+                    Label("Insurance Details:", systemImage: "checkmark.shield.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .fontWeight(.semibold)
+                    
+                    VStack(alignment: .leading){
+                        Text("Insurance Number: \(vehicle.insurancePolicyNumber)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                       
+                        Text("Expires At: \(vehicle.insuranceExpiryDate.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.leading, 15)
+                }
+            }
+            
+            Spacer()
+            
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.title2)
+            }
+            
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+    }
+}
+
 struct VehicleSelectionView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: IFEDataController
     @Binding var selectedVehicle: Vehicle?
+    @State private var searchText = ""
     
     var availableVehicles: [Vehicle] {
-        viewModel.vehicles.filter { vehicle in
+        let vehicles = viewModel.vehicles.filter { vehicle in
             vehicle.status == .available && vehicle.activeStatus
+        }
+        
+        if searchText.isEmpty {
+            return vehicles
+        }
+        
+        return vehicles.filter { vehicle in
+            vehicle.model.lowercased().contains(searchText.lowercased()) ||
+            vehicle.make.lowercased().contains(searchText.lowercased()) ||
+            vehicle.vinNumber.lowercased().contains(searchText.lowercased()) ||
+            vehicle.loadCapacity.description.lowercased().contains(searchText.lowercased()) ||
+            vehicle.licenseNumber.lowercased().contains(searchText.lowercased())
         }
     }
     
     var body: some View {
         NavigationView {
-            List(availableVehicles) { vehicle in
-                Button(action: {
-                    selectedVehicle = vehicle
-                    dismiss()
-                }) {
-                    HStack(spacing: 12) {
+            VStack {
+                SearchBar(text: $searchText)
+                    .padding(.vertical, 8)
+                
+                if availableVehicles.isEmpty {
+                    VStack(spacing: 20) {
                         Image(systemName: "car.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.green)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(vehicle.model)
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            Text("\(vehicle.make) • \(vehicle.licenseNumber)")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            
-                            HStack {
-                                Label("VIN: \(vehicle.vinNumber)", systemImage: "number")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                
-                                Spacer()
-                                
-                                Label("\(vehicle.loadCapacity) tons", systemImage: "scalemass")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            HStack {
-                                Label(vehicle.fuelType.rawValue, systemImage: "fuelpump.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                
-                                Spacer()
-                                
-                                Label(vehicle.currentCoordinate, systemImage: "location.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            HStack {
-                                Label("Insurance: \(vehicle.insurancePolicyNumber)", systemImage: "checkmark.shield.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                
-                                Spacer()
-                                
-                                Label("Expires: \(vehicle.insuranceExpiryDate.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        if selectedVehicle?.id == vehicle.id {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.title2)
-                        }
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text(searchText.isEmpty ? "No available vehicles" : "No matching vehicles")
+                            .font(.headline)
+                            .foregroundColor(.gray)
                     }
-                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(availableVehicles) { vehicle in
+                                Button(action: {
+                                    selectedVehicle = vehicle
+                                    dismiss()
+                                }) {
+                                    VehicleCardContent(vehicle: vehicle, isSelected: selectedVehicle?.id == vehicle.id)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .background(Color.white)
                 }
             }
             .navigationTitle("Select Vehicle")
@@ -868,11 +961,15 @@ struct VehicleSelectionView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(.primaryGradientEnd)
                 }
             }
+            .toolbarBackground(Color(.white), for: .navigationBar)
+            .background(Color.white)
         }
     }
 }
 
-
-
+#Preview{
+    TripsView()
+}
