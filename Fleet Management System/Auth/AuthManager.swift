@@ -9,29 +9,164 @@ import Foundation
 import Supabase
 import Auth
 
-struct AppUser: Equatable {
-   var id: String
-   var email: String?
-   var role: Role
-//   var workingStatus: Bool
-   
-   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
-       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
-   }
+protocol User: Codable, Equatable, Identifiable {
+    var meta_data: UserMetaData { get set }
+    
+    var id: UUID { get }
+    
+    var activeStatus: Bool { get }
+    var employeeID: Int { get }
+    var role: Role { get }
 }
 
-struct UserRoles:Codable{
-    var id : UUID
-    var role : Role
-    var workingStatus : Bool
-    var firstTimeLogin : Bool
-    var createdAt : Date
+struct UserMetaData: Codable, Equatable, Identifiable {
+    var id: UUID
+    var fullName: String
+    var email: String
+    var phone: String
+    var role: Role
+    var employeeID: Int
+    var firstTimeLogin: Bool
+    var createdAt: Date
+    var activeStatus: Bool
+    
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
-enum Role:String,Codable{
-    case fleetManager
-    case driver
-    case maintenancePersonal
+struct FleetManager: User {
+    var activeStatus: Bool { return meta_data.activeStatus }
+    
+    var employeeID: Int { return meta_data.employeeID }
+    
+    var role: Role { return meta_data.role }
+    
+    var meta_data: UserMetaData
+    var id: UUID { meta_data.id }
+}
+
+struct Driver: User {
+    var activeStatus: Bool { return meta_data.activeStatus }
+    
+    var employeeID: Int { return meta_data.employeeID }
+    
+    var role: Role { return meta_data.role }
+    
+    var meta_data: UserMetaData
+    var licenseNumber: String
+    var totalTrips: Int
+    var status: DriverStatus
+    
+    var id: UUID { meta_data.id }
+}
+
+struct AppUser: Codable, Equatable, Identifiable {
+    var userData: UserSpecificData
+
+    enum UserSpecificData: Codable, Equatable {
+        case driver(Driver)
+        case fleetManager(FleetManager)
+
+        enum CodingKeys: String, CodingKey {
+            case type, data
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            switch self {
+            case .driver(let driver):
+                try container.encode("driver", forKey: .type)
+                try container.encode(driver, forKey: .data)
+            case .fleetManager(let manager):
+                try container.encode("fleetManager", forKey: .type)
+                try container.encode(manager, forKey: .data)
+            }
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+
+            switch type {
+            case "driver":
+                let driver = try container.decode(Driver.self, forKey: .data)
+                self = .driver(driver)
+            case "fleetManager":
+                let manager = try container.decode(FleetManager.self, forKey: .data)
+                self = .fleetManager(manager)
+            default:
+                throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Invalid role type")
+            }
+        }
+    }
+
+    var meta_data: UserMetaData {
+        switch userData {
+        case .driver(let driver):
+            return driver.meta_data
+        case .fleetManager(let fleetManager):
+            return fleetManager.meta_data
+        }
+    }
+    
+    var role: Role { return meta_data.role }
+    
+    var licenseNumber: String? {
+        switch userData {
+        case .driver(let driver):
+            return driver.licenseNumber
+        default: return nil
+        }
+    }
+    
+    var totalTrips: Int? {
+        switch userData {
+        case .driver(let driver):
+            return driver.totalTrips
+        default: return nil
+        }
+    }
+    
+    var driverStatus: DriverStatus? {
+        switch userData {
+        case .driver(let driver):
+            return driver.status
+        default: return nil
+        }
+    }
+    
+    var id: UUID {  return meta_data.id }
+    
+    var activeStatus: Bool { return meta_data.activeStatus }
+    
+    var employeeID: Int { return meta_data.employeeID }
+}
+
+
+//struct AppUser: Equatable {
+//   var id: String
+//   var email: String?
+//   var role: Role
+////   var workingStatus: Bool
+//   
+//   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
+//       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
+//   }
+//}
+//
+//struct UserRoles:Codable{
+//    var id : UUID
+//    var role : Role
+//    var workingStatus : Bool
+//    var firstTimeLogin : Bool
+//    var createdAt : Date
+//}
+
+enum Role: String, Codable {
+    case fleetManager = "fleetManager"
+    case driver = "driver"
+    case maintenancePersonnel = "maintenancePersonnel"
 }
 
 //enum AuthError: Error {
@@ -74,18 +209,18 @@ class AuthManager{
         is2FACompleted = UserDefaults.standard.bool(forKey: twoFACompletedKey)
     }
     
-    let client = SupabaseClient(supabaseURL: URL(string: "https://cxeocphyzvdokhuzrkre.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZW9jcGh5enZkb2todXpya3JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNDY4MDAsImV4cCI6MjA1NzkyMjgwMH0.XnWtTxwBfTVhqXyY4dr9avnGLVWYDlsT3T9hdEz96lk")
+    let client = SupabaseClient(supabaseURL: URL(string: "https://rhmhyrccjrgmgjyxgmlf.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJobWh5cmNjanJnbWdqeXhnbWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3Mjk0MTksImV4cCI6MjA1ODMwNTQxOX0.FtGNdVw_TBTUOGlUm8tH6EqZbvCCZsdxpd6LN91_Sho")
 
     func getCurrentSession() async throws -> AppUser? {
         do {
             // Try to get the current session
             let session = try await client.auth.session
-            let userId = session.user.id.uuidString
+            let userId = session.user.id
             
             // If 2FA is not required or has been completed, return the user
             if !AuthManager.is2FAEnabled || is2FACompleted {
-                let role = try await getUserRole(userId: userId)
-                return AppUser(id: userId, email: session.user.email, role: role)
+                let role = try await getUserRole(userId: userId.uuidString)
+                return try await getAppUser(byType: role, id: userId)
             } else {
                 // 2FA is required but not completed - force re-authentication
                 try await signOut()
@@ -134,7 +269,24 @@ class AuthManager{
         
         // If working status is true, proceed with getting role and creating user
         let role = try await getUserRole(userId: userId)
-        return AppUser(id: session.user.id.uuidString, email: session.user.email, role: role)
+        return try await getAppUser(byType: role, id: session.user.id)
+    }
+    
+    func getAppUser(byType type: Role, id: UUID) async throws -> AppUser {
+        switch type {
+        case .driver:
+            let driverData: Driver = try await client
+                .rpc("get_driver_data_by_id", params: ["p_id": id.uuidString])
+                .execute()
+                .value
+            return AppUser(userData: .driver(driverData))
+        case .fleetManager, .maintenancePersonnel:
+            let managerData: FleetManager = try await client
+                .rpc("get_fleet_manager_data_by_id", params: ["p_id": id.uuidString])
+                .execute()
+                .value
+            return AppUser(userData: .fleetManager(managerData))
+        }
     }
     
     // MARK: - User Roles
@@ -145,16 +297,25 @@ class AuthManager{
         }
 
         do {
-
-            let response: UserRoles = try await client
-                .from("UserRoles")
-                .select("*")
-                .eq("id", value: userUUID)
-                .single()
-                .execute()
-                .value
+            struct UserRole: Codable {
+                let role: String
+            }
             
-            return response.role
+            let response = try await client
+                .from("UserRoles").select("role").eq("id", value: userUUID).single()
+                .execute()
+            
+            let userRole = try JSONDecoder().decode(UserRole.self, from: response.data)
+            if userRole.role == "driver" { return .driver }
+            else { return .fleetManager }
+//            print("JSON: \(json)")
+//            if let json = try? JSONSerialization.jsonObject(with: response.data, options: []) as? [String: Any] {
+//                   let roleString = json["role"] as? String
+//                   let role = Role(rawValue: roleString ?? "fleetManager")!
+//                    return role
+//                } else {
+//                    throw NSError(domain: "Invalid Role Data", code: 1, userInfo: nil)
+//                }
         } catch {
             print("Error fetching user role: \(error.localizedDescription)")
             throw error
@@ -173,18 +334,13 @@ class AuthManager{
         }
 
         do {
-            let response: UserRoles = try await client
-                .from("UserRoles")
-                .select("*")
-                .eq("id", value: userUUID)
-                .single()
-                .execute()
-                .value
+            let firstTimeLoginStatus: Bool = try await client
+                .rpc("get_user_first_time_login_status_by_id", params: ["p_id": userId])
+                .execute().value
             
-            // Cache the result
-            firstTimeLoginCache[userId] = response.firstTimeLogin
+            firstTimeLoginCache[userId] = firstTimeLoginStatus
             
-            return response.firstTimeLogin
+            return firstTimeLoginStatus
         } catch {
             print("Error fetching firstTimeLogin status: \(error.localizedDescription)")
             return false // Default to false in case of errors
@@ -199,9 +355,9 @@ class AuthManager{
         
         do {
             try await client
-                .from("UserRoles")
+                .from("UserMetaData")
                 .update(["firstTimeLogin": firstTimeLogin])
-                .eq("id", value: userUUID)
+                .eq("id", value: userId)
                 .execute()
             
             // Update the cache
@@ -218,18 +374,11 @@ class AuthManager{
         }
 
         do {
-
-            let response: UserRoles = try await client
-                .from("UserRoles")
-                .select("*")
-                .eq("id", value: userUUID)
-                .single()
-                .execute()
-                .value
-            
-            return response.workingStatus
+            return try await client
+                .rpc("get_user_active_status_by_id", params: ["p_id": userId])
+                .execute().value
         } catch {
-            print("Error fetching user role: \(error.localizedDescription)")
+            print("Error fetching user active status: \(error.localizedDescription)")
             throw error
         }
     }
@@ -251,6 +400,7 @@ class AuthManager{
     }
     
     func verifyOTP(email: String, token: String) async throws -> Bool {
+        print("Token: \(token)")
         // Verify the OTP using the verifyOTP method
         do {
             try await client.auth.verifyOTP(
@@ -349,7 +499,9 @@ class AuthManager{
     // Enhanced sign-in method with 2FA support
     func signInWithEmailAndInitiate2FA(email: String, password: String) async throws -> AppUser? {
         do {
+            print("Attempting to sign in...")
             let authResponse = try await client.auth.signIn(email: email, password: password)
+//            print("Auth Response: \(authResponse)")
             
             // Get the user from the response
             let user = authResponse.user
@@ -362,11 +514,11 @@ class AuthManager{
                 throw AuthError.inactiveUser
             }
             
-            let userEmail = user.email
+//            let userEmail = user.email
             
             // Get user role
             let role = try await getUserRole(userId: userId)
-            let appUser = AppUser(id: userId, email: userEmail, role: role)
+            let appUser = try await getAppUser(byType: role, id: user.id)
             
             // Reset 2FA completed flag
             is2FACompleted = false

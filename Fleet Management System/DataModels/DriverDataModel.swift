@@ -25,13 +25,13 @@ enum FuelType: String, Codable {
 
 enum VehicleStatus: String, Codable {
     case available = "Available"
-    case inUse = "In Use"
-    case maintenance = "Maintenance"
+    case assigned = "Assigned"
+    case underMaintenance = "underMaintenance"
     case inactive = "Inactive"
 }
 
 struct Vehicle: Identifiable, Codable, Equatable{
-    let id: Int
+    var id: Int
     let make: String //company name
     let model: String
     let vinNumber: String

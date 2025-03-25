@@ -85,19 +85,21 @@ struct ProgressBarView: View {
                                     .foregroundColor(.gray)
             }
             
-            GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    ForEach(items, id: \.0) { item in
-                        let width = CGFloat(item.1) / CGFloat(total) * geometry.size.width
-                        Rectangle()
-                            .fill(item.2)
-                            .frame(width: width)
-                    }
-                }
-                .frame(height: 8)
-                .clipShape(Capsule())
-            }
-            .frame(height: 8)
+                                GeometryReader { geometry in
+                                    let availableWidth = max(1, geometry.size.width) // Prevent zero width
+                                    HStack(spacing: 0) {
+                                        ForEach(items, id: \.0) { item in
+                                            let validValue = max(0, CGFloat(item.1)) // Ensure non-negative values
+                                            let width = total > 0 ? validValue / CGFloat(total) * availableWidth : 0
+                                            Rectangle()
+                                                .fill(item.2)
+                                                .frame(width: width)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                    .clipShape(Capsule())
+                                }
+                                .frame(height: 8)
             
             HStack(spacing: 16) {
                 ForEach(items, id: \.0) { item in
@@ -202,7 +204,32 @@ struct FleetManagerDashboardView: View {
     @Binding var user: AppUser?
     @Binding var role: Role?
     @State private var showingProfile = false
-    @StateObject private var viewModel = DriverViewModel.shared
+    @StateObject private var viewModel = IFEDataController.shared
+    
+    var availableDrivers: Int {
+        viewModel.drivers.filter { $0.status == .available && $0.activeStatus}.count
+    }
+
+    var onTripDrivers: Int {
+        viewModel.drivers.filter { $0.status == .onTrip && $0.activeStatus}.count
+    }
+    
+    var inactiveDrivers: Int {
+        viewModel.drivers.filter { !$0.activeStatus }.count
+    }
+    
+    var availableVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .available && $0.activeStatus }.count
+    }
+    
+    var assignedVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .assigned && $0.activeStatus}.count
+    }
+    
+    var inactiveVehicles: Int {
+        viewModel.vehicles.filter { $0.activeStatus == false }.count
+    }
+
     
     var body: some View {
         ScrollView {
@@ -218,9 +245,12 @@ struct FleetManagerDashboardView: View {
                         title: "Drivers",
                         total: viewModel.drivers.count,
                         items: [
-                            ("Available", viewModel.drivers.filter{ $0.status == .available }.count, Color.mint),
-                            ("On Trip",viewModel.drivers.filter{$0.status == .onTrip }.count, Color.primaryGradientEnd),
-                            ("Disabled", viewModel.drivers.filter{$0.workingStatus == false}.count, Color.orange)
+                            (DriverStatus.available.rawValue,
+                             availableDrivers,
+                             Color.mint),
+                            
+                            (DriverStatus.onTrip.rawValue, onTripDrivers, Color.primaryGradientEnd),
+                            (DriverStatus.inactive.rawValue, inactiveDrivers, Color.orange)
                         ]
                     )
                     
@@ -237,9 +267,9 @@ struct FleetManagerDashboardView: View {
                         title: "Trucks",
                         total: viewModel.vehicles.count,
                         items: [
-                            ("Available", viewModel.vehicles.filter { $0.status == .available }.count, Color.mint),
-                            ("In Use", viewModel.vehicles.filter { $0.status == .inUse }.count, Color.primaryGradientEnd),
-                            ("Disabled", viewModel.vehicles.filter { $0.status == .inactive }.count, Color.statusOrange)
+                            (VehicleStatus.available.rawValue, availableVehicles, Color.mint),
+                            (VehicleStatus.assigned.rawValue, assignedVehicles, Color.primaryGradientEnd),
+                            (VehicleStatus.inactive.rawValue, inactiveVehicles, Color.statusOrange)
                         ]
                     )
                 }
@@ -292,13 +322,13 @@ struct FleetManagerDashboardView: View {
         .navigationTitle("Fleet Manager")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    // Action for the bell button
-                }) {
-                    Image(systemName: "bell.fill")
-                        .font(.title2)
-                        .foregroundColor(.primaryGradientEnd)
-                }
+//                Button(action: {
+//                    // Action for the bell button
+//                }) {
+//                    Image(systemName: "bell.fill")
+//                        .font(.title2)
+//                        .foregroundColor(.primaryGradientEnd)
+//                }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
@@ -420,7 +450,4 @@ struct FleetManagerTabBarView: View {
         }
         .accentColor(.primaryGradientEnd)
     }
-}
-#Preview{
-    TripsView()
 }

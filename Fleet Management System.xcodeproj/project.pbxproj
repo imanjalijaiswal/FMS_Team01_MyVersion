@@ -13,6 +13,7 @@
 		60EBFDC92D893A4D002D3775 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 60EBFDC82D893A4D002D3775 /* Realtime */; };
 		60EBFDCB2D893A4D002D3775 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 60EBFDCA2D893A4D002D3775 /* Storage */; };
 		60EBFDCD2D893A4D002D3775 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 60EBFDCC2D893A4D002D3775 /* Supabase */; };
+		EF5E9B1A2D90D52300B93C86 /* SwiftSMTP in Frameworks */ = {isa = PBXBuildFile; productRef = EF5E9B192D90D52300B93C86 /* SwiftSMTP */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 				60EBFDCD2D893A4D002D3775 /* Supabase in Frameworks */,
 				60EBFDC32D893A4D002D3775 /* Auth in Frameworks */,
 				60EBFDCB2D893A4D002D3775 /* Storage in Frameworks */,
+				EF5E9B1A2D90D52300B93C86 /* SwiftSMTP in Frameworks */,
 				60EBFDC92D893A4D002D3775 /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -86,6 +88,7 @@
 				60EBFDC82D893A4D002D3775 /* Realtime */,
 				60EBFDCA2D893A4D002D3775 /* Storage */,
 				60EBFDCC2D893A4D002D3775 /* Supabase */,
+				EF5E9B192D90D52300B93C86 /* SwiftSMTP */,
 			);
 			productName = "Fleet Management System";
 			productReference = 60A12F8E2D883A7600569683 /* Fleet Management System.app */;
@@ -117,6 +120,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				60EBFDC12D893A4D002D3775 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				EF5E9B182D90D52300B93C86 /* XCRemoteSwiftPackageReference "Swift-SMTP" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 60A12F8F2D883A7600569683 /* Products */;
@@ -358,6 +362,14 @@
 				minimumVersion = 2.5.1;
 			};
 		};
+		EF5E9B182D90D52300B93C86 /* XCRemoteSwiftPackageReference "Swift-SMTP" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Kitura/Swift-SMTP.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -390,6 +402,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 60EBFDC12D893A4D002D3775 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		EF5E9B192D90D52300B93C86 /* SwiftSMTP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EF5E9B182D90D52300B93C86 /* XCRemoteSwiftPackageReference "Swift-SMTP" */;
+			productName = SwiftSMTP;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
