@@ -295,8 +295,6 @@ struct VehiclesView: View {
         .sheet(isPresented: $showingAddVehicle) {
             VehicleDetailsView(viewModel: viewModel)
         }
-        .onAppear {
-        }
     }
 }
 
