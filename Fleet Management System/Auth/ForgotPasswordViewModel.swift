@@ -92,6 +92,30 @@ class ForgotPasswordViewModel: ObservableObject {
             throw PasswordResetError.invalidPassword
         }
         
+        // Check if new password is same as current password
+        do {
+            let isSamePassword = try await AuthManager.shared.checkIfSamePassword(
+                email: email,  // Use the email from the current flow
+                password: newPassword
+            )
+            if isSamePassword {
+                throw PasswordResetError.sameAsCurrentPassword
+            }
+        } catch {
+            // If checkIfSamePassword throws an error, it means either:
+            // 1. The sign-in failed (different password)
+            // 2. There was a network error
+            // In case #1, we can proceed with the password update
+            // In case #2, we should throw the error
+            if let authError = error as? AuthError {
+                // This is case #1, we can proceed
+                print("Password is different, proceeding with update")
+            } else {
+                // This is case #2, rethrow the error
+                throw error
+            }
+        }
+        
         // Update password using Supabase
         try await AuthManager.shared.updateUserPassword(email: email, password: newPassword)
         currentStep = .completed
@@ -122,6 +146,7 @@ enum PasswordResetError: LocalizedError {
     case invalidPassword
     case passwordsDoNotMatch
     case resetFailed
+    case sameAsCurrentPassword
     case otpRateLimit
     
     var errorDescription: String? {
@@ -136,6 +161,8 @@ enum PasswordResetError: LocalizedError {
             return "Passwords do not match."
         case .resetFailed:
             return "Failed to reset password. Please try again."
+        case .sameAsCurrentPassword:
+            return "⚠️ New password must be different from your current password."
         case .otpRateLimit:
             return "You have reached the rate limit for resending OTP. Please wait before trying again."
         }

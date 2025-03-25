@@ -198,6 +198,9 @@ class AuthManager{
     // Store the current 2FA code
     private var current2FACode: String = ""
     
+    // Store the current user
+    private(set) var currentUser: AppUser?
+    
     // UserDefaults key for storing 2FA completion status
     private let twoFACompletedKey = "twoFACompleted"
     
@@ -236,6 +239,7 @@ class AuthManager{
     func signOut() async throws{
         try await client.auth.signOut()
         is2FACompleted = false
+        currentUser = nil  // Clear current user
         // Clear 2FA completion status in UserDefaults
         UserDefaults.standard.set(false, forKey: twoFACompletedKey)
         
@@ -269,7 +273,9 @@ class AuthManager{
         
         // If working status is true, proceed with getting role and creating user
         let role = try await getUserRole(userId: userId)
-        return try await getAppUser(byType: role, id: session.user.id)
+        let user = try await getAppUser(byType: role, id: session.user.id)
+        currentUser = user  // Set current user
+        return user
     }
     
     func getAppUser(byType type: Role, id: UUID) async throws -> AppUser {
@@ -501,7 +507,6 @@ class AuthManager{
         do {
             print("Attempting to sign in...")
             let authResponse = try await client.auth.signIn(email: email, password: password)
-//            print("Auth Response: \(authResponse)")
             
             // Get the user from the response
             let user = authResponse.user
@@ -514,11 +519,10 @@ class AuthManager{
                 throw AuthError.inactiveUser
             }
             
-//            let userEmail = user.email
-            
             // Get user role
             let role = try await getUserRole(userId: userId)
             let appUser = try await getAppUser(byType: role, id: user.id)
+            currentUser = appUser  // Set current user
             
             // Reset 2FA completed flag
             is2FACompleted = false
@@ -551,6 +555,22 @@ class AuthManager{
                 throw authError
             }
             throw error
+        }
+    }
+
+    // Check if the new password is same as current password
+    func checkIfSamePassword(email: String, password: String) async throws -> Bool {
+        do {
+            // Try to sign in with the provided password
+            // If successful, it means the password is the same as current
+            _ = try await client.auth.signIn(
+                email: email,
+                password: password
+            )
+            return true
+        } catch {
+            // If sign in fails, it means the password is different
+            return false
         }
     }
 }

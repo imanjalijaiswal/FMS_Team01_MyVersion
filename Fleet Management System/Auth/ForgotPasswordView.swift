@@ -12,9 +12,17 @@ struct ForgotPasswordView: View {
             ZStack {
                 Color.white.ignoresSafeArea()
                 
-                VStack(spacing: 25) {
-                    // Header
-                    headerView
+                VStack(spacing: 20) {
+                    // Title and subtitle
+                    Text(stepTitle)
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text(stepSubtitle)
+                        .font(.body)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                     
                     // Current step content
                     Group {
@@ -30,19 +38,10 @@ struct ForgotPasswordView: View {
                         }
                     }
                     
-                    // Error message
-                    if let errorMessage = errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.subheadline)
-                            .padding(.top, 10)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                    }
-                    
                     Spacer()
                 }
-                .padding(.top, 20)
+                .padding(.top, 40)
+                .padding(.horizontal)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -103,128 +102,149 @@ struct ForgotPasswordView: View {
     // MARK: - Step Views
     
     private var emailEntryView: some View {
-        VStack {
+        VStack(spacing: 20) {
+            // Info box
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Check your email")
+                    .font(.headline)
+                
+                Text("We'll send a verification code to your email. Please enter the code on the next screen.")
+                    .font(.body)
+                    .foregroundColor(.gray)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            
             VStack(alignment: .leading, spacing: 8) {
                 Text("Email")
-                    .foregroundColor(.black)
-                    .padding(.leading)
+                    .font(.headline)
                 
                 TextField("Enter your email", text: $viewModel.email)
+                    .textFieldStyle(.plain)
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
+                    .keyboardType(.emailAddress)
             }
-            .padding(.horizontal)
-            .padding(.top, 20)
             
             // Send Verification Code Button
             Button(action: requestOTP) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    }
-                    Text(isLoading ? "Sending..." : "Send Verification Code")
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text("Send Verification Code")
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    Group {
-                        if isLoading {
-                            Color.gray
-                        } else if viewModel.email.isEmpty {
-                            Color.gray.opacity(0.5)
-                        } else {
-                            Color.primaryGradientStart
-                        }
-                    }
-                )
-                .cornerRadius(12)
             }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .foregroundColor(.white)
+            .background(isLoading || viewModel.email.isEmpty ? Color.gray.opacity(0.5) : Color.primaryGradientStart)
+            .cornerRadius(12)
             .disabled(isLoading || viewModel.email.isEmpty)
-            .padding(.horizontal)
+            
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.footnote)
+            }
         }
     }
     
     private var otpVerificationView: some View {
-        VStack {
+        VStack(spacing: 20) {
+            // Info box
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Check your email")
+                    .font(.headline)
+                
+                Text("We've sent a verification link and code to your email. You can either click the link in the email or enter the code manually here.")
+                    .font(.body)
+                    .foregroundColor(.gray)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            
             VStack(alignment: .leading, spacing: 8) {
                 Text("Verification Code")
-                    .foregroundColor(.black)
-                    .padding(.leading)
+                    .font(.headline)
                 
                 TextField("Enter 6-digit code", text: $viewModel.otpCode)
+                    .textFieldStyle(.plain)
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
                     .keyboardType(.numberPad)
                     .onChange(of: viewModel.otpCode) { newValue in
-                        // Limit to 6 digits
                         if newValue.count > 6 {
                             viewModel.otpCode = String(newValue.prefix(6))
                         }
-                        
-                        // Remove non-numeric characters
                         viewModel.otpCode = newValue.filter { $0.isNumber }
                     }
             }
-            .padding(.horizontal)
-            .padding(.top, 20)
             
-            // Verify OTP Button
+            // Verify Button
             Button(action: verifyOTP) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    }
-                    Text(isLoading ? "Verifying..." : "Verify Code")
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text("Verify")
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    Group {
-                        if isLoading {
-                            Color.gray
-                        } else if !viewModel.isValidOTP {
-                            Color.gray.opacity(0.5)
-                        } else {
-                            Color.primaryGradientStart
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .foregroundColor(.white)
+            .background(isLoading || !viewModel.isValidOTP ? Color.gray.opacity(0.5) : Color.primaryGradientStart)
+            .cornerRadius(12)
+            .disabled(isLoading || !viewModel.isValidOTP)
+            
+            Text(viewModel.isResendButtonEnabled ? "Resend Code" : "Resend Code in \(viewModel.remainingTime)s")
+                .foregroundColor(viewModel.isResendButtonEnabled ? Color.primaryGradientStart : .gray)
+                .font(.subheadline)
+                .onTapGesture {
+                    if viewModel.isResendButtonEnabled && !isLoading {
+                        Task {
+                            await requestOTP()
                         }
                     }
-                )
-                .cornerRadius(12)
-            }
-            .disabled(isLoading || !viewModel.isValidOTP)
-            .padding(.horizontal)
-            
-            // Resend Code with Timer
-            Button(action: {
-                Task {
-                    await requestOTP()
                 }
-            }) {
-                Text(viewModel.isResendButtonEnabled ? "Resend Code" : "Resend Code in \(viewModel.remainingTime)s")
-                    .foregroundColor(viewModel.isResendButtonEnabled ? Color.primaryGradientStart : .gray)
-                    .font(.subheadline)
+            
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.footnote)
             }
-            .padding(.top, 15)
-            .disabled(isLoading || !viewModel.isResendButtonEnabled)
         }
     }
     
     private var newPasswordView: some View {
-        VStack {
+        VStack(spacing: 20) {
+            // Info box
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Create New Password")
+                    .font(.headline)
+                
+                Text("Please enter a new password that is different from your current password.")
+                    .font(.body)
+                    .foregroundColor(.gray)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            
             VStack(alignment: .leading, spacing: 8) {
                 Text("New Password")
-                    .foregroundColor(.black)
-                    .padding(.leading)
+                    .font(.headline)
                 
                 HStack {
                     if viewModel.isNewPasswordVisible {
@@ -240,23 +260,19 @@ struct ForgotPasswordView: View {
                             .foregroundColor(.gray)
                     }
                 }
+                .textFieldStyle(.plain)
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
-                // Password requirements hint
                 Text("Password must be at least 8 characters")
                     .font(.caption)
                     .foregroundColor(.gray)
-                    .padding(.leading, 4)
             }
-            .padding(.horizontal)
-            .padding(.top, 20)
             
             VStack(alignment: .leading, spacing: 8) {
                 Text("Confirm Password")
-                    .foregroundColor(.black)
-                    .padding(.leading)
+                    .font(.headline)
                 
                 HStack {
                     if viewModel.isConfirmPasswordVisible {
@@ -272,41 +288,35 @@ struct ForgotPasswordView: View {
                             .foregroundColor(.gray)
                     }
                 }
+                .textFieldStyle(.plain)
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
             }
-            .padding(.horizontal)
-            .padding(.top, 10)
             
             // Update Password Button
             Button(action: updatePassword) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    }
-                    Text(isLoading ? "Updating..." : "Update Password")
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text("Update Password")
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    Group {
-                        if isLoading {
-                            Color.gray
-                        } else if !viewModel.isPasswordValid {
-                            Color.gray.opacity(0.5)
-                        } else {
-                            Color.primaryGradientStart
-                        }
-                    }
-                )
-                .cornerRadius(12)
             }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .foregroundColor(.white)
+            .background(isLoading || !viewModel.isPasswordValid ? Color.gray.opacity(0.5) : Color.primaryGradientStart)
+            .cornerRadius(12)
             .disabled(isLoading || !viewModel.isPasswordValid)
-            .padding(.horizontal)
+            
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
     
@@ -398,31 +408,15 @@ struct ForgotPasswordView: View {
         errorMessage = nil
         isLoading = true
         
-        // Validate password length
-        if viewModel.newPassword.count < 8 {
-            errorMessage = "⚠️ Password must be at least 8 characters."
-            isLoading = false
-            return
-        }
-        
-        // Validate passwords match
-        if viewModel.newPassword != viewModel.confirmPassword {
-            errorMessage = "⚠️ Passwords do not match."
-            isLoading = false
-            return
-        }
-        
         Task {
             do {
                 try await viewModel.updatePassword()
-                await MainActor.run {
-                    isLoading = false
-                }
+            } catch PasswordResetError.sameAsCurrentPassword {
+                errorMessage = "⚠️ Please enter a different password. You cannot use your current password."
+                isLoading = false
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isLoading = false
-                }
+                errorMessage = error.localizedDescription
+                isLoading = false
             }
         }
     }
