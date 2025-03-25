@@ -250,7 +250,7 @@ struct FleetManagerDashboardView: View {
                              Color.mint),
                             
                             (DriverStatus.onTrip.rawValue, onTripDrivers, Color.primaryGradientEnd),
-                            (DriverStatus.inactive.rawValue, inactiveDrivers, Color.orange)
+                            ("Inactive", inactiveDrivers, Color.orange)
                         ]
                     )
                     
