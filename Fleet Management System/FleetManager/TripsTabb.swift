@@ -513,13 +513,16 @@ struct DriversRowView: View {
     }
 }
 
+import SwiftUI
+
 struct DriverSelectionView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: IFEDataController
     @Binding var selectedDriver: Driver?
     let excludeDriver: Driver?
     @State private var searchText = ""
-    
+    @State private var temporarySelectedDriver: Driver? // Holds selection until confirmed
+
     var availableDrivers: [Driver] {
         let drivers = viewModel.drivers.filter { driver in
             driver.activeStatus &&
@@ -534,7 +537,7 @@ struct DriverSelectionView: View {
         
         return drivers.filter { driver in
             driver.meta_data.fullName.lowercased().contains(searchText.lowercased()) ||
-            String( driver.employeeID).contains(searchText) ||
+            String(driver.employeeID).contains(searchText) ||
             driver.meta_data.phone.contains(searchText) ||
             driver.licenseNumber.lowercased().contains(searchText.lowercased())
         }
@@ -561,14 +564,22 @@ struct DriverSelectionView: View {
                         LazyVStack(spacing: 12) {
                             ForEach(availableDrivers) { driver in
                                 Button(action: {
-                                    selectedDriver = driver
-                                    dismiss()
+                                    if temporarySelectedDriver?.id == driver.id {
+                                        // Deselect if already selected
+                                        temporarySelectedDriver = nil
+                                    } else {
+                                        // Select new driver
+                                        temporarySelectedDriver = driver
+                                    }
                                 }) {
-                                    DriversRowView(driver: driver, isSelected: selectedDriver?.id == driver.id)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal)
-                                        .background(Color(.systemGray6))
-                                        .cornerRadius(10)
+                                    DriversRowView(
+                                        driver: driver,
+                                        isSelected: temporarySelectedDriver?.id == driver.id
+                                    )
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(10)
                                 }
                             }
                         }
@@ -586,12 +597,24 @@ struct DriverSelectionView: View {
                     }
                     .foregroundColor(.primaryGradientEnd)
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        selectedDriver = temporarySelectedDriver
+                        dismiss()
+                    }
+                    .disabled(temporarySelectedDriver == nil)
+                    .foregroundColor(temporarySelectedDriver == nil ? Color.gray : Color.primaryGradientStart)// Disable if no selection
+                }
             }
             .toolbarBackground(Color(.white), for: .navigationBar)
             .background(Color.white)
+        }.onAppear{
+            temporarySelectedDriver = selectedDriver
         }
     }
 }
+
 
 struct LocationSearchBar: View {
     @Binding var text: String
@@ -617,7 +640,7 @@ struct LocationSearchBar: View {
                 
                 Button(action: { showingMap = true }) {
                     Image(systemName: "map")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.primaryGradientStart)
                 }
             }
             
@@ -823,6 +846,7 @@ struct StatusBadge: View {
 struct VehicleCardContent: View {
     let vehicle: Vehicle
     let isSelected: Bool
+    let vehicleAddress: String
     
     var body: some View {
         HStack(spacing: 12) {
@@ -831,7 +855,6 @@ struct VehicleCardContent: View {
                 .foregroundColor(.green)
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack{
                     VStack(alignment: .leading, spacing: 4){
                         Text(vehicle.model)
                             .font(.headline)
@@ -841,14 +864,10 @@ struct VehicleCardContent: View {
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
-                    Spacer()
-                    
-                    Label(vehicle.currentCoordinate, systemImage: "location.fill")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.trailing, 5)
-                }
-                
+                Label(vehicleAddress, systemImage: "location.fill")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.trailing, 5)
                 // Fuel and Weight
         
                     Label(vehicle.fuelType.rawValue, systemImage: "fuelpump.fill")
@@ -897,11 +916,19 @@ struct VehicleCardContent: View {
     }
 }
 
+import SwiftUI
+import CoreLocation
+
+import SwiftUI
+import CoreLocation
+
 struct VehicleSelectionView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: IFEDataController
     @Binding var selectedVehicle: Vehicle?
     @State private var searchText = ""
+    @State private var vehicleAddresses: [Int: String] = [:]
+    @State private var temporarySelectedVehicle: Vehicle? // Holds the selection until confirmed
     
     var availableVehicles: [Vehicle] {
         let vehicles = viewModel.vehicles.filter { vehicle in
@@ -942,10 +969,22 @@ struct VehicleSelectionView: View {
                         LazyVStack(spacing: 12) {
                             ForEach(availableVehicles) { vehicle in
                                 Button(action: {
-                                    selectedVehicle = vehicle
-                                    dismiss()
+                                    if temporarySelectedVehicle?.id == vehicle.id {
+                                        // Deselect if already selected
+                                        temporarySelectedVehicle = nil
+                                    } else {
+                                        // Select new vehicle
+                                        temporarySelectedVehicle = vehicle
+                                    }
                                 }) {
-                                    VehicleCardContent(vehicle: vehicle, isSelected: selectedVehicle?.id == vehicle.id)
+                                    VehicleCardContent(
+                                        vehicle: vehicle,
+                                        isSelected: temporarySelectedVehicle?.id == vehicle.id,
+                                        vehicleAddress: vehicleAddresses[vehicle.id] ?? "Fetching address..."
+                                    )
+                                }
+                                .onAppear {
+                                    fetchVehicleAddress(for: vehicle)
                                 }
                             }
                         }
@@ -963,12 +1002,35 @@ struct VehicleSelectionView: View {
                     }
                     .foregroundColor(.primaryGradientEnd)
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        selectedVehicle = temporarySelectedVehicle
+                        dismiss()
+                    }
+                    .disabled(temporarySelectedVehicle == nil)
+                    .foregroundColor(temporarySelectedVehicle == nil ? Color.gray : Color.primaryGradientStart) // Custom color
+                }
             }
             .toolbarBackground(Color(.white), for: .navigationBar)
             .background(Color.white)
+        }.onAppear{
+            temporarySelectedVehicle = selectedVehicle
+        }
+    }
+    
+    /// Fetches address from vehicle's coordinate
+    private func fetchVehicleAddress(for vehicle: Vehicle) {
+        guard vehicleAddresses[vehicle.id] == nil else { return } // Avoid duplicate requests
+        
+        getAddress(from: vehicle.currentCoordinate) { address in
+            DispatchQueue.main.async {
+                vehicleAddresses[vehicle.id] = address ?? "Unknown location"
+            }
         }
     }
 }
+
 
 #Preview{
     TripsView()
