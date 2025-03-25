@@ -83,10 +83,20 @@ struct TwoFactorView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(isLoading ? Color.gray : Color.primaryGradientStart)
+                    .background(
+                        Group {
+                            if isLoading {
+                                Color.gray
+                            } else if !viewModel.isValidOTP {
+                                Color.gray.opacity(0.5)
+                            } else {
+                                Color.primaryGradientStart
+                            }
+                        }
+                    )
                     .cornerRadius(12)
                 }
-                .disabled(isLoading || viewModel.verificationCode.count != 6)
+                .disabled(isLoading || !viewModel.isValidOTP)
                 .padding(.horizontal)
                 
                 // Resend Code

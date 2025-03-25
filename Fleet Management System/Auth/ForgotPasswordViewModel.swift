@@ -14,6 +14,10 @@ class ForgotPasswordViewModel: ObservableObject {
     
     private var timer: Timer?
     
+    var isValidOTP: Bool {
+        otpCode.count == 6 && otpCode.allSatisfy { $0.isNumber }
+    }
+    
     enum PasswordResetStep {
         case emailEntry
         case otpVerification

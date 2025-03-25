@@ -13,6 +13,10 @@ class TwoFactorViewModel: ObservableObject {
     private let authenticatedUser: AppUser
     private var timer: Timer?
     
+    var isValidOTP: Bool {
+        verificationCode.count == 6 && verificationCode.allSatisfy { $0.isNumber }
+    }
+    
     init(user: AppUser) {
         self.authenticatedUser = user
         // Start the timer immediately when view model is initialized
