@@ -95,12 +95,12 @@ struct TwoFactorView: View {
                         await sendVerificationCode()
                     }
                 }) {
-                    Text("Resend Code")
-                        .foregroundColor(Color.primaryGradientStart)
+                    Text(viewModel.isResendButtonEnabled ? "Resend Code" : "Resend Code in \(viewModel.remainingTime)s")
+                        .foregroundColor(viewModel.isResendButtonEnabled ? Color.primaryGradientStart : .gray)
                         .font(.subheadline)
                 }
                 .padding(.top, 15)
-                .disabled(isLoading)
+                .disabled(isLoading || !viewModel.isResendButtonEnabled)
                 
                 // Error message
                 if let errorMessage = viewModel.errorMessage {
@@ -113,6 +113,12 @@ struct TwoFactorView: View {
                 }
                 
                 Spacer()
+            }
+        }
+        .onAppear {
+            // Ensure timer is running when view appears
+            if !viewModel.isResendButtonEnabled {
+                viewModel.startResendTimer()
             }
         }
     }

@@ -6,36 +6,49 @@ class TwoFactorViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
     @Published var hasSentCode: Bool = false
+    @Published var remainingTime: Int = 60
+    @Published var isResendButtonEnabled: Bool = false
     
     private let authManager = AuthManager.shared
     private let authenticatedUser: AppUser
+    private var timer: Timer?
     
     init(user: AppUser) {
         self.authenticatedUser = user
+        // Start the timer immediately when view model is initialized
+        startResendTimer()
+    }
+    
+    func startResendTimer() {
+        remainingTime = 60
+        isResendButtonEnabled = false
+        
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if self.remainingTime > 0 {
+                self.remainingTime -= 1
+            } else {
+                self.timer?.invalidate()
+                self.isResendButtonEnabled = true
+            }
+        }
     }
     
     // Send verification code
     func sendVerificationCode() async throws {
-        // If code has already been sent, don't send again
-        if hasSentCode {
-            return
-        }
-        
         self.isLoading = true
         self.errorMessage = nil
         
         do {
             // Generate and send code via AuthManager
-            let email = authenticatedUser.meta_data.email //{
+            let email = authenticatedUser.meta_data.email
             try await authManager.generateAndSend2FACode(email: email)
             self.isLoading = false
             self.hasSentCode = true
             self.errorMessage = "Verification code sent to \(email)"
-//            } else {
-//                self.isLoading = false
-//                self.errorMessage = "User email not available"
-//                throw NSError(domain: "TwoFactorError", code: 1, userInfo: [NSLocalizedDescriptionKey: "User email not available"])
-//            }
+            self.startResendTimer() // Restart the timer when code is resent
         } catch {
             self.isLoading = false
             self.errorMessage = "Failed to send verification code: \(error.localizedDescription)"
@@ -45,10 +58,6 @@ class TwoFactorViewModel: ObservableObject {
     
     // Verify the entered code
     func verifyCode() async -> Bool {
-//        let email = authenticatedUser.meta_data.email else {
-//            errorMessage = "User email not available"
-//            return false
-//        }
         let email = authenticatedUser.meta_data.email
         
         do {
@@ -74,5 +83,9 @@ class TwoFactorViewModel: ObservableObject {
     // Get the authenticated user
     func getAuthenticatedUser() -> AppUser {
         return authenticatedUser
+    }
+    
+    deinit {
+        timer?.invalidate()
     }
 } 
