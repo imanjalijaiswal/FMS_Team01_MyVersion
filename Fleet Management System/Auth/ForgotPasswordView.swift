@@ -186,10 +186,23 @@ struct ForgotPasswordView: View {
                     .foregroundColor(.black)
                     .padding(.leading)
                 
-                SecureField("Enter new password", text: $viewModel.newPassword)
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                HStack {
+                    if viewModel.isNewPasswordVisible {
+                        TextField("Enter new password", text: $viewModel.newPassword)
+                    } else {
+                        SecureField("Enter new password", text: $viewModel.newPassword)
+                    }
+                    
+                    Button(action: {
+                        viewModel.isNewPasswordVisible.toggle()
+                    }) {
+                        Image(systemName: viewModel.isNewPasswordVisible ? "eye.fill" : "eye.slash.fill")
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
             .padding(.horizontal)
             .padding(.top, 20)
@@ -199,10 +212,23 @@ struct ForgotPasswordView: View {
                     .foregroundColor(.black)
                     .padding(.leading)
                 
-                SecureField("Confirm new password", text: $viewModel.confirmPassword)
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                HStack {
+                    if viewModel.isConfirmPasswordVisible {
+                        TextField("Confirm new password", text: $viewModel.confirmPassword)
+                    } else {
+                        SecureField("Confirm new password", text: $viewModel.confirmPassword)
+                    }
+                    
+                    Button(action: {
+                        viewModel.isConfirmPasswordVisible.toggle()
+                    }) {
+                        Image(systemName: viewModel.isConfirmPasswordVisible ? "eye.fill" : "eye.slash.fill")
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
             .padding(.horizontal)
             .padding(.top, 10)

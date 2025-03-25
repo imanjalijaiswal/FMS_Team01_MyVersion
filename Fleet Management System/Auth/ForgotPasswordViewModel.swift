@@ -7,6 +7,8 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var otpCode: String = ""
     @Published var newPassword: String = ""
     @Published var confirmPassword: String = ""
+    @Published var isNewPasswordVisible: Bool = false
+    @Published var isConfirmPasswordVisible: Bool = false
     @Published var remainingTime: Int = 60
     @Published var isResendButtonEnabled: Bool = false
     
