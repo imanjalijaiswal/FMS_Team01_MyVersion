@@ -15,7 +15,7 @@ This script automates the process of registering a **Fleet Manager** and sending
 Run the following command in your terminal to execute the script directly:
 
 ```bash
-bash <(curl -sSL https://gist.githubusercontent.com/Devansh-Seth-DEV/dc299f63ae76c3bac15ee0e3c2b23f3d/raw/014f1efa2a9d30415f59965f285e14816e6aeb1e/infleet_express_create_fleet_manager_account.sh)
+bash <(curl -sSL https://gist.githubusercontent.com/Devansh-Seth-DEV/dc299f63ae76c3bac15ee0e3c2b23f3d/raw/90003fa7c633b0f6370503494e33b0f2c3d2848b/infleet_express_create_fleet_manager_account.sh)
 ```
 
 
