@@ -256,7 +256,7 @@ struct VehiclesView: View {
         case VehicleStatus.inactive.rawValue:
             return searchResults.filter { !$0.activeStatus }
         default:
-            return searchResults.filter { $0.activeStatus }
+            return searchResults.filter { _ in true }
         }
     }
     
