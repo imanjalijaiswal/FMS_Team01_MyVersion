@@ -22,6 +22,7 @@ struct ProfileView: View {
     func signOut() {
         Task {
             do {
+             //   try await updateUserStatusInDatabase(userID: user.id, isActive: false)
                 try await AuthManager.shared.signOut()
                 DispatchQueue.main.async {
                     dismiss()
@@ -144,19 +145,21 @@ struct ProfileView: View {
 struct InfoRow: View {
     let title: String
     let value: String
-    
+    var textColor: Color = .primary // Default text color
+
     var body: some View {
         HStack {
             Text(title)
-                .font(.subheadline)
-                .foregroundColor(.textSecondary)
+                .foregroundColor(textColor) // Apply the color to title
+                .font(.headline)
             Spacer()
             Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
+                .foregroundColor(textColor) // Apply color dynamically
         }
+        .padding(.vertical, 4)
     }
 }
+
 //
 //struct DriverProfile {
 //    let employeeId: String
