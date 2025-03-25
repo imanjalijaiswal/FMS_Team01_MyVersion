@@ -8,6 +8,7 @@ struct LoginFormView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var isPasswordVisible: Bool = false
+    @FocusState private var isPasswordFocused: Bool
     @State private var isBlinking = false
     @State private var isLoading = false
     @State private var showForgotPassword = false
@@ -24,12 +25,12 @@ struct LoginFormView: View {
                         .fill(Color.primaryGradientStart)
                         .frame(width: 150, height: 150)
                     
-                    Image(isPasswordVisible ? "panda-open" : "panda-closed")
+                    Image(shouldShowPandaEyesOpen ? "panda-open" : "panda-closed")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 135, height: 135)
                         .scaleEffect(1.0)
-                        .animation(.easeInOut(duration: 0.2), value: isPasswordVisible)
+                        .animation(.easeInOut(duration: 0.2), value: shouldShowPandaEyesOpen)
                 }
                 .padding(.bottom, 20)
                 
@@ -63,8 +64,10 @@ struct LoginFormView: View {
                     HStack {
                         if isPasswordVisible {
                             TextField("Enter password", text: $password)
+                                .focused($isPasswordFocused)
                         } else {
                             SecureField("Enter password", text: $password)
+                                .focused($isPasswordFocused)
                         }
                         
                         Button(action: {
@@ -136,6 +139,13 @@ struct LoginFormView: View {
                 TwoFactorView(authenticatedUser: tempUser, user: $user)
             }
         }
+    }
+    
+    private var shouldShowPandaEyesOpen: Bool {
+        // Show open eyes if:
+        // 1. Password is visible (user toggled visibility)
+        // 2. Password field is not focused (user is not entering password)
+        isPasswordVisible || !isPasswordFocused
     }
     
     // MARK: - Authentication Handlers
