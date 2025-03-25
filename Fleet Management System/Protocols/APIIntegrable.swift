@@ -25,6 +25,8 @@ protocol DatabaseAPIIntegrable {
     
     func getRegisteredDrivers() async throws -> [Driver]
     
+    func getRegisteredDriver(by id: UUID) async throws -> Driver
+    
     func getUserEmail(by id: UUID) async throws -> String
     
     func updateUserActiveStatus(by id: UUID, with status: Bool) async throws
@@ -36,6 +38,10 @@ protocol DatabaseAPIIntegrable {
     func addNewVehicle(_ vehicle: Vehicle) async throws -> Int
     
     func getRegisteredVehicles() async throws -> [Vehicle]
+    
+    func getRegisteredVehicle(by id: Int) async throws -> Vehicle
+    
+    func getRegisteredVehicleCompanies() async throws -> [String]
     
     func updateVehicleExpiry(by id: Int, with expiry: (puc: Date, insurance: Date, registration: Date)) async throws
     

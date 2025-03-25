@@ -9,7 +9,7 @@ enum StaffRole {
 enum DriverStatus: String, Codable {
     case available = "Available"
     case onTrip = "On Trip"
-    case inactive = "Inactive"
+    case Offline = "Offline"
 }
 
 
@@ -46,15 +46,15 @@ struct DriverRowView: View {
                         if driver.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill((driver.status == .available) ? Color.green : Color.gray)
+                                    .fill(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? Color.green : Color.gray) : Color.red)
                                     .frame(width: 4, height: 4)
-                                Text(driver.status.rawValue)
+                                Text(!driver.meta_data.firstTimeLogin ? driver.status.rawValue : "Offline")
                                     .font(.caption)
-                                    .foregroundColor((driver.status == .available) ? .green : .gray)
+                                    .foregroundColor(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? .green : .gray) : .red)
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background((driver.status == .available) ? Color.green.opacity(0.1) : Color.gray.opacity(0.1))
+                            .background(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? Color.green.opacity(0.1) : Color.gray.opacity(0.1)) : Color.red.opacity(0.1))
                             .cornerRadius(8)
                         }
                     }
@@ -79,7 +79,7 @@ struct StaffView: View {
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     @State private var selectedRole = 0 // 0 for drivers, 1 for maintenance
-    let filters = ["All", DriverStatus.available.rawValue, DriverStatus.onTrip.rawValue, DriverStatus.inactive.rawValue]
+    let filters = ["All", DriverStatus.available.rawValue, DriverStatus.onTrip.rawValue, "Inactive", DriverStatus.Offline.rawValue]
     @State private var showingAddStaff = false
     
     var filteredStaff: [Driver] {
@@ -95,14 +95,21 @@ struct StaffView: View {
         }
         
         switch selectedFilter {
-        case DriverStatus.available.rawValue:
-            return searchResults.filter { $0.status == .available && $0.activeStatus }
-        case DriverStatus.onTrip.rawValue:
-            return searchResults.filter { $0.status == .onTrip && $0.activeStatus }
-        case DriverStatus.inactive.rawValue:
+        case filters[1]: //Available
+            return searchResults.filter { $0.status == .available && $0.activeStatus && !$0.meta_data.firstTimeLogin }
+        case filters[2]: //On Trip
+            return searchResults.filter { $0.status == .onTrip && $0.activeStatus && !$0.meta_data.firstTimeLogin }
+        case filters[3]: //Inactive
+            // activeStaus = true means driver is active
+            // activeStaus = false means driver is inactive
             return searchResults.filter { !$0.activeStatus }
-        default:
-            return searchResults.filter { $0.activeStatus }
+        case filters[4]: //Offline
+            // firstTimeLogin = true means the driver has not logged in,
+            // for better understanding read this variable as shouldFirstTimeLogin
+            // firstTimeLogin = false means the driver has logged in.
+            return searchResults.filter { $0.meta_data.firstTimeLogin }
+        default: //All
+            return searchResults.filter { _ in true }
         }
     }
     
@@ -183,21 +190,29 @@ struct DriverDetailView: View {
             }
             
             Section("Driver Info") {
-                InfoRow(title: "Employee ID", value: String(driver.employeeID))
-                InfoRow(title: "License Number", value: driver.licenseNumber)
-                InfoRow(title: "Total Trips", value: "\(driver.totalTrips)")
+                InfoRow(title: "Employee ID", value: String(driver.employeeID), textColor: isEditing ? .gray : .primary)
+                InfoRow(title: "License Number", value: driver.licenseNumber, textColor: isEditing ? .gray : .primary)
+                InfoRow(title: "Total Trips", value: "\(driver.totalTrips)", textColor: isEditing ? .gray : .primary)
             }
-            
+
             Section("Contact") {
-                InfoRow(title: "Email", value: driver.meta_data.email)
+                InfoRow(title: "Email", value: driver.meta_data.email, textColor: isEditing ? .gray : .primary)
+
                 if isEditing {
-                    TextField("Phone", text: $editedPhone)
-                        .keyboardType(.phonePad)
-                    
+                    VStack(alignment: .leading) {
+                        Text("Phone")
+                           // .foregroundColor(.gray) // Label similar to InfoRow
+                            .font(.headline)
+                        TextField("editingPhone", text: $editedPhone)
+                            .keyboardType(.phonePad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle()) // Enhances visibility
+                    }
                 } else {
-                    InfoRow(title: "Phone", value: editedPhone)
+                    InfoRow(title: "Phone", value: editedPhone.isEmpty ? "Not available" : editedPhone, textColor: .primary)
                 }
             }
+
+
             
             Section {
                 if driver.activeStatus {

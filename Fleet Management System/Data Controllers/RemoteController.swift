@@ -21,13 +21,30 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable{
+    func getRegisteredVehicle(by id: Int) async throws -> Vehicle {
+        return try await client
+            .rpc("get_vehicle_data_by_id", params: ["p_id": id])
+            .execute().value
+    }
+    
+    func getRegisteredVehicleCompanies() async throws -> [String] {
+        return try await client
+            .rpc("get_registered_vehicle_companies")
+            .execute().value
+    }
+    
+    func getRegisteredDriver(by id: UUID) async throws -> Driver {
+        return try await client
+            .rpc("get_driver_data_by_id", params: ["p_id": id.uuidString])
+            .execute().value
+    }
+    
     func updateDriverStatus(by id: UUID, _ newStatus: DriverStatus) async throws {
         try await client
             .rpc("update_driver_status_by_id", params: [
                 "p_id": id.uuidString,
                 "p_new_status": newStatus.rawValue
-            ])
-            .execute()
+            ]).execute()
     }
     
     func updateUserPhone(by id: UUID, _ phone: String) async throws {

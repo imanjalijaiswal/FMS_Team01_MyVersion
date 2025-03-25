@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+
 struct VehicleRowView: View {
     var vehicle: Vehicle
     @ObservedObject var viewModel: IFEDataController
@@ -107,9 +108,9 @@ struct VehicleDetailView: View {
     var body: some View {
         List {
             Section {
+                InfoRow(title: "Vehicle ID", value: String(vehicle.id))
                 InfoRow(title: "Model", value: vehicle.model)
                 InfoRow(title: "Company Name", value: vehicle.make)
-                InfoRow(title: "Year of Manufacture", value: String(vehicle.id))
             } header: {
                 Text("Basic Details")
             }
@@ -255,7 +256,7 @@ struct VehiclesView: View {
         case VehicleStatus.inactive.rawValue:
             return searchResults.filter { !$0.activeStatus }
         default:
-            return searchResults.filter { $0.activeStatus }
+            return searchResults.filter { _ in true }
         }
     }
     

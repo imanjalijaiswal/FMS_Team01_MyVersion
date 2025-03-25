@@ -4,24 +4,11 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var user: AppUser?
     @Binding var role : Role?
-    // Sample driver data with Indian standards
-//    let driver = Driver(meta_data: UserMetaData(id: UUID(),
-//                                                fullName: "Rajesh Kumar Singh",
-//                                                email: "driver@driver.com",
-//                                                phone: "+910987654321",
-//                                                role: .driver,
-//                                                employeeID: 4,
-//                                                firstTimeLogin: false,
-//                                                createdAt: .now,
-//                                                activeStatus: true),
-//                        licenseNumber: "DL-01-2024-1234567",
-//                        totalTrips: 9,
-//                        status: .available
-//        drivingLicense: "DL-01-2024-1234567" // Format: DL-{State Code}-{Year}-{7 digits}
-//    )
+    
     func signOut() {
         Task {
             do {
+             //   try await updateUserStatusInDatabase(userID: user.id, isActive: false)
                 try await AuthManager.shared.signOut()
                 DispatchQueue.main.async {
                     dismiss()
@@ -73,9 +60,15 @@ struct ProfileView: View {
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        Text("Professional Driver")
-                            .font(.subheadline)
-                            .foregroundColor(.textSecondary)
+                        if let user = user, user.role == .driver {
+                            Text("Driver")
+                                .font(.subheadline)
+                                .foregroundColor(.textSecondary)
+                        } else {
+                            Text("Fleet Manager")
+                                .font(.subheadline)
+                                .foregroundColor(.textSecondary)
+                        }
                     }
                     .padding(.top)
                     
@@ -144,25 +137,17 @@ struct ProfileView: View {
 struct InfoRow: View {
     let title: String
     let value: String
-    
+    var textColor: Color = .primary // Default text color
+
     var body: some View {
         HStack {
             Text(title)
-                .font(.subheadline)
-                .foregroundColor(.textSecondary)
+                .foregroundColor(textColor) // Apply the color to title
+                .font(.headline)
             Spacer()
             Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
+                .foregroundColor(textColor) // Apply color dynamically
         }
+        .padding(.vertical, 4)
     }
 }
-//
-//struct DriverProfile {
-//    let employeeId: String
-//    let fullName: String
-//    let email: String
-//    let phoneNumber: String
-//    let drivingLicense: String
-//}
-
