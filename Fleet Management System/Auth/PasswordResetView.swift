@@ -19,6 +19,10 @@ struct PasswordResetView: View {
         newPassword == confirmPassword && newPassword.count >= 8
     }
     
+    private var shouldShowPandaEyesOpen: Bool {
+        isPasswordVisible || isConfirmPasswordVisible
+    }
+    
     var body: some View {
         ZStack {
             Color.white.ignoresSafeArea()
@@ -29,7 +33,7 @@ struct PasswordResetView: View {
                         .fill(Color.primaryGradientStart)
                         .frame(width: 120, height: 120)
                     
-                    Image("panda-open")
+                    Image(shouldShowPandaEyesOpen ? "panda-open" : "panda-closed")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 110, height: 110)
