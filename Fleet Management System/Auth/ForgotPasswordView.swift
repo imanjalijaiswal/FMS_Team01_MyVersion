@@ -164,18 +164,18 @@ struct ForgotPasswordView: View {
             )
             .disabled(isLoading || viewModel.otpCode.count != 6)
             
-            // Resend Code
+            // Resend Code with Timer
             Button(action: {
                 Task {
                     await requestOTP()
                 }
             }) {
-                Text("Resend Code")
-                    .foregroundColor(Color.primaryGradientStart)
+                Text(viewModel.isResendButtonEnabled ? "Resend Code" : "Resend Code in \(viewModel.remainingTime)s")
+                    .foregroundColor(viewModel.isResendButtonEnabled ? Color.primaryGradientStart : .gray)
                     .font(.subheadline)
             }
             .padding(.top, 15)
-            .disabled(isLoading)
+            .disabled(isLoading || !viewModel.isResendButtonEnabled)
         }
     }
     

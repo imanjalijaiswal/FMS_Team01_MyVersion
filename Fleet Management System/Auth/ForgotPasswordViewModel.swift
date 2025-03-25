@@ -7,12 +7,33 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var otpCode: String = ""
     @Published var newPassword: String = ""
     @Published var confirmPassword: String = ""
+    @Published var remainingTime: Int = 60
+    @Published var isResendButtonEnabled: Bool = false
+    
+    private var timer: Timer?
     
     enum PasswordResetStep {
         case emailEntry
         case otpVerification
         case newPasswordEntry
         case completed
+    }
+    
+    func startResendTimer() {
+        remainingTime = 60
+        isResendButtonEnabled = false
+        
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if self.remainingTime > 0 {
+                self.remainingTime -= 1
+            } else {
+                self.timer?.invalidate()
+                self.isResendButtonEnabled = true
+            }
+        }
     }
     
     func requestOTP() async throws {
@@ -23,6 +44,7 @@ class ForgotPasswordViewModel: ObservableObject {
         // Use Supabase's method to send OTP
         try await AuthManager.shared.resetPasswordWithOTP(email: email)
         currentStep = .otpVerification
+        startResendTimer() // Start the timer when OTP is first requested
     }
     
     func verifyOTP() async throws {
@@ -61,6 +83,10 @@ class ForgotPasswordViewModel: ObservableObject {
         }
         
         return true
+    }
+    
+    deinit {
+        timer?.invalidate()
     }
 }
 
