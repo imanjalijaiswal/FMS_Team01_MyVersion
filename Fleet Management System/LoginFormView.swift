@@ -115,7 +115,8 @@ struct LoginFormView: View {
                 if let errorMessage = errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
-                        .font(.footnote)
+                        .font(.subheadline)
+                        .padding(.horizontal)
                         .padding(.top, 5)
                 }
                 
@@ -143,11 +144,12 @@ struct LoginFormView: View {
         hideKeyboard()
         
         guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "⚠️ Please enter email and password."
+            errorMessage = "Please enter your email and password."
             return
         }
         
         isLoading = true
+        errorMessage = nil
         
         Task {
             do {
@@ -171,9 +173,19 @@ struct LoginFormView: View {
                     self.errorMessage = authError.localizedDescription
                     self.isLoading = false
                 }
+            } catch let error as NSError {
+                DispatchQueue.main.async {
+                    // Handle Supabase rate limit error
+                    if error.domain == "Auth" && error.code == 429 {
+                        self.errorMessage = "Please wait before requesting another OTP. Try again in a few seconds."
+                    } else {
+                        self.errorMessage = "Something went wrong. Please try again."
+                    }
+                    self.isLoading = false
+                }
             } catch {
                 DispatchQueue.main.async {
-                    self.errorMessage = "❌ Something went wrong. Please try again."
+                    self.errorMessage = "Something went wrong. Please try again."
                     self.isLoading = false
                 }
             }
