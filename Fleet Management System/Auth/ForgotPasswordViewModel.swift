@@ -11,8 +11,10 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var isConfirmPasswordVisible: Bool = false
     @Published var remainingTime: Int = 60
     @Published var isResendButtonEnabled: Bool = false
+    @Published var isResendingOTP: Bool = false
     
     private var timer: Timer?
+    private let minimumResendInterval: TimeInterval = 60 // 60 seconds minimum between resends
     
     var isValidOTP: Bool {
         otpCode.count == 6 && otpCode.allSatisfy { $0.isNumber }
@@ -33,6 +35,7 @@ class ForgotPasswordViewModel: ObservableObject {
     func startResendTimer() {
         remainingTime = 60
         isResendButtonEnabled = false
+        isResendingOTP = false
         
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -52,10 +55,22 @@ class ForgotPasswordViewModel: ObservableObject {
             throw PasswordResetError.invalidEmail
         }
         
-        // Use Supabase's method to send OTP
-        try await AuthManager.shared.resetPasswordWithOTP(email: email)
-        currentStep = .otpVerification
-        startResendTimer() // Start the timer when OTP is first requested
+        // Check if we're already in the process of sending an OTP
+        guard !isResendingOTP else {
+            throw PasswordResetError.otpRateLimit
+        }
+        
+        isResendingOTP = true
+        
+        do {
+            // Use Supabase's method to send OTP
+            try await AuthManager.shared.resetPasswordWithOTP(email: email)
+            currentStep = .otpVerification
+            startResendTimer() // Start the timer when OTP is first requested
+        } catch {
+            isResendingOTP = false
+            throw error
+        }
     }
     
     func verifyOTP() async throws {
@@ -107,6 +122,7 @@ enum PasswordResetError: LocalizedError {
     case invalidPassword
     case passwordsDoNotMatch
     case resetFailed
+    case otpRateLimit
     
     var errorDescription: String? {
         switch self {
@@ -120,6 +136,8 @@ enum PasswordResetError: LocalizedError {
             return "Passwords do not match."
         case .resetFailed:
             return "Failed to reset password. Please try again."
+        case .otpRateLimit:
+            return "You have reached the rate limit for resending OTP. Please wait before trying again."
         }
     }
 } 

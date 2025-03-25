@@ -8,10 +8,12 @@ class TwoFactorViewModel: ObservableObject {
     @Published var hasSentCode: Bool = false
     @Published var remainingTime: Int = 60
     @Published var isResendButtonEnabled: Bool = false
+    @Published var isResendingOTP: Bool = false
     
     private let authManager = AuthManager.shared
     private let authenticatedUser: AppUser
     private var timer: Timer?
+    private let minimumResendInterval: TimeInterval = 60 // 60 seconds minimum between resends
     
     var isValidOTP: Bool {
         verificationCode.count == 6 && verificationCode.allSatisfy { $0.isNumber }
@@ -26,6 +28,7 @@ class TwoFactorViewModel: ObservableObject {
     func startResendTimer() {
         remainingTime = 60
         isResendButtonEnabled = false
+        isResendingOTP = false
         
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
@@ -42,6 +45,13 @@ class TwoFactorViewModel: ObservableObject {
     
     // Send verification code
     func sendVerificationCode() async throws {
+        // Check if we're already in the process of sending an OTP
+        guard !isResendingOTP else {
+            throw TwoFactorError.otpRateLimit
+        }
+        
+        isResendingOTP = true
+        
         self.isLoading = true
         self.errorMessage = nil
         
@@ -91,5 +101,22 @@ class TwoFactorViewModel: ObservableObject {
     
     deinit {
         timer?.invalidate()
+    }
+}
+
+enum TwoFactorError: LocalizedError {
+    case invalidCode
+    case verificationFailed
+    case otpRateLimit
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidCode:
+            return "Please enter a valid 6-digit code."
+        case .verificationFailed:
+            return "Verification failed. Please try again."
+        case .otpRateLimit:
+            return "You have reached the rate limit for resending OTP. Please wait before trying again."
+        }
     }
 } 
