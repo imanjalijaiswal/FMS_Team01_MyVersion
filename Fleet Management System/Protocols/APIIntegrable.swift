@@ -62,6 +62,8 @@ protocol DatabaseAPIIntegrable {
                        totalTripDuration: (hours: Int, minutes: Int),
                        scheduledDateTime: Date) async throws -> Trip
     
+    func updateTripStatus(by id: UUID, to new_status: TripStatus) async throws
+    
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip]
     
     func getDriverTrips(by id: UUID) async throws -> [Trip]
