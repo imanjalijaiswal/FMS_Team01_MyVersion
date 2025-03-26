@@ -207,7 +207,7 @@ struct TripCard: View {
 struct AssignTripView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: IFEDataController
-    
+
     @State private var pickupLocation = ""
     @State private var destination = ""
     @State private var selectedVehicle: Vehicle? = nil
@@ -233,7 +233,7 @@ struct AssignTripView: View {
         selectedVehicle != nil &&
         selectedDriver1 != nil
     }
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -243,13 +243,13 @@ struct AssignTripView: View {
                         placeholder: "Pickup Location",
                         selectedLocation: $selectedStartLocation
                     )
-                    
+
                     LocationSearchBar(
                         text: $destination,
                         placeholder: "Drop-off Location",
                         selectedLocation: $selectedEndLocation
                     )
-                    
+
                     // Scheduled Date Time
                     VStack {
                         Button(action: { showScheduledDatePicker.toggle() }) {
@@ -264,7 +264,7 @@ struct AssignTripView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        
+
                         if showScheduledDatePicker {
                             DatePicker(
                                 "Scheduled Date & Time",
@@ -298,7 +298,7 @@ struct AssignTripView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        
+
                         if showEstimatedDatePicker {
                             DatePicker(
                                 "Estimated Arrival",
@@ -416,7 +416,7 @@ struct AssignTripView: View {
                                             scheduledDateTime: scheduledDateTime, createdAt: .now,
                                             status: .scheduled
                                         )
-                                        
+
                                         viewModel.addTrip(newTrip)
                                         showingAlert = true
                                     }
@@ -427,7 +427,7 @@ struct AssignTripView: View {
                     .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isFormValid)
                 }
-                
+
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
@@ -446,6 +446,210 @@ struct AssignTripView: View {
         }
     }
 }
+
+
+//struct AssignTripView: View {
+//    @Environment(\.dismiss) var dismiss
+//    @ObservedObject var viewModel: IFEDataController
+//    
+//    @State private var pickupLocation = ""
+//    @State private var destination = ""
+//    @State private var selectedVehicle: Vehicle? = nil
+//    @State private var selectedStartLocation: String? = nil
+//    @State private var selectedEndLocation: String? = nil
+//    @State private var showingAlert = false
+//    @State private var scheduledDateTime = Date()
+//    @State private var estimatedArrivalDateTime = Date()
+//    @State private var showScheduledDatePicker = false
+//    @State private var showEstimatedDatePicker = false
+//    @State private var showVehiclePicker = false
+//    @State private var selectedDriver1: Driver? = nil
+//    @State private var selectedDriver2: Driver? = nil
+//    @State private var showDriver1Selection = false
+//    @State private var showDriver2Selection = false
+//    @State private var tripDescription = ""
+//    
+//    var isFormValid: Bool {
+//        !pickupLocation.isEmpty &&
+//        !destination.isEmpty &&
+//        selectedVehicle != nil &&
+//        selectedDriver1 != nil
+//    }
+//    
+//    var body: some View {
+//        NavigationView {
+//            ScrollView {
+//                formContent
+//            }
+//            .navigationTitle("Assign Trip")
+//            .navigationBarTitleDisplayMode(.inline)
+//            .toolbar { toolbarContent }
+//            .alert("Success", isPresented: $showingAlert) {
+//                Button("OK") { dismiss() }
+//            } message: {
+//                Text("Trip assigned successfully")
+//            }
+//        }
+//    }
+//    
+//    private var formContent: some View {
+//        VStack(alignment: .leading, spacing: 16) {
+//            locationInputs
+//            datePickers
+//            tripDetails
+//            driverVehicleSelection
+//            vehicleSelection
+//        }
+//        .padding()
+//    }
+//    
+//    private var locationInputs: some View {
+//        VStack {
+//            LocationSearchBar(text: $pickupLocation, placeholder: "Pickup Location", selectedLocation: $selectedStartLocation)
+//            LocationSearchBar(text: $destination, placeholder: "Drop-off Location", selectedLocation: $selectedEndLocation)
+//        }
+//    }
+//    
+////    private var datePickers: some View {
+////        VStack {
+////            DatePickerButton(title: "Scheduled Date & Time", date: $scheduledDateTime, isExpanded: $showScheduledDatePicker)
+////            DatePickerButton(title: "Estimated Arrival", date: $estimatedArrivalDateTime, isExpanded: $showEstimatedDatePicker)
+////        }
+////    }
+//    
+//    private var driverVehicleSelection: some View {
+//            VStack {
+//                driverSelection
+//                vehicleSelection
+//            }
+//        }
+//    
+//    private var datePickers: some View {
+//        VStack {
+//            DatePicker("Scheduled Date & Time", selection: $scheduledDateTime, displayedComponents: [.date, .hourAndMinute])
+//                .datePickerStyle(.compact)
+//            
+//            DatePicker("Estimated Arrival", selection: $estimatedArrivalDateTime, displayedComponents: [.date, .hourAndMinute])
+//                .datePickerStyle(.compact)
+//        }
+//    }
+//
+//    
+//    private var tripDetails: some View {
+//        VStack {
+//            TextField("Trip Description (Optional)", text: $tripDescription)
+//                .textFieldStyle(RoundedBorderTextFieldStyle())
+//                .padding()
+//                .background(Color(.systemGray6))
+//                .cornerRadius(10)
+//        }
+//    }
+//    
+////    private var driverVehicleSelection: some View {
+////        VStack {
+////            VehicleSelectionButton(selectedVehicle: $selectedVehicle, isPresented: $showVehiclePicker)
+////            DriverSelectionButton(selectedDriver: $selectedDriver1, title: "Driver 1", isPresented: $showDriver1Selection)
+////            DriverSelectionButton(selectedDriver: $selectedDriver2, title: "Driver 2 (Optional)", isPresented: $showDriver2Selection)
+////        }
+////    }
+//    
+//    private var vehicleSelection: some View {
+//        Button(action: { showVehiclePicker.toggle() }) {
+//            HStack {
+//                Text("Select Vehicle")
+//                Spacer()
+//                Text(selectedVehicle?.vinNumber ?? "None")
+//                    .foregroundColor(.gray)
+//            }
+//            .padding()
+//            .background(Color(.systemGray6))
+//            .cornerRadius(10)
+//        }
+//        .sheet(isPresented: $showVehiclePicker) {
+//            VehicleSelectionView(viewModel: viewModel, selectedVehicle: $selectedVehicle)
+//        }
+//    }
+//
+//    
+//    private var driverSelection: some View {
+//        VStack {
+//            Button(action: { showDriver1Selection.toggle() }) {
+//                HStack {
+//                    Text("Select Driver 1")
+//                    Spacer()
+//                    Text(selectedDriver1?.meta_data.fullName ?? "None")
+//                        .foregroundColor(.gray)
+//                }
+//                .padding()
+//                .background(Color(.systemGray6))
+//                .cornerRadius(10)
+//            }
+//            .sheet(isPresented: $showDriver1Selection) {
+//                DriverSelectionView(viewModel: viewModel, selectedDriver: $selectedDriver1, excludeDriver: selectedDriver2)
+//            }
+//
+//            Button(action: { showDriver2Selection.toggle() }) {
+//                HStack {
+//                    Text("Select Driver 2 (Optional)")
+//                    Spacer()
+//                    Text(selectedDriver2?.meta_data.fullName ?? "None")
+//                        .foregroundColor(.gray)
+//                }
+//                .padding()
+//                .background(Color(.systemGray6))
+//                .cornerRadius(10)
+//            }
+//            .sheet(isPresented: $showDriver2Selection) {
+//                DriverSelectionView(viewModel: viewModel, selectedDriver: $selectedDriver2, excludeDriver: selectedDriver1)
+//            }
+//        }
+//    }
+//
+//
+//    
+//    private var toolbarContent: some ToolbarContent {
+//            @ToolbarContentBuilder
+//            var content: some ToolbarContent {
+//                ToolbarItem(placement: .navigationBarTrailing) {
+//                    Button("Done") { assignTrip() }
+//                        .foregroundColor(Color.primaryGradientEnd)
+//                        .disabled(!isFormValid)
+//                }
+//
+//                ToolbarItem(placement: .navigationBarLeading) {
+//                    Button("Cancel") { dismiss() }
+//                        .foregroundColor(Color.primaryGradientEnd)
+//                }
+//            }
+//            return content
+//        }
+//
+//
+//
+//    
+//    private func assignTrip() {
+//        let newTrip = Trip(
+//            id: UUID(),
+//            tripID: Int.random(in: 1000...9999), tripInspectionUID: UUID(),
+//            assignedByFleetManagerID: UUID(),
+//            assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
+//            assignedVehicleID: selectedVehicle?.id ?? 0,
+//            pickupLocation: selectedStartLocation ?? "0,0",
+//            destination: selectedEndLocation ?? "0,0",
+//            estimatedArrivalDateTime: estimatedArrivalDateTime,
+//            totalDistance: 0, // Distance calculation can be added
+//            totalTripDuration: estimatedArrivalDateTime,
+//            description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
+//            scheduledDateTime: scheduledDateTime,
+//            createdAt: .now,
+//            status: .scheduled
+//        )
+//        
+//        viewModel.addTrip(newTrip)
+//        showingAlert = true
+//    }
+//}
+
 
 
 func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
@@ -970,6 +1174,4 @@ struct VehicleSelectionView: View {
     }
 }
 
-#Preview{
-    TripsView()
-}
+
