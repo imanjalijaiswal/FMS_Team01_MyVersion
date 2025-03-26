@@ -134,7 +134,7 @@ struct LoginFormView: View {
                 ForgotPasswordView(isPresented: $showForgotPassword)
             }
         }
-        .fullScreenCover(isPresented: $show2FAView) {
+        .sheet(isPresented: $show2FAView) {
             if let tempUser = tempAuthenticatedUser {
                 TwoFactorView(authenticatedUser: tempUser, user: $user)
             }
