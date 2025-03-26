@@ -343,8 +343,20 @@ struct AddDriverView: View {
                                                    totalTrips: 0,
                                                    status: .available)
                             Task {
+                                // Make sure to save the fleet manager ID before adding the driver
+                                if let currentUser = viewModel.user, currentUser.role == .fleetManager {
+                                    AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
+                                }
+                                
                                 await viewModel.addDriver(newDriver, password: generatedPassword)
                                 viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
+                                
+                                // Ensure we still have the fleet manager's session
+                                if viewModel.user == nil || viewModel.user?.role != .fleetManager {
+                                    if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                                        try? await AuthManager.shared.restoreFleetManagerSession()
+                                    }
+                                }
                                 
                                 showEmailError = false
                                 dismiss()

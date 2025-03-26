@@ -93,23 +93,34 @@ class IFEDataController: ObservableObject {
 
     func addDriver(_ driver: Driver, password: String) async {
         do {
-            // If the current user is a fleet manager, save their ID
+            // Save the current fleet manager ID before any operations
             if let currentUser = user, currentUser.role == .fleetManager {
                 AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
             }
             
+            // Create the new driver
             let new_driver_uid = try await remoteController.createNewDriver(driver.meta_data.email, password: password)
             let employeeID = try await remoteController.getMaxEmployeeID(ofType: .driver)
             
-//            print("New Driver ID: \(new_driver_uid)")
-//            print("EployeeID: \(employeeID + 1)")
-            
+            // Add the driver metadata
             let newDriver = try await remoteController.addNewDriverMetaData(by: new_driver_uid, phoneNumber: driver.meta_data.phone, fullName: driver.meta_data.fullName, employeeID: employeeID+1, licenseNumber: driver.licenseNumber)
+            
+            // Make sure the current user is still set correctly after driver creation
+            if user == nil || user?.role != .fleetManager {
+                // Attempt to restore the fleet manager session
+                if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                    let role = try await remoteController.getUserRole(by: fleetManagerId.uuidString)
+                    if role == .fleetManager {
+                        user = try await AuthManager.shared.getAppUser(byType: role, id: fleetManagerId)
+                    }
+                }
+            }
+            
             DispatchQueue.main.async {
                 self.drivers.append(newDriver)
             }
         } catch {
-            print("Error: \(error.localizedDescription)")
+            print("Error adding driver: \(error.localizedDescription)")
         }
     }
     

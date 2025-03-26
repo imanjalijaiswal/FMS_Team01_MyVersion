@@ -236,16 +236,44 @@ class AuthManager{
         UserDefaults.standard.removeObject(forKey: activeFleetManagerKey)
     }
 
+    // Explicitly attempt to restore the fleet manager's session
+    func restoreFleetManagerSession() async throws -> AppUser? {
+        // Check if we have a stored fleet manager ID
+        guard let fleetManagerID = getActiveFleetManagerID() else {
+            return nil
+        }
+        
+        // Try to get the user by the stored ID
+        do {
+            let role = try await getUserRole(userId: fleetManagerID.uuidString)
+            if role == .fleetManager {
+                let appUser = try await getAppUser(byType: role, id: fleetManagerID)
+                currentUser = appUser
+                return appUser
+            }
+        } catch {
+            print("Could not restore fleet manager session: \(error)")
+        }
+        
+        return nil
+    }
+    
     func getCurrentSession() async throws -> AppUser? {
         do {
-            // Try to get the current session
+            // First try to get the current session
             let session: Session
             
             do {
                 session = try await client.auth.session
             } catch {
-                // If we can't get a session, user is not logged in
+                // If we can't get a session, try to restore the fleet manager session
                 print("No active session found: \(error)")
+                
+                // Try to restore the fleet manager session
+                if let fleetManager = try await restoreFleetManagerSession() {
+                    return fleetManager
+                }
+                
                 return nil
             }
             
