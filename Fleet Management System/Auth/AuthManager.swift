@@ -198,8 +198,14 @@ class AuthManager{
     // Store the current 2FA code
     private var current2FACode: String = ""
     
+    // Store the current user
+    private(set) var currentUser: AppUser?
+    
     // UserDefaults key for storing 2FA completion status
     private let twoFACompletedKey = "twoFACompleted"
+    
+    // UserDefaults key for storing the active fleet manager's ID
+    private let activeFleetManagerKey = "activeFleetManagerID"
     
     // Cache for first time login status to avoid repetitive database queries
     private var firstTimeLoginCache: [String: Bool] = [:]
@@ -211,8 +217,41 @@ class AuthManager{
     
     let client = SupabaseClient(supabaseURL: URL(string: "https://rhmhyrccjrgmgjyxgmlf.supabase.co" )!, supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJobWh5cmNjanJnbWdqeXhnbWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3Mjk0MTksImV4cCI6MjA1ODMwNTQxOX0.FtGNdVw_TBTUOGlUm8tH6EqZbvCCZsdxpd6LN91_Sho")
 
+    // Store the active fleet manager's ID in UserDefaults
+    func saveActiveFleetManager(id: UUID) {
+        UserDefaults.standard.set(id.uuidString, forKey: activeFleetManagerKey)
+    }
+    
+    // Get the stored fleet manager ID from UserDefaults
+    func getActiveFleetManagerID() -> UUID? {
+        guard let idString = UserDefaults.standard.string(forKey: activeFleetManagerKey),
+              let uuid = UUID(uuidString: idString) else {
+            return nil
+        }
+        return uuid
+    }
+    
+    // Clear the saved fleet manager ID
+    func clearActiveFleetManager() {
+        UserDefaults.standard.removeObject(forKey: activeFleetManagerKey)
+    }
+
     func getCurrentSession() async throws -> AppUser? {
         do {
+            // Check if we have a stored fleet manager ID
+            if let fleetManagerID = getActiveFleetManagerID() {
+                // Try to get the user by the stored ID
+                do {
+                    let role = try await getUserRole(userId: fleetManagerID.uuidString)
+                    let appUser = try await getAppUser(byType: role, id: fleetManagerID)
+                    currentUser = appUser
+                    return appUser
+                } catch {
+                    print("Could not restore fleet manager session: \(error)")
+                    // If we couldn't load the fleet manager, continue with normal flow
+                }
+            }
+            
             // Try to get the current session
             let session = try await client.auth.session
             let userId = session.user.id
@@ -220,7 +259,15 @@ class AuthManager{
             // If 2FA is not required or has been completed, return the user
             if !AuthManager.is2FAEnabled || is2FACompleted {
                 let role = try await getUserRole(userId: userId.uuidString)
-                return try await getAppUser(byType: role, id: userId)
+                
+                // If this is a fleet manager, save their ID for future use
+                if role == .fleetManager {
+                    saveActiveFleetManager(id: userId)
+                }
+                
+                let appUser = try await getAppUser(byType: role, id: userId)
+                currentUser = appUser
+                return appUser
             } else {
                 // 2FA is required but not completed - force re-authentication
                 try await signOut()
@@ -236,8 +283,12 @@ class AuthManager{
     func signOut() async throws{
         try await client.auth.signOut()
         is2FACompleted = false
+        currentUser = nil  // Clear current user
         // Clear 2FA completion status in UserDefaults
         UserDefaults.standard.set(false, forKey: twoFACompletedKey)
+        
+        // DON'T clear the active fleet manager when signing out
+        // This allows the fleet manager to remain the primary user
         
         // Clear the firstTimeLogin cache to ensure fresh state on next login
         firstTimeLoginCache.removeAll()
@@ -269,7 +320,15 @@ class AuthManager{
         
         // If working status is true, proceed with getting role and creating user
         let role = try await getUserRole(userId: userId)
-        return try await getAppUser(byType: role, id: session.user.id)
+        let user = try await getAppUser(byType: role, id: session.user.id)
+        currentUser = user  // Set current user
+        
+        // If this is a fleet manager logging in, save their ID
+        if role == .fleetManager {
+            saveActiveFleetManager(id: session.user.id)
+        }
+        
+        return user
     }
     
     func getAppUser(byType type: Role, id: UUID) async throws -> AppUser {
@@ -501,7 +560,6 @@ class AuthManager{
         do {
             print("Attempting to sign in...")
             let authResponse = try await client.auth.signIn(email: email, password: password)
-//            print("Auth Response: \(authResponse)")
             
             // Get the user from the response
             let user = authResponse.user
@@ -514,11 +572,10 @@ class AuthManager{
                 throw AuthError.inactiveUser
             }
             
-//            let userEmail = user.email
-            
             // Get user role
             let role = try await getUserRole(userId: userId)
             let appUser = try await getAppUser(byType: role, id: user.id)
+            currentUser = appUser  // Set current user
             
             // Reset 2FA completed flag
             is2FACompleted = false
@@ -551,6 +608,22 @@ class AuthManager{
                 throw authError
             }
             throw error
+        }
+    }
+
+    // Check if the new password is same as current password
+    func checkIfSamePassword(email: String, password: String) async throws -> Bool {
+        do {
+            // Try to sign in with the provided password
+            // If successful, it means the password is the same as current
+            _ = try await client.auth.signIn(
+                email: email,
+                password: password
+            )
+            return true
+        } catch {
+            // If sign in fails, it means the password is different
+            return false
         }
     }
 }

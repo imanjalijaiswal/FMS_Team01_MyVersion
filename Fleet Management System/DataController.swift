@@ -93,6 +93,11 @@ class IFEDataController: ObservableObject {
 
     func addDriver(_ driver: Driver, password: String) async {
         do {
+            // If the current user is a fleet manager, save their ID
+            if let currentUser = user, currentUser.role == .fleetManager {
+                AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
+            }
+            
             let new_driver_uid = try await remoteController.createNewDriver(driver.meta_data.email, password: password)
             let employeeID = try await remoteController.getMaxEmployeeID(ofType: .driver)
             
