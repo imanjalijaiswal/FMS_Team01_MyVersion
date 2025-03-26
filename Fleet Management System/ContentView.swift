@@ -19,6 +19,7 @@ struct ContentView: View {
                 ProgressView("Loading...")
             } else if let user = user, isFirstTimeLogin {
                 // Show password reset screen for first-time login - only when we have a user AND firstTimeLogin is true
+                // AND the user is NOT a driver that was just created
                 PasswordResetView(user: $user, isFirstTimeLogin: $isFirstTimeLogin)
             } else if let user = user {
                 switch user.role {
@@ -41,7 +42,19 @@ struct ContentView: View {
                 
                 // Check if it's first-time login only if we have a valid user
                 if let currentUser = user {
-                    isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id.uuidString)
+                    // Only allow first-time login flow for fleet managers
+                    // Newly created drivers will be redirected to login screen
+                    if currentUser.role == .fleetManager || currentUser.role == .maintenancePersonnel {
+                        isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id.uuidString)
+                    } else if currentUser.role == .driver {
+                        // If it's a driver and first-time login is true, we need to sign them out
+                        // so they don't auto-login - they should log in explicitly
+                        let isFirstTime = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id.uuidString)
+                        if isFirstTime {
+                            try await AuthManager.shared.signOut()
+                            user = nil // Force them to go to login screen
+                        }
+                    }
                 }
                 
                 isLoading = false
@@ -61,7 +74,19 @@ struct ContentView: View {
                 
                 // Check first-time login status for the new user
                 if let newUser = newUser {
-                    isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: newUser.id.uuidString)
+                    // Only allow first-time login flow for fleet managers
+                    // Newly created drivers will be redirected to login screen
+                    if newUser.role == .fleetManager || newUser.role == .maintenancePersonnel {
+                        isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: newUser.id.uuidString)
+                    } else if newUser.role == .driver {
+                        // For drivers, check if this is first-time login
+                        let isFirstTime = try await AuthManager.shared.checkFirstTimeLogin(userId: newUser.id.uuidString)
+                        if isFirstTime {
+                            // If it's a first-time login for a driver, allow them to reset their password
+                            // but only if they explicitly logged in (not on app restart)
+                            isFirstTimeLogin = isFirstTime
+                        }
+                    }
                 }
             }
         }
