@@ -14,6 +14,15 @@ struct PasswordResetView: View {
     @State private var isLoading = false
     @State private var showSuccess = false
     
+    private var isPasswordValid: Bool {
+        !newPassword.isEmpty && !confirmPassword.isEmpty && 
+        newPassword == confirmPassword && newPassword.count >= 8
+    }
+    
+    private var shouldShowPandaEyesOpen: Bool {
+        isPasswordVisible || isConfirmPasswordVisible
+    }
+    
     var body: some View {
         ZStack {
             Color.white.ignoresSafeArea()
@@ -24,7 +33,7 @@ struct PasswordResetView: View {
                         .fill(Color.primaryGradientStart)
                         .frame(width: 120, height: 120)
                     
-                    Image("panda-open")
+                    Image(shouldShowPandaEyesOpen ? "panda-open" : "panda-closed")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 110, height: 110)
@@ -64,6 +73,12 @@ struct PasswordResetView: View {
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    
+                    // Password requirements hint
+                    Text("Password must be at least 8 characters")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.leading, 4)
                 }
                 .padding(.horizontal)
                 
@@ -107,10 +122,10 @@ struct PasswordResetView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(isLoading ? Color.gray : Color.primaryGradientStart)
+                    .background(isLoading ? Color.gray : (isPasswordValid ? Color.primaryGradientStart : Color.gray.opacity(0.5)))
                     .cornerRadius(12)
                 }
-                .disabled(isLoading)
+                .disabled(isLoading || !isPasswordValid)
                 .padding(.horizontal)
                 
                 // Show error message if reset fails
@@ -131,32 +146,60 @@ struct PasswordResetView: View {
             
             // Success message overlay
             if showSuccess {
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
+                Color.white.ignoresSafeArea()
                 
-                VStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.green)
-                    
-                    Text("Password reset successful!")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.top)
-                    
-                    Button("Continue") {
-                        // Continue to the main app
-                        navigateToMainApp()
+                VStack(spacing: 20) {
+                    // Close button
+                    HStack {
+                        Button(action: {
+                            navigateToMainApp()
+                        }) {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.gray)
+                                .padding()
+                        }
+                        Spacer()
                     }
-                    .padding()
-                    .background(Color.white)
-                    .foregroundColor(.blue)
-                    .cornerRadius(10)
-                    .padding(.top, 20)
+                    
+                    Spacer()
+                    
+                    Text("Password Updated!")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Your password has been successfully updated. You can now log in with your new password.")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    // Green checkmark circle
+                    ZStack {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 80, height: 80)
+                        
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 40, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.vertical, 30)
+                    
+                    Button(action: {
+                        navigateToMainApp()
+                    }) {
+                        Text("Continue")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(red: 52/255, green: 120/255, blue: 120/255))
+                            .cornerRadius(10)
+                    }
+                    .padding(.horizontal, 40)
+                    
+                    Spacer()
                 }
-                .padding(30)
-                .background(Color.gray.opacity(0.9))
-                .cornerRadius(20)
             }
         }
     }
@@ -170,8 +213,8 @@ struct PasswordResetView: View {
             return
         }
         
-        guard newPassword.count >= 6 else {
-            errorMessage = "⚠️ Password must be at least 6 characters."
+        guard newPassword.count >= 8 else {
+            errorMessage = "⚠️ Password must be at least 8 characters."
             return
         }
         
