@@ -18,6 +18,7 @@ class IFEDataController: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
     @Published var tripsForDriver: [Trip] = []
+    @Published var vehicleCompanies: [String] = []
     let remoteController = RemoteController.shared
     
     init() {
@@ -30,6 +31,7 @@ class IFEDataController: ObservableObject {
                     await loadDrivers()
                     await loadVehicles()
                     await loadTrips()
+                    await loadVehicleCompanies()
                 }
             }
         }
@@ -73,6 +75,15 @@ class IFEDataController: ObservableObject {
             }
         } catch {
             print("Error while fetching trips: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func loadVehicleCompanies() async {
+        do {
+            vehicleCompanies = try await remoteController.getRegisteredVehicleCompanies()
+        } catch {
+            print("Error while fetching registered vehicle companies: \(error.localizedDescription)")
         }
     }
     
@@ -140,12 +151,6 @@ class IFEDataController: ObservableObject {
             } catch {
                 print("Error while enabling the driver: \(error.localizedDescription)")
             }
-        }
-    }
-    
-    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
-        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
-            trips[index].status = newStatus
         }
     }
     
@@ -320,6 +325,63 @@ class IFEDataController: ObservableObject {
             } catch {
                 print("Error while updating the vehicle: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
+        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
+            Task {
+                do {
+                    try await remoteController.updateTripStatus(by: trip.id, to: newStatus)
+                    trips[index].status = newStatus
+                } catch {
+                    print("Error while updating the trip status: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    func updateDriverStatus(_ driver: Driver, with newStatus: DriverStatus) {
+        if let index = drivers.firstIndex(where: { $0 == driver }) {
+            Task {
+                do {
+                    try await remoteController.updateDriverStatus(by: driver.id, newStatus)
+                    drivers[index].status = newStatus
+                } catch {
+                    print("Error while updating the driver status: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    func updateVehicleStatus(_ vehicle: Vehicle, with newStatus: VehicleStatus) {
+        if let index = vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+            Task {
+                do {
+                    try await remoteController.updateVehicleStatus(by: vehicle.id, with: newStatus)
+                    vehicles[index].status = newStatus
+                } catch {
+                    print("Error while updating the driver status: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    func getRegisteredDriver(by id: UUID) async -> Driver? {
+        do {
+            return try await remoteController.getRegisteredDriver(by: id)
+        } catch {
+            print("Error while fetching the driver by id: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    func getRegisteredVehicle(by id: Int) async -> Vehicle? {
+        do {
+            return try await remoteController.getRegisteredVehicle(by: id)
+        } catch {
+            print("Error while fetching the vehicle by id: \(error.localizedDescription)")
+            return nil
         }
     }
 }

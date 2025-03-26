@@ -232,7 +232,7 @@ struct DriverDetailView: View {
                     })
                     {
                                 Text("Make Active")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.primaryGradientStart)
                                     .frame(maxWidth: .infinity)
                                     .multilineTextAlignment(.center)
                             }
@@ -263,7 +263,7 @@ struct DriverDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to make this driver as Inactive?")
+            Text("Are you sure you want to make this driver Inactive ?")
         }
         .onAppear {
             editedPhone = driver.meta_data.phone

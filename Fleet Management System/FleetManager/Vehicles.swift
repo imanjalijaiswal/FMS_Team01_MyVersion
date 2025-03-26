@@ -171,18 +171,19 @@ struct VehicleDetailView: View {
                     Button(action: {
                         showingDisableAlert = true
                     }) {
-                        Text("Disable Vehicle")
-                            .foregroundColor(.red)
+                        Text("Make Inactive")
+                            .foregroundColor((vehicle.status == .assigned) ? .gray : .red)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
                     }
+                    .disabled((vehicle.status == .assigned))
                 } else {
                     Button(action: {
                         viewModel.enableVehicle(vehicle)
                         dismiss()
                     }) {
-                        Text("Enable Vehicle")
-                            .foregroundColor(.green)
+                        Text("Make Active")
+                            .foregroundColor(.primaryGradientStart)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
                     }
@@ -206,23 +207,14 @@ struct VehicleDetailView: View {
                 }
             }
         }
-        .alert("Disable Vehicle", isPresented: $showingDisableAlert) {
+        .alert("Make Vehicle Inactive", isPresented: $showingDisableAlert) {
             Button("Cancel", role: .cancel) { }
-            Button(action: {
+            Button("Inactive", role: .destructive) {
                 viewModel.removeVehicle(vehicle)
                 dismiss()
-            }) {
-                Text("Disable")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(vehicle.status == .assigned ? Color.gray.opacity(0.2) : Color.red)
-                    .foregroundColor(vehicle.status == .assigned ? Color.gray : Color.white)
-                    .cornerRadius(8)
             }
-            .disabled(vehicle.status == .assigned)
-
         } message: {
-            Text("Are you sure you want to disable this vehicle? This action cannot be undone.")
+            Text("Are you sure you want to make this vehicle Inactive ?")
         }
         .onAppear {
             insuranceExpiry = vehicle.insuranceExpiryDate
