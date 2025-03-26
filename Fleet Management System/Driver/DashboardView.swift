@@ -25,95 +25,79 @@ struct DashboardView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Gradient background
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        .primaryGradientStart1,
-//                        .primaryGradientEnd
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Active Trip Section
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Active Trip")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primaryGradientStart)
-                                .padding(.horizontal)
-                            
-                            if let activeTrip = activeTrip {
-                                TaskCard(task: activeTrip)
-                                    .padding(.horizontal)
-                                    .shadow(radius: 2, x: 2, y: 2)
-                            } else {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "truck.box")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 60, height: 60)
-                                        .foregroundColor(.primaryGradientStart.opacity(0.6))
-                                    
-                                    Text("No Active Trip")
-                                        .font(.headline)
-                                        .foregroundColor(.primaryGradientStart)
-                                    
-                                    Text("You don't have any active trips at the moment")
-                                        .font(.subheadline)
-                                        .foregroundColor(.primaryGradientStart.opacity(0.8))
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 32)
-                                .background(Color.white.opacity(0.1))
-                                .cornerRadius(12)
-                                .padding(.horizontal)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        
-                        Text("My Trips")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .foregroundColor(.primaryGradientStart)
-                        
-                        // Task filters
-                        TaskFilterView(selectedFilter: $selectedFilter)
-                        
-                        // Task list
+        NavigationView{
+            ScrollView{
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Active Trip")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primaryGradientStart)
+                        .padding(.horizontal)
+                    
+                    if let activeTrip = activeTrip {
+                        TaskCard(task: activeTrip)
+                            .padding(.horizontal)
+                            .shadow(radius: 2, x: 2, y: 2)
+                    } else {
                         VStack(spacing: 16) {
-                            ForEach(filteredTrips, id: \.id) { trip in
-                                TaskCard(task: trip)
-                                    .shadow(radius: 2, x: 2, y: 2)
-                            }
+                            Image(systemName: "truck.box")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 60, height: 60)
+                                .foregroundColor(.primaryGradientStart.opacity(0.6))
+                            
+                            Text("No Active Trip")
+                                .font(.headline)
+                                .foregroundColor(.primaryGradientStart)
+                            
+                            Text("You don't have any active trips at the moment")
+                                .font(.subheadline)
+                                .foregroundColor(.primaryGradientStart.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
                         }
-                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
                     }
                 }
+                .padding(.vertical, 8)
+                
+                Text("My Trips")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .foregroundColor(.primaryGradientStart)
+                
+                // Task filters
+                TaskFilterView(selectedFilter: $selectedFilter)
+                
+                // Task list
+                VStack(spacing: 16) {
+                    ForEach(filteredTrips, id: \.id) { trip in
+                        TaskCard(task: trip)
+                            .shadow(radius: 2, x: 2, y: 2)
+                    }
+                }
+                .padding()
             }
-            .navigationBarTitle("Hello, Rajesh", displayMode: .large)// Empty title to prevent double title
+            .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+            .navigationTitle("Hello, \(user!.meta_data.fullName.split(separator: " ").first ?? "")")// Empty title to prevent double title
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-//                    Button(action: {
-//                        // Action for the bell button
-//                    }) {
-//                        Image(systemName: "bell.fill")
-//                            .font(.title2)
-//                            .foregroundColor(.primaryGradientStart)
-//                    }
+                    //                    Button(action: {
+                    //                        // Action for the bell button
+                    //                    }) {
+                    //                        Image(systemName: "bell.fill")
+                    //                            .font(.title2)
+                    //                            .foregroundColor(.primaryGradientStart)
+                    //                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        // Action for the bell button
                         showingProfile = true
                     }) {
                         Image(systemName: "person.circle")
