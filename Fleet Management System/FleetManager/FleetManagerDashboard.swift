@@ -426,6 +426,14 @@ struct FleetManagerTabBarView: View {
             .tabItem {
                 Label("Trips", systemImage: "map.fill")
             }
+            
+            NavigationView {
+                MaintenanceSchedulingView()
+            }
+            .tabItem {
+                Label("Maintenance", systemImage: "wrench.fill")
+            }
+            
         }
         .accentColor(.primaryGradientEnd)
     }
