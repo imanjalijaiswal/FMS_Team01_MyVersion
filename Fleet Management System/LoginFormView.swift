@@ -75,10 +75,20 @@ struct LoginFormView: View {
                         
                         Button(action: {
                             // Toggle password visibility and explicitly update panda eyes
+                            isPasswordVisible.toggle()
+                            
+                            // Use explicit animation and make sure it's applied
                             withAnimation(.easeInOut(duration: 0.3)) {
-                                isPasswordVisible.toggle()
-                                // Directly update panda eyes based on password visibility
+                                // Always update panda eyes based on password visibility
+                                // when the eye button is pressed
                                 pandaEyesOpen = isPasswordVisible
+                            }
+                            
+                            // Double-check the update with slight delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    pandaEyesOpen = isPasswordVisible
+                                }
                             }
                         }) {
                             Image(systemName: isPasswordVisible ? "eye.fill" : "eye.slash.fill")
@@ -91,6 +101,24 @@ struct LoginFormView: View {
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    .onTapGesture {
+                        // Force close eyes immediately when tapping on password field
+                        pandaEyesOpen = false
+                        
+                        // Set focus with slight delay to avoid race conditions
+                        DispatchQueue.main.async {
+                            isPasswordFocused = true
+                            
+                            // Ensure eyes are still closed after focus change
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if !isPasswordVisible {
+                                        pandaEyesOpen = false
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
                 
@@ -146,12 +174,27 @@ struct LoginFormView: View {
             }
         }
         .onChange(of: isPasswordFocused) { _, newValue in
-            withAnimation(.easeInOut(duration: 0.3)) {
-                if newValue {
-                    // When password field is focused, eyes state matches visibility
-                    pandaEyesOpen = isPasswordVisible
-                } else {
-                    // When password field loses focus, eyes open
+            if newValue {
+                // When password field is focused, ALWAYS close eyes
+                // Use DispatchQueue to ensure this happens reliably
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        pandaEyesOpen = false
+                    }
+                }
+                
+                // Add a second update with slight delay to ensure the change persists
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        // Only update if still focused and eye icon is not showing
+                        if isPasswordFocused && !isPasswordVisible {
+                            pandaEyesOpen = false
+                        }
+                    }
+                }
+            } else {
+                // When password field loses focus, eyes open
+                withAnimation(.easeInOut(duration: 0.2)) {
                     pandaEyesOpen = true
                 }
             }
