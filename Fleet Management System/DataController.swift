@@ -138,10 +138,11 @@ class IFEDataController: ObservableObject {
         }
     }
     
-    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
+    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) -> Trip{
         if let index = trips.firstIndex(where: { $0.id == trip.id }) {
             trips[index].status = newStatus
         }
+        return trip
     }
     
     func addVehicle(_ vehicle: Vehicle) {
@@ -366,4 +367,9 @@ func getCoordinates(from address: String) async -> String? {
         print("Geocoding failed: \(error.localizedDescription)")
     }
     return nil
+}
+
+func estimatedDate(from startDate: Date, hours: Float) -> Date {
+    let secondsToAdd = Int(hours * 3600)// Convert hours to seconds
+    return Calendar.current.date(byAdding: .second, value: secondsToAdd, to: startDate) ?? startDate
 }

@@ -173,34 +173,6 @@ struct TripCard: View {
         .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .actionSheet(isPresented: $showingStatusSheet) {
-            let buttons: [ActionSheet.Button] = {
-                switch trip.status {
-                case .scheduled:
-                    return [
-                        .default(Text("Mark as In Progress")) {
-                            viewModel.updateTripStatus(trip, to: .inProgress)
-                        },
-                        .cancel()
-                    ]
-                case .inProgress:
-                    return [
-                        .default(Text("Mark as Completed")) {
-                            viewModel.updateTripStatus(trip, to: .completed)
-                        },
-                        .cancel()
-                    ]
-                case .completed:
-                    return [.cancel()]
-                }
-            }()
-            
-            return ActionSheet(
-                title: Text("Update Trip Status"),
-                message: nil,
-                buttons: buttons
-            )
-        }
     }
 }
 
@@ -411,7 +383,7 @@ struct AssignTripView: View {
                                             destination: selectedEndLocation ?? "0,0",
                                             estimatedArrivalDateTime: estimatedArrivalDateTime,
                                             totalDistance: Int(distance/1000),
-                                            totalTripDuration: estimatedArrivalDateTime,
+                                            totalTripDuration: estimatedDate(from: scheduledDateTime, hours: Float((distance/1000)/50)),
                                             description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
                                             scheduledDateTime: scheduledDateTime, createdAt: .now,
                                             status: .scheduled
