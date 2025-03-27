@@ -20,7 +20,46 @@ extension Date {
     }
 }
 
-class RemoteController: DatabaseAPIIntegrable{
+class RemoteController: DatabaseAPIIntegrable {
+    func getOfflineDrivers() async throws -> [Driver] {
+        return try await client
+            .rpc("get_offline_drivers").execute().value
+    }
+    
+    func getTripInspectionForTrip(by id: UUID) async throws -> TripInspection {
+        return try await client
+            .rpc("get_trip_inspection_for_trip_id", params: ["p_id": id.uuidString])
+            .execute().value
+    }
+    
+    func addPreTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
+        struct PreInspectionParams: Codable {
+            let p_id: String
+            let p_pre_trip_inspection: [TripInspectionItem: Bool]
+            let p_note: String
+        }
+        
+        let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspection, p_note: note)
+        
+        try await client
+            .rpc("add_pre_trip_inspection_for_trip_id", params: params)
+            .execute().value
+    }
+    
+    func addPostTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
+        struct PostInspectionParams: Codable {
+            let p_id: String
+            let p_post_trip_inspection: [TripInspectionItem: Bool]
+            let p_note: String
+        }
+        
+        let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspection, p_note: note)
+        
+        try await client
+            .rpc("add_post_trip_inspection_for_trip_id", params: params)
+            .execute().value
+    }
+    
     func updateTripStatus(by id: UUID, to newStatus: TripStatus) async throws {
         try await client
             .rpc("update_trip_status_for_id", params: [
