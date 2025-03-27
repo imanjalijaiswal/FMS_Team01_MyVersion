@@ -56,6 +56,14 @@ struct TripOverviewView: View {
                 Text("You cannot end journey without filling Post-Trip Inspection list")
             }
         }
+        .task {
+            // Replace onAppear with task modifier for async operations
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id) {
+                hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                hasCompletedPostInspection = !inspection.postInspection.isEmpty
+                requiresMaintenance = inspection.preInspection.values.contains(false)
+            }
+        }
     }
     
     private var contentView: some View {
@@ -83,7 +91,7 @@ struct TripOverviewView: View {
     private var preTripInspectionSheet: some View {
         PreTripInspectionChecklistView(trip: task) { inspectionItems, note in
             let hasAnyFailure = inspectionItems.values.contains(false)
-            hasCompletedPreInspection = inspectionItems.values.contains(true)
+            hasCompletedPreInspection = !inspectionItems.isEmpty
             requiresMaintenance = hasAnyFailure
             IFEDataController.shared.addPreTripInspectionForTrip(
                 by: task.id,
@@ -93,12 +101,14 @@ struct TripOverviewView: View {
         }
     }
     
-    private var postTripInspectionSheet: some View{
-        PostTripInspectionChecklistView(trip: task) { inspectionItems,note in
-            hasCompletedPostInspection = inspectionItems.values.contains(true)
-            
-            IFEDataController.shared.addPostTripInspectionForTrip(by: task.id, inspection: inspectionItems, note: note)
-            
+    private var postTripInspectionSheet: some View {
+        PostTripInspectionChecklistView(trip: task) { inspectionItems, note in
+            hasCompletedPostInspection = !inspectionItems.isEmpty
+            IFEDataController.shared.addPostTripInspectionForTrip(
+                by: task.id,
+                inspection: inspectionItems,
+                note: note
+            )
         }
     }
     
