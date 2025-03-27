@@ -18,6 +18,7 @@ class IFEDataController: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
     @Published var tripsForDriver: [Trip] = []
+    @Published var vehicleCompanies: [String] = []
     let remoteController = RemoteController.shared
     
     init() {
@@ -30,6 +31,7 @@ class IFEDataController: ObservableObject {
                     await loadDrivers()
                     await loadVehicles()
                     await loadTrips()
+                    await loadVehicleCompanies()
                 }
             }
         }
@@ -77,6 +79,15 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
+    private func loadVehicleCompanies() async {
+        do {
+            vehicleCompanies = try await remoteController.getRegisteredVehicleCompanies()
+        } catch {
+            print("Error while fetching registered vehicle companies: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
     func loadTripsForDriver() async {
         do {
             if let user = user {
@@ -93,23 +104,34 @@ class IFEDataController: ObservableObject {
 
     func addDriver(_ driver: Driver, password: String) async {
         do {
-            // If the current user is a fleet manager, save their ID
+            // Save the current fleet manager ID before any operations
             if let currentUser = user, currentUser.role == .fleetManager {
                 AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
             }
             
+            // Create the new driver
             let new_driver_uid = try await remoteController.createNewDriver(driver.meta_data.email, password: password)
             let employeeID = try await remoteController.getMaxEmployeeID(ofType: .driver)
             
-//            print("New Driver ID: \(new_driver_uid)")
-//            print("EployeeID: \(employeeID + 1)")
-            
+            // Add the driver metadata
             let newDriver = try await remoteController.addNewDriverMetaData(by: new_driver_uid, phoneNumber: driver.meta_data.phone, fullName: driver.meta_data.fullName, employeeID: employeeID+1, licenseNumber: driver.licenseNumber)
+            
+            // Make sure the current user is still set correctly after driver creation
+            if user == nil || user?.role != .fleetManager {
+                // Attempt to restore the fleet manager session
+                if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                    let role = try await remoteController.getUserRole(by: fleetManagerId.uuidString)
+                    if role == .fleetManager {
+                        user = try await AuthManager.shared.getAppUser(byType: role, id: fleetManagerId)
+                    }
+                }
+            }
+            
             DispatchQueue.main.async {
                 self.drivers.append(newDriver)
             }
         } catch {
-            print("Error: \(error.localizedDescription)")
+            print("Error adding driver: \(error.localizedDescription)")
         }
     }
     
@@ -140,12 +162,6 @@ class IFEDataController: ObservableObject {
             } catch {
                 print("Error while enabling the driver: \(error.localizedDescription)")
             }
-        }
-    }
-    
-    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
-        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
-            trips[index].status = newStatus
         }
     }
     
@@ -320,6 +336,63 @@ class IFEDataController: ObservableObject {
             } catch {
                 print("Error while updating the vehicle: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
+        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
+            Task {
+                do {
+                    try await remoteController.updateTripStatus(by: trip.id, to: newStatus)
+                    trips[index].status = newStatus
+                } catch {
+                    print("Error while updating the trip status: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    func updateDriverStatus(_ driver: Driver, with newStatus: DriverStatus) {
+        if let index = drivers.firstIndex(where: { $0 == driver }) {
+            Task {
+                do {
+                    try await remoteController.updateDriverStatus(by: driver.id, newStatus)
+                    drivers[index].status = newStatus
+                } catch {
+                    print("Error while updating the driver status: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    func updateVehicleStatus(_ vehicle: Vehicle, with newStatus: VehicleStatus) {
+        if let index = vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+            Task {
+                do {
+                    try await remoteController.updateVehicleStatus(by: vehicle.id, with: newStatus)
+                    vehicles[index].status = newStatus
+                } catch {
+                    print("Error while updating the driver status: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    func getRegisteredDriver(by id: UUID) async -> Driver? {
+        do {
+            return try await remoteController.getRegisteredDriver(by: id)
+        } catch {
+            print("Error while fetching the driver by id: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    func getRegisteredVehicle(by id: Int) async -> Vehicle? {
+        do {
+            return try await remoteController.getRegisteredVehicle(by: id)
+        } catch {
+            print("Error while fetching the vehicle by id: \(error.localizedDescription)")
+            return nil
         }
     }
 }

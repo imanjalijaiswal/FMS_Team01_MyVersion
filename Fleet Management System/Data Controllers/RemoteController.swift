@@ -21,6 +21,14 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable{
+    func updateTripStatus(by id: UUID, to newStatus: TripStatus) async throws {
+        try await client
+            .rpc("update_trip_status_for_id", params: [
+                "p_trip_uuid": id.uuidString,
+                "p_new_status": newStatus.rawValue])
+            .execute()
+    }
+    
     func getRegisteredVehicle(by id: Int) async throws -> Vehicle {
         return try await client
             .rpc("get_vehicle_data_by_id", params: ["p_id": id])
@@ -57,9 +65,21 @@ class RemoteController: DatabaseAPIIntegrable{
     }
     
     func createNewDriver(_ email: String, password: String) async throws -> UUID {
+        // Store the current session before creating a new driver
+        let currentSession = try? await client.auth.session
+        
+        // Create the new driver account
         let authResponse = try await client.auth.signUp(email: email, password: password)
-        // Step 2: Extract user ID
+        
+        // Extract the new driver's user ID
         let userId = authResponse.user.id
+        
+        // If we had a session before and the new user creation changed it, restore it
+        if let session = currentSession, try await client.auth.session.user.id != session.user.id {
+            // Re-authenticate with the stored session token to restore the fleet manager's session
+            try await client.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+        }
+        
         return userId
     }
     
@@ -305,6 +325,25 @@ class RemoteController: DatabaseAPIIntegrable{
             .rpc("get_registered_drivers")
             .execute()
             .value
+    }
+    
+    func getUserRole(by userId: String) async throws -> Role {
+        struct UserRole: Codable {
+            let role: String
+        }
+        
+        let response = try await client
+            .from("UserRoles").select("role").eq("id", value: userId).single()
+            .execute()
+        
+        let userRole = try JSONDecoder().decode(UserRole.self, from: response.data)
+        if userRole.role == "driver" { 
+            return .driver 
+        } else if userRole.role == "maintenancePersonnel" {
+            return .maintenancePersonnel
+        } else {
+            return .fleetManager
+        }
     }
    
     private let client = AuthManager.shared.client
