@@ -1,3 +1,10 @@
+//
+//  ExampleView.swift
+//  SomeProject
+//
+//  Created by You on 3/20/25.
+//
+
 import SwiftUI
 import Foundation
 
@@ -77,14 +84,43 @@ struct DriverRowView: View {
 struct StaffView: View {
     @StateObject var viewModel = IFEDataController.shared
     @State private var searchText = ""
-    @State private var selectedFilter = "All"
-    @State private var selectedRole = 0 // 0 for drivers, 1 for maintenance
+    @State private var selectedFilter = ""
+    @State private var selectedRole = 0
     let filters = ["All", DriverStatus.available.rawValue, DriverStatus.onTrip.rawValue, "Inactive", DriverStatus.Offline.rawValue]
     @State private var showingAddStaff = false
     
+    private var availableCount: Int {
+        viewModel.drivers.filter { $0.status == .available && $0.activeStatus && !$0.meta_data.firstTimeLogin }.count
+    }
+    
+    private var onTripCount: Int {
+        viewModel.drivers.filter { $0.status == .onTrip && $0.activeStatus && !$0.meta_data.firstTimeLogin }.count
+    }
+    
+    private var inactiveCount: Int {
+        viewModel.drivers.filter { !$0.activeStatus }.count
+    }
+    
+    private var offlineCount: Int {
+        viewModel.drivers.filter { $0.meta_data.firstTimeLogin }.count
+    }
+    
+    private var allCount: Int {
+        viewModel.drivers.count
+    }
+    
+    private var filtersWithCount: [String] {
+        [
+            "All (\(allCount))",
+            "\(DriverStatus.available.rawValue) (\(availableCount))",
+            "\(DriverStatus.onTrip.rawValue) (\(onTripCount))",
+            "Inactive (\(inactiveCount))",
+            "\(DriverStatus.Offline.rawValue) (\(offlineCount))"
+        ]
+    }
+    
     var filteredStaff: [Driver] {
         let roleFiltered = viewModel.drivers.filter { driver in
-//            selectedRole == 0 ? driver.role == .driver : driver.role == .maintenancePersonal
             true
         }
 
@@ -95,30 +131,23 @@ struct StaffView: View {
         }
         
         switch selectedFilter {
-        case filters[1]: //Available
+        case _ where selectedFilter.contains(DriverStatus.available.rawValue):
             return searchResults.filter { $0.status == .available && $0.activeStatus && !$0.meta_data.firstTimeLogin }
-        case filters[2]: //On Trip
+        case _ where selectedFilter.contains(DriverStatus.onTrip.rawValue):
             return searchResults.filter { $0.status == .onTrip && $0.activeStatus && !$0.meta_data.firstTimeLogin }
-        case filters[3]: //Inactive
-            // activeStaus = true means driver is active
-            // activeStaus = false means driver is inactive
+        case _ where selectedFilter.contains("Inactive"):
             return searchResults.filter { !$0.activeStatus }
-        case filters[4]: //Offline
-            // firstTimeLogin = true means the driver has not logged in,
-            // for better understanding read this variable as shouldFirstTimeLogin
-            // firstTimeLogin = false means the driver has logged in.
+        case _ where selectedFilter.contains(DriverStatus.Offline.rawValue):
             return searchResults.filter { $0.meta_data.firstTimeLogin }
-        default: //All
+        default:
             return searchResults.filter { _ in true }
         }
     }
     
     var body: some View {
         VStack(spacing: 16) {
-            // Role Picker
             Picker("Staff Type", selection: $selectedRole) {
                 Text("Drivers").tag(0)
-//                Text("Maintenance").tag(1)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -127,7 +156,7 @@ struct StaffView: View {
             
             FilterSection(
                 title: "",
-                filters: filters,
+                filters: filtersWithCount,
                 selectedFilter: $selectedFilter
             )
             
@@ -158,7 +187,9 @@ struct StaffView: View {
         }
         .background(.white)
         .onAppear {
-            // Empty onAppear since data is initialized in ViewModel
+            if selectedFilter.isEmpty {
+                selectedFilter = filtersWithCount[0]
+            }
         }
     }
 }
@@ -232,7 +263,7 @@ struct DriverDetailView: View {
                     })
                     {
                                 Text("Make Active")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.primaryGradientStart)
                                     .frame(maxWidth: .infinity)
                                     .multilineTextAlignment(.center)
                             }
@@ -263,14 +294,41 @@ struct DriverDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("Are you sure you want to make this driver as Inactive?")
+            Text("Are you sure you want to make this driver Inactive ?")
         }
         .onAppear {
             editedPhone = driver.meta_data.phone
         }
     }
 }
-                        
+
+func isValidEmail(_ email: String) -> Bool {
+    let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+    let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
+    return emailPred.evaluate(with: email)
+}
+
+func isValidPhone(_ phone: String) -> Bool {
+    let phoneRegEx = "^[0-9]{10}$" // Exactly 10 digits
+    let phonePred = NSPredicate(format:"SELF MATCHES %@", phoneRegEx)
+    return phonePred.evaluate(with: phone)
+}
+
+func isValidFullName(_ name: String) -> Bool {
+    let nameRegEx = "^[a-zA-Z\\s]+$"
+    let namePred = NSPredicate(format:"SELF MATCHES %@", nameRegEx)
+    return namePred.evaluate(with: name)
+}
+
+func isValidLicense(_ license: String) -> Bool {
+    // Check if license is 15 characters
+    guard license.count == 15 else { return false }
+    
+    // Regular expression for format: 2 letters, followed by 13 numbers
+    let licenseRegEx = "^[A-Z]{2}[0-9]{13}$"
+    let licensePred = NSPredicate(format: "SELF MATCHES %@", licenseRegEx)
+    return licensePred.evaluate(with: license)
+}
 
 struct AddDriverView: View {
     @Environment(\.dismiss) var dismiss
@@ -285,6 +343,30 @@ struct AddDriverView: View {
     @State private var generatedPassword = ""
     @State private var showEmailError = false
     @State private var showPhoneError = false
+    @State private var showNameError = false
+    @State private var showLicenseError = false
+    @State private var showEmailExistsError = false
+    @State private var showPhoneExistsError = false
+    @State private var showLicenseExistsError = false
+    
+    private func isEmailExists(_ email: String) -> Bool {
+        return viewModel.drivers.contains { $0.meta_data.email.lowercased() == email.lowercased() }
+    }
+    
+    private func isPhoneExists(_ phone: String) -> Bool {
+        return viewModel.drivers.contains { $0.meta_data.phone == phone }
+    }
+    
+    private func isLicenseExists(_ license: String) -> Bool {
+           return viewModel.drivers.contains { $0.licenseNumber == license }
+    }
+    
+    private var isFormValid: Bool {
+        !fullName.isEmpty && isValidFullName(fullName) &&
+        !email.isEmpty && isValidEmail(email) && !isEmailExists(email) &&
+        !phone.isEmpty && isValidPhone(phone) && !isPhoneExists(phone) &&
+        !licenseNumber.isEmpty && isValidLicense(licenseNumber) && !isLicenseExists(licenseNumber)
+    }
     
     func generatePassword() -> String {
         let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -304,32 +386,89 @@ struct AddDriverView: View {
         NavigationView {
             Form {
                 Section("Driver Details") {
-
-                    TextField("Full Name", text: $fullName)
-                        .textContentType(.name)
-                    TextField("Email", text: $email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                    if showEmailError {
-                        Text("Invalid email address")
-                            .foregroundColor(.red)
-                            .font(.caption)
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Full Name", text: $fullName)
+                            .textContentType(.name)
+                            .onChange(of: fullName) { _, newValue in
+                                showNameError = !newValue.isEmpty && !isValidFullName(newValue)
+                            }
+                        if showNameError {
+                            Text("Please enter a valid name (letters only)")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
-                    TextField("Phone Number", text: $phone)
-                        .keyboardType(.phonePad)
-                    if showPhoneError {
-                        Text("Invalid phone number")
-                            .foregroundColor(.red)
-                            .font(.caption)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Email", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .autocapitalization(.none)
+                            .onChange(of: email) { _, newValue in
+                                showEmailError = !newValue.isEmpty && !isValidEmail(newValue)
+                                showEmailExistsError = !newValue.isEmpty && isEmailExists(newValue)
+                            }
+                        if showEmailError {
+                            Text("Invalid email address")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        } else if showEmailExistsError {
+                            Text("This email is already registered")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
-                    TextField("License Number", text: $licenseNumber)
-                        .textContentType(.name)
-                }
-                
-                Section("Generated Password") {
-                    Text(generatedPassword)
-                        .foregroundColor(.gray)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Phone Number", text: $phone)
+                            .keyboardType(.numberPad)
+                            .onChange(of: phone) { _, newValue in
+                                showPhoneError = !newValue.isEmpty && !isValidPhone(newValue)
+                                showPhoneExistsError = !newValue.isEmpty && isPhoneExists(newValue)
+                                if newValue.count > 10 {
+                                    phone = String(newValue.prefix(10))
+                                }
+                            }
+                        if showPhoneError {
+                            Text("Please enter a valid 10-digit phone number")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        } else if showPhoneExistsError {
+                            Text("This phone number is already registered")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("License Number (Example: KA0120241234567)", text: $licenseNumber)
+                            .textContentType(.name)
+                            .onChange(of: licenseNumber) { _, newValue in
+                                // Remove any spaces and convert to uppercase
+                                let formatted = newValue.replacingOccurrences(of: " ", with: "").uppercased()
+                                
+                                // Limit to 15 characters
+                                if formatted.count > 15 {
+                                    licenseNumber = String(formatted.prefix(15))
+                                } else {
+                                    licenseNumber = formatted
+                                }
+                                
+                                showLicenseError = !licenseNumber.isEmpty && !isValidLicense(licenseNumber)
+                                showLicenseExistsError = !licenseNumber.isEmpty && isLicenseExists(licenseNumber)
+                            }
+                            .textInputAutocapitalization(.characters)
+                        
+                        if showLicenseError {
+                            Text("Format: 2 letters followed by 13 numbers\n(Example: KA0120241234567)")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        } else if showLicenseExistsError {
+                            Text("This license number is already registered")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
                 }
             }
             .navigationTitle("Add Driver")
@@ -344,33 +483,44 @@ struct AddDriverView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        if isValidEmail(email) && isValidPhone(phone) {
+                        if isFormValid {
                             let newDriver = Driver(meta_data: UserMetaData(id: UUID(),
-                                                                           fullName: fullName,
-                                                                           email: email,
-                                                                           phone: phone,
-                                                                           role: .driver,
-                                                                           employeeID: Int(employeeId) ?? -1,
-                                                                           firstTimeLogin: true,
-                                                                           createdAt: .now,
-                                                                           activeStatus: true),
-                                                   licenseNumber: licenseNumber,
-                                                   totalTrips: 0,
-                                                   status: .available)
+                                                                         fullName: fullName,
+                                                                         email: email,
+                                                                         phone: phone,
+                                                                         role: .driver,
+                                                                         employeeID: Int(employeeId) ?? -1,
+                                                                         firstTimeLogin: true,
+                                                                         createdAt: .now,
+                                                                         activeStatus: true),
+                                                 licenseNumber: licenseNumber.uppercased(),
+                                                 totalTrips: 0,
+                                                 status: .available)
                             Task {
+                                // Make sure to save the fleet manager ID before adding the driver
+                                if let currentUser = viewModel.user, currentUser.role == .fleetManager {
+                                    AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
+                                }
+                                
                                 await viewModel.addDriver(newDriver, password: generatedPassword)
                                 viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
+
+                                
+                                // Ensure we still have the fleet manager's session
+                                if viewModel.user == nil || viewModel.user?.role != .fleetManager {
+                                    if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                                        try? await AuthManager.shared.restoreFleetManagerSession()
+                                    }
+                                }
                                 
                                 showEmailError = false
+
                                 dismiss()
                             }
-                        } else {
-                            showEmailError = !isValidEmail(email)
-                            showPhoneError = !isValidPhone(phone)
                         }
                     }
-                    .foregroundColor(Color.primaryGradientEnd)
-                    .disabled(!isValidEmail(email) || !isValidPhone(phone))
+                    .foregroundColor(isFormValid ? Color.primaryGradientEnd : Color.gray)
+                    .disabled(!isFormValid)
                 }
             }
         }
@@ -379,19 +529,6 @@ struct AddDriverView: View {
         }
     }
 }
-
-func isValidEmail(_ email: String) -> Bool {
-    let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-    let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
-    return emailPred.evaluate(with: email)
-}
-
-func isValidPhone(_ phone: String) -> Bool {
-    let phoneRegEx = "^[0-9+][0-9]{9,14}$" // Allows + prefix and 10-15 digits
-    let phonePred = NSPredicate(format:"SELF MATCHES %@", phoneRegEx)
-    return phonePred.evaluate(with: phone)
-}
-
 
 #Preview{
     StaffView()

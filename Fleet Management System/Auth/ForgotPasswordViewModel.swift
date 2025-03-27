@@ -7,6 +7,23 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var otpCode: String = ""
     @Published var newPassword: String = ""
     @Published var confirmPassword: String = ""
+    @Published var isNewPasswordVisible: Bool = false
+    @Published var isConfirmPasswordVisible: Bool = false
+    @Published var remainingTime: Int = 60
+    @Published var isResendButtonEnabled: Bool = false
+    @Published var isResendingOTP: Bool = false
+    
+    private var timer: Timer?
+    private let minimumResendInterval: TimeInterval = 60 // 60 seconds minimum between resends
+    
+    var isValidOTP: Bool {
+        otpCode.count == 6 && otpCode.allSatisfy { $0.isNumber }
+    }
+    
+    var isPasswordValid: Bool {
+        !newPassword.isEmpty && !confirmPassword.isEmpty && 
+        newPassword == confirmPassword && newPassword.count >= 8
+    }
     
     enum PasswordResetStep {
         case emailEntry
@@ -15,14 +32,45 @@ class ForgotPasswordViewModel: ObservableObject {
         case completed
     }
     
+    func startResendTimer() {
+        remainingTime = 60
+        isResendButtonEnabled = false
+        isResendingOTP = false
+        
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if self.remainingTime > 0 {
+                self.remainingTime -= 1
+            } else {
+                self.timer?.invalidate()
+                self.isResendButtonEnabled = true
+            }
+        }
+    }
+    
     func requestOTP() async throws {
         guard email.isValidEmail() else {
             throw PasswordResetError.invalidEmail
         }
         
-        // Use Supabase's method to send OTP
-        try await AuthManager.shared.resetPasswordWithOTP(email: email)
-        currentStep = .otpVerification
+        // Check if we're already in the process of sending an OTP
+        guard !isResendingOTP else {
+            throw PasswordResetError.otpRateLimit
+        }
+        
+        isResendingOTP = true
+        
+        do {
+            // Use Supabase's method to send OTP
+            try await AuthManager.shared.resetPasswordWithOTP(email: email)
+            currentStep = .otpVerification
+            startResendTimer() // Start the timer when OTP is first requested
+        } catch {
+            isResendingOTP = false
+            throw error
+        }
     }
     
     func verifyOTP() async throws {
@@ -44,6 +92,30 @@ class ForgotPasswordViewModel: ObservableObject {
             throw PasswordResetError.invalidPassword
         }
         
+        // Check if new password is same as current password
+        do {
+            let isSamePassword = try await AuthManager.shared.checkIfSamePassword(
+                email: email,  // Use the email from the current flow
+                password: newPassword
+            )
+            if isSamePassword {
+                throw PasswordResetError.sameAsCurrentPassword
+            }
+        } catch {
+            // If checkIfSamePassword throws an error, it means either:
+            // 1. The sign-in failed (different password)
+            // 2. There was a network error
+            // In case #1, we can proceed with the password update
+            // In case #2, we should throw the error
+            if let authError = error as? AuthError {
+                // This is case #1, we can proceed
+                print("Password is different, proceeding with update")
+            } else {
+                // This is case #2, rethrow the error
+                throw error
+            }
+        }
+        
         // Update password using Supabase
         try await AuthManager.shared.updateUserPassword(email: email, password: newPassword)
         currentStep = .completed
@@ -62,6 +134,10 @@ class ForgotPasswordViewModel: ObservableObject {
         
         return true
     }
+    
+    deinit {
+        timer?.invalidate()
+    }
 }
 
 enum PasswordResetError: LocalizedError {
@@ -70,6 +146,8 @@ enum PasswordResetError: LocalizedError {
     case invalidPassword
     case passwordsDoNotMatch
     case resetFailed
+    case sameAsCurrentPassword
+    case otpRateLimit
     
     var errorDescription: String? {
         switch self {
@@ -83,6 +161,10 @@ enum PasswordResetError: LocalizedError {
             return "Passwords do not match."
         case .resetFailed:
             return "Failed to reset password. Please try again."
+        case .sameAsCurrentPassword:
+            return "⚠️ New password must be different from your current password."
+        case .otpRateLimit:
+            return "You have reached the rate limit for resending OTP. Please wait before trying again."
         }
     }
 } 

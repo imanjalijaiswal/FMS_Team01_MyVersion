@@ -8,6 +8,9 @@ struct LoginFormView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var isPasswordVisible: Bool = false
+    @State private var pandaEyesOpen: Bool = true  // New explicit state for panda eyes
+    @FocusState private var isEmailFocused: Bool
+    @FocusState private var isPasswordFocused: Bool
     @State private var isBlinking = false
     @State private var isLoading = false
     @State private var showForgotPassword = false
@@ -24,12 +27,12 @@ struct LoginFormView: View {
                         .fill(Color.primaryGradientStart)
                         .frame(width: 150, height: 150)
                     
-                    Image(isPasswordVisible ? "panda-open" : "panda-closed")
+                    Image(pandaEyesOpen ? "panda-open" : "panda-closed")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 135, height: 135)
                         .scaleEffect(1.0)
-                        .animation(.easeInOut(duration: 0.2), value: isPasswordVisible)
+                        .animation(.easeInOut(duration: 0.3), value: pandaEyesOpen)
                 }
                 .padding(.bottom, 20)
                 
@@ -47,6 +50,7 @@ struct LoginFormView: View {
                         .padding(.leading)
                     
                     TextField("Enter your email", text: $email)
+                        .focused($isEmailFocused)
                         .padding()
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
@@ -63,16 +67,26 @@ struct LoginFormView: View {
                     HStack {
                         if isPasswordVisible {
                             TextField("Enter password", text: $password)
+                                .focused($isPasswordFocused)
                         } else {
                             SecureField("Enter password", text: $password)
+                                .focused($isPasswordFocused)
                         }
                         
                         Button(action: {
-                            isPasswordVisible.toggle()
+                            // Toggle password visibility and explicitly update panda eyes
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                isPasswordVisible.toggle()
+                                // Directly update panda eyes based on password visibility
+                                pandaEyesOpen = isPasswordVisible
+                            }
                         }) {
                             Image(systemName: isPasswordVisible ? "eye.fill" : "eye.slash.fill")
                                 .foregroundColor(.gray)
+                                .contentShape(Rectangle())
+                                .frame(width: 35, height: 35) // Larger tap target
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .padding()
                     .background(Color(.systemGray6))
@@ -115,7 +129,8 @@ struct LoginFormView: View {
                 if let errorMessage = errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
-                        .font(.footnote)
+                        .font(.subheadline)
+                        .padding(.horizontal)
                         .padding(.top, 5)
                 }
                 
@@ -130,7 +145,24 @@ struct LoginFormView: View {
                 ForgotPasswordView(isPresented: $showForgotPassword)
             }
         }
-        .fullScreenCover(isPresented: $show2FAView) {
+        .onChange(of: isPasswordFocused) { _, newValue in
+            withAnimation(.easeInOut(duration: 0.3)) {
+                if newValue {
+                    // When password field is focused, eyes state matches visibility
+                    pandaEyesOpen = isPasswordVisible
+                } else {
+                    // When password field loses focus, eyes open
+                    pandaEyesOpen = true
+                }
+            }
+        }
+        .onChange(of: isEmailFocused) { _, newValue in
+            withAnimation(.easeInOut(duration: 0.3)) {
+                // Email field always has open eyes
+                pandaEyesOpen = true
+            }
+        }
+        .sheet(isPresented: $show2FAView) {
             if let tempUser = tempAuthenticatedUser {
                 TwoFactorView(authenticatedUser: tempUser, user: $user)
             }
@@ -143,11 +175,12 @@ struct LoginFormView: View {
         hideKeyboard()
         
         guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "⚠️ Please enter email and password."
+            errorMessage = "Please enter your email and password."
             return
         }
         
         isLoading = true
+        errorMessage = nil
         
         Task {
             do {
@@ -171,9 +204,19 @@ struct LoginFormView: View {
                     self.errorMessage = authError.localizedDescription
                     self.isLoading = false
                 }
+            } catch let error as NSError {
+                DispatchQueue.main.async {
+                    // Handle Supabase rate limit error
+                    if error.domain == "Auth" && error.code == 429 {
+                        self.errorMessage = "Please wait before requesting another OTP. Try again in a few seconds."
+                    } else {
+                        self.errorMessage = "Something went wrong. Please try again."
+                    }
+                    self.isLoading = false
+                }
             } catch {
                 DispatchQueue.main.async {
-                    self.errorMessage = "❌ Something went wrong. Please try again."
+                    self.errorMessage = "Something went wrong. Please try again."
                     self.isLoading = false
                 }
             }

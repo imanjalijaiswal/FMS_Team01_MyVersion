@@ -42,6 +42,27 @@ enum TripStatus: String, Codable {
     case completed = "Completed"
 }
 
+struct TripInspection: Codable, Equatable, Identifiable {
+    var id: UUID // This is trip id
+    var preInspection: [TripInspectionItem: Bool]
+    var postInspection: [TripInspectionItem: Bool]
+    var preInspectionNote: String
+    var postInspectionNote: String
+}
+
+enum TripInspectionItem: String, Codable, CaseIterable {
+    case tireCondition = "Tire Condition"
+    case brakeSystem = "Brake System"
+    case lights = "Lights"
+    case fluidLevels = "Fluid Levels"
+    case tirePressure = "Tire Pressure"
+    case coolingSystem = "Cooling System"
+    case mirrors = "Mirrors"
+    case batteryHealth = "Battery Health"
+    case seatBelts = "Seat Belts"
+    case airbags = "Airbags"
+    case emergencyKit = "Emergency Kit"
+}
 
 struct TripInspection: Codable, Equatable, Identifiable {
     var id: UUID

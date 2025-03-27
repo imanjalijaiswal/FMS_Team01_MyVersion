@@ -1,25 +1,101 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
-struct MapView: View {
-    @State private var region = MKCoordinateRegion(
+class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+    private let locationManager = CLLocationManager()
+    @Published var location: CLLocation?
+    @Published var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 52.2297, longitude: 21.0122),
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
     )
+    private var isFirstLocationUpdate = true
+    
+    override init() {
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        self.location = location
+        
+        // Center on user location on first update
+        if isFirstLocationUpdate {
+            isFirstLocationUpdate = false
+            centerOnUserLocation()
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("❌ Failed to get location: \(error.localizedDescription)")
+    }
+    
+    func requestLocation() {
+        let status = locationManager.authorizationStatus
+        if status == .denied || status == .restricted {
+            print("❌ Location access is denied or restricted.")
+            return
+        }
+        locationManager.requestLocation()
+    }
+    
+    func centerOnUserLocation() {
+        guard let location = location else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            region = MKCoordinateRegion(
+                center: location.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            )
+        }
+    }
+}
+
+struct MapView: View {
+    @StateObject private var viewModel = IFEDataController.shared
+    @StateObject private var locationManager = LocationManager()
+    @Binding var selectedTab: Int
+    @State private var mapType: MapStyle = .standard
+    @State private var userTrackingMode: MapUserTrackingMode = .follow
+    
+    var activeTrip: Trip? {
+        viewModel.tripsForDriver.first { $0.status == .inProgress }
+    }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack(alignment: .bottom) {
-                Map(coordinateRegion: $region)
+                Map(coordinateRegion: $locationManager.region,
+                    showsUserLocation: true,
+                    userTrackingMode: $userTrackingMode)
+                    .mapStyle(mapType)
                     .edgesIgnoringSafeArea(.all)
                 
-                // Back button
+                // Custom navigation bar
                 VStack {
                     HStack {
-                        
                         Spacer()
                         
-                        Button(action: {}) {
+                        // Location button
+                        Button(action: {
+                            locationManager.centerOnUserLocation()
+                            userTrackingMode = .follow
+                        }) {
+                            Image(systemName: "location.circle.fill")
+                                .foregroundColor(.primaryGradientStart)
+                                .padding()
+                                .background(Color.white)
+                                .clipShape(Circle())
+                                .shadow(radius: 3)
+                        }
+                        
+                        // Refresh button
+                        Button(action: {
+                            locationManager.requestLocation()
+                        }) {
                             Image(systemName: "arrow.clockwise")
                                 .foregroundColor(.primaryGradientStart)
                                 .padding()
@@ -33,34 +109,79 @@ struct MapView: View {
                 }
                 
                 VStack(spacing: 0) {
-                    // Location card
-                    LocationCard()
-                    
-                    // Trip details card
-                    TripDetailsCard()
+                    if let trip = activeTrip {
+                        // Active trip cards
+                        LocationCard(trip: trip)
+                        TripDetailsCard(trip: trip)
+                    } else {
+                        // Empty state card
+                        EmptyTripCard(selectedTab: $selectedTab)
+                    }
                 }
                 .padding()
             }
-            .navigationBarHidden(true)
         }
     }
 }
 
+struct EmptyTripCard: View {
+    @Binding var selectedTab: Int
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "map.circle")
+                .font(.system(size: 60))
+                .foregroundColor(.primaryGradientStart.opacity(0.8))
+            
+            VStack(spacing: 8) {
+                Text("No Active Trip")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primaryGradientStart)
+                
+                Text("Start a trip from your dashboard to see navigation details")
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            Button(action: {
+                selectedTab = 0 // Switch to Dashboard tab
+            }) {
+                Text("View Dashboard")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.primaryGradientStart)
+                    .cornerRadius(12)
+            }
+        }
+        .padding(24)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(radius: 5)
+    }
+}
+
 struct LocationCard: View {
+    let trip: Trip
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Warszawska 82, 96-515 Sochaczew")
+                Text(trip.destination)
                     .font(.subheadline)
                     .foregroundColor(.textPrimary)
                 Spacer()
             }
             
             HStack(spacing: 4) {
-                Text("55.9 km")
+                Text("\(trip.totalDistance) km")
                 Text("•")
-                Text("You're")
-                Text("1h 1m")
+                Text("Estimated")
+                Text("\(trip.totalTripDuration)")
                 Text("away")
             }
             .font(.caption)
@@ -75,6 +196,8 @@ struct LocationCard: View {
 }
 
 struct TripDetailsCard: View {
+    let trip: Trip
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Driver info
@@ -87,14 +210,14 @@ struct TripDetailsCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("David Russel")
                         .fontWeight(.medium)
-                    Text("PO 123FF")
+                    Text("Trip #\(trip.tripID)")
                         .font(.subheadline)
                         .foregroundColor(.textSecondary)
                 }
                 
                 Spacer()
                 
-                Text("ONLINE")
+                Text("IN PROGRESS")
                     .font(.caption)
                     .fontWeight(.medium)
                     .padding(.horizontal, 8)
@@ -104,20 +227,21 @@ struct TripDetailsCard: View {
                     .cornerRadius(4)
             }
             
-            Text("Logged from Jan 4, 4:21 AM")
+            Text("Started at \(trip.createdAt.formatted())")
                 .font(.caption)
                 .foregroundColor(.textSecondary)
             
             Divider()
             
-            // Solar Panel details
+            // Trip details
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Solar Panel")
+                    Text("Trip Details")
                         .font(.headline)
                     HStack {
-                        Text("Green Energy LTD")
-                        Text("#GE73895")
+                        Text("Vehicle ID: \(trip.assignedVehicleID)")
+                        Text("•")
+                        Text("\(trip.description ?? "No description")")
                             .foregroundColor(.statusOrange)
                     }
                     .font(.subheadline)
@@ -125,7 +249,7 @@ struct TripDetailsCard: View {
                 
                 Spacer()
                 
-                Text("ASSIGNED")
+                Text("ACTIVE")
                     .font(.caption)
                     .fontWeight(.medium)
                     .padding(.horizontal, 8)
@@ -136,9 +260,9 @@ struct TripDetailsCard: View {
             }
             
             HStack {
-                Text("Today")
+                Text("Scheduled: \(trip.scheduledDateTime.formatted())")
                 Text("•")
-                Text("Container, 54.1 lbs")
+                Text("ETA: \(trip.estimatedArrivalDateTime.formatted())")
             }
             .font(.subheadline)
             .foregroundColor(.textSecondary)
@@ -146,7 +270,7 @@ struct TripDetailsCard: View {
             // Action buttons
             HStack(spacing: 12) {
                 Button(action: {}) {
-                    Text("Reject")
+                    Text("End Trip")
                         .font(.headline)
                         .foregroundColor(.red)
                         .frame(maxWidth: .infinity)
@@ -156,7 +280,7 @@ struct TripDetailsCard: View {
                 }
                 
                 Button(action: {}) {
-                    Text("Pickup Load")
+                    Text("Update Status")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -173,5 +297,5 @@ struct TripDetailsCard: View {
 }
 
 #Preview {
-    TripsView()
+    MapView(selectedTab: .constant(0))
 } 

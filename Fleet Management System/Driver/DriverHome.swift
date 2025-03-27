@@ -13,15 +13,6 @@ struct DriverView: View {
     @Binding var role : Role?
     var body: some View {
         MainTabView(user: $user, role: $role)
-//        Button(action: signOut) {
-//            Text("Sign Out")
-//                .font(.title2)
-//                .padding()
-//                .background(Color.white)
-//                .foregroundColor(.green)
-//                .cornerRadius(10)
-//        }
-//        .padding(.bottom, 50)
     }
 
     func signOut() {
@@ -58,24 +49,26 @@ struct DriverView: View {
 struct MainTabView: View {
     @Binding var user: AppUser?
     @Binding var role : Role?
+    @State private var selectedTab = 0
+    
     var body: some View {
-        TabView {
-            DashboardView(user: $user, role: $role)
+        TabView(selection: $selectedTab) {
+                DashboardView(user: $user, role: $role)
+                    .tabItem {
+                        Image(systemName: "square.grid.2x2")
+                        Text("Dashboard")
+                    }
+                    .tag(0)
+            
+            MapView(selectedTab: $selectedTab)
                 .tabItem {
-                    Label("Dashboard", systemImage: "square.grid.2x2")
+                    Image(systemName: "map")
+                    Text("Trip")
                 }
-            
-//            MapView()
-//                .tabItem {
-//                    Label("Trip", systemImage: "map")
-//                }
-            
-//            MaintenanceView()
-//                .tabItem {
-//                    Label("Maintenance", systemImage: "wrench.and.screwdriver")
-//                }
+                .tag(1)
         }
-        .accentColor(.primaryGradientEnd) // Applies teal color to selected tab
+        .accentColor(.primaryGradientStart)
     }
 }
+
 

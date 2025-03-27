@@ -13,23 +13,23 @@ enum AuthError: LocalizedError {
     case invalidCredentials
     case invalidEmail
     case emptyFields
-    case passwordTooShort
     case inactiveUser
+    case otpRateLimit
     
     var errorDescription: String? {
         switch self {
         case .invalidForm:
-            return "❌ Invalid email or password. Password must be at least 8 characters."
+            return "Email or password is incorrect."
         case .invalidCredentials:
-            return "❌ Email or password incorrect."
+            return "Email or password is incorrect."
         case .invalidEmail:
-            return "❌ Invalid email format."
+            return "Please enter a valid email address."
         case .emptyFields:
-            return "❌ Email and password fields cannot be empty."
-        case .passwordTooShort:
-            return "❌ Password must be at least 6 characters."
+            return "Please enter your email and password."
         case .inactiveUser:
-            return "❌ Your account is currently inactive. Please contact your administrator."
+            return "Your account is currently inactive. Please contact your administrator."
+        case .otpRateLimit:
+            return "Please wait before requesting another OTP. Try again in a few seconds."
         }
     }
 }
@@ -111,10 +111,6 @@ class SignInViewModel: ObservableObject {
         // Validation logic
         if email.isEmpty || password.isEmpty {
             throw AuthError.emptyFields
-        }
-        
-        if password.count < 6 {
-            throw AuthError.passwordTooShort
         }
     }
 }

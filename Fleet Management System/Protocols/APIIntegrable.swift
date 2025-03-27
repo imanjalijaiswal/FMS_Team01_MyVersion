@@ -31,6 +31,8 @@ protocol DatabaseAPIIntegrable {
     
     func updateUserActiveStatus(by id: UUID, with status: Bool) async throws
     
+    func getOfflineDrivers() async throws -> [Driver]
+    
     func getMaxEmployeeID(ofType type: Role) async throws -> Int
     
     
@@ -62,7 +64,20 @@ protocol DatabaseAPIIntegrable {
                        totalTripDuration: (hours: Int, minutes: Int),
                        scheduledDateTime: Date) async throws -> Trip
     
+    func updateTripStatus(by id: UUID, to new_status: TripStatus) async throws
+    
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip]
     
     func getDriverTrips(by id: UUID) async throws -> [Trip]
+    
+    
+    func getTripInspectionForTrip(by id: UUID) async throws -> TripInspection
+    
+    func addPreTripInspectionForTrip(by id: UUID,
+                                     inspection: [TripInspectionItem: Bool],
+                                     note: String) async throws
+    
+    func addPostTripInspectionForTrip(by id: UUID,
+                                      inspection: [TripInspectionItem: Bool],
+                                      note: String) async throws
 }
