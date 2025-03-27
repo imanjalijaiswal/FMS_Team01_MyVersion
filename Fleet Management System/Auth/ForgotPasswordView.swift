@@ -249,8 +249,18 @@ struct ForgotPasswordView: View {
                 HStack {
                     if viewModel.isNewPasswordVisible {
                         TextField("Enter new password", text: $viewModel.newPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.newPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     } else {
                         SecureField("Enter new password", text: $viewModel.newPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.newPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     }
                     
                     Button(action: {
@@ -265,9 +275,34 @@ struct ForgotPasswordView: View {
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
-                Text("Password must be at least 8 characters")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                // Password validation criteria feedback
+                VStack(alignment: .leading, spacing: 5) {
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasMinLength,
+                        text: "At least 8 characters long"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasLowercase,
+                        text: "Include at least 1 lowercase letter"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasUppercase,
+                        text: "Include at least 1 uppercase letter"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasDigit,
+                        text: "Include at least 1 number"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasSpecialChar,
+                        text: "Include at least 1 special character (!@#$%^&*)"
+                    )
+                }
+                .padding(.top, 8)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -277,8 +312,18 @@ struct ForgotPasswordView: View {
                 HStack {
                     if viewModel.isConfirmPasswordVisible {
                         TextField("Confirm new password", text: $viewModel.confirmPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.confirmPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     } else {
                         SecureField("Confirm new password", text: $viewModel.confirmPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.confirmPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     }
                     
                     Button(action: {
@@ -292,6 +337,28 @@ struct ForgotPasswordView: View {
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
+                
+                // Password match validation
+                if !viewModel.confirmPassword.isEmpty {
+                    PasswordRequirementRow(
+                        isMet: viewModel.passwordsMatch,
+                        text: "Passwords match"
+                    )
+                    .padding(.top, 5)
+                }
+            }
+            
+            // Password strength feedback
+            if viewModel.isPasswordValid {
+                HStack {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                    Text("Strong password!")
+                        .foregroundColor(.green)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .padding(.top, 5)
             }
             
             // Update Password Button
@@ -316,6 +383,23 @@ struct ForgotPasswordView: View {
                     .foregroundColor(.red)
                     .font(.footnote)
                     .multilineTextAlignment(.center)
+            }
+        }
+    }
+    
+    // Password requirement row
+    private struct PasswordRequirementRow: View {
+        let isMet: Bool
+        let text: String
+        
+        var body: some View {
+            HStack(spacing: 10) {
+                Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isMet ? .green : .gray)
+                
+                Text(text)
+                    .font(.caption)
+                    .foregroundColor(isMet ? .green : .gray)
             }
         }
     }

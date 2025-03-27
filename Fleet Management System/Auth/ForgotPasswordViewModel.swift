@@ -13,6 +13,14 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var isResendButtonEnabled: Bool = false
     @Published var isResendingOTP: Bool = false
     
+    // Password validation properties
+    @Published var hasMinLength: Bool = false
+    @Published var hasLowercase: Bool = false
+    @Published var hasUppercase: Bool = false
+    @Published var hasDigit: Bool = false
+    @Published var hasSpecialChar: Bool = false
+    @Published var passwordsMatch: Bool = false
+    
     private var timer: Timer?
     private let minimumResendInterval: TimeInterval = 60 // 60 seconds minimum between resends
     
@@ -21,8 +29,8 @@ class ForgotPasswordViewModel: ObservableObject {
     }
     
     var isPasswordValid: Bool {
-        !newPassword.isEmpty && !confirmPassword.isEmpty && 
-        newPassword == confirmPassword && newPassword.count >= 8
+        hasMinLength && hasLowercase && hasUppercase && hasDigit && hasSpecialChar && 
+        newPassword == confirmPassword
     }
     
     enum PasswordResetStep {
@@ -30,6 +38,29 @@ class ForgotPasswordViewModel: ObservableObject {
         case otpVerification
         case newPasswordEntry
         case completed
+    }
+    
+    // MARK: - Password Validation
+    
+    /// Validates the password criteria in real-time
+    func validatePasswordCriteria() {
+        // Check minimum length (8 characters)
+        hasMinLength = newPassword.count >= 8
+        
+        // Check for lowercase letter
+        hasLowercase = newPassword.range(of: "[a-z]", options: .regularExpression) != nil
+        
+        // Check for uppercase letter
+        hasUppercase = newPassword.range(of: "[A-Z]", options: .regularExpression) != nil
+        
+        // Check for digit
+        hasDigit = newPassword.range(of: "[0-9]", options: .regularExpression) != nil
+        
+        // Check for special character
+        hasSpecialChar = newPassword.range(of: "[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]", options: .regularExpression) != nil
+        
+        // Check if passwords match
+        passwordsMatch = newPassword == confirmPassword
     }
     
     func startResendTimer() {
@@ -88,8 +119,20 @@ class ForgotPasswordViewModel: ObservableObject {
     }
     
     func updatePassword() async throws {
-        guard validatePassword() else {
-            throw PasswordResetError.invalidPassword
+        guard isPasswordValid else {
+            if !hasMinLength {
+                throw PasswordResetError.passwordTooShort
+            } else if !hasLowercase {
+                throw PasswordResetError.noLowercase
+            } else if !hasUppercase {
+                throw PasswordResetError.noUppercase
+            } else if !hasDigit {
+                throw PasswordResetError.noDigit
+            } else if !hasSpecialChar {
+                throw PasswordResetError.noSpecialChar
+            } else {
+                throw PasswordResetError.passwordsDoNotMatch
+            }
         }
         
         // Check if new password is same as current password
@@ -122,17 +165,7 @@ class ForgotPasswordViewModel: ObservableObject {
     }
     
     private func validatePassword() -> Bool {
-        // Password must be at least 8 characters
-        if newPassword.count < 8 {
-            return false
-        }
-        
-        // Passwords must match
-        if newPassword != confirmPassword {
-            return false
-        }
-        
-        return true
+        return isPasswordValid
     }
     
     deinit {
@@ -144,6 +177,11 @@ enum PasswordResetError: LocalizedError {
     case invalidEmail
     case invalidOTP
     case invalidPassword
+    case passwordTooShort
+    case noLowercase
+    case noUppercase
+    case noDigit
+    case noSpecialChar
     case passwordsDoNotMatch
     case resetFailed
     case sameAsCurrentPassword
@@ -156,7 +194,17 @@ enum PasswordResetError: LocalizedError {
         case .invalidOTP:
             return "The verification code is incorrect. Please try again."
         case .invalidPassword:
-            return "Password must be at least 8 characters."
+            return "Password does not meet all requirements."
+        case .passwordTooShort:
+            return "Password must be at least 8 characters long."
+        case .noLowercase:
+            return "Include at least 1 lowercase letter."
+        case .noUppercase:
+            return "Include at least 1 uppercase letter."
+        case .noDigit:
+            return "Include at least 1 number."
+        case .noSpecialChar:
+            return "Include at least 1 special character (!@#$%^&*)."
         case .passwordsDoNotMatch:
             return "Passwords do not match."
         case .resetFailed:
