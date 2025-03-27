@@ -250,6 +250,10 @@ struct VehiclesView: View {
         viewModel.vehicles.filter { !$0.activeStatus }.count
     }
     
+    private var underMaintenanceCount: Int {
+        viewModel.vehicles.filter { $0.status == .underMaintenance}.count
+    }
+    
     private var allCount: Int {
         viewModel.vehicles.count
     }
@@ -259,6 +263,7 @@ struct VehiclesView: View {
             "All (\(allCount))",
             "\(VehicleStatus.available.rawValue) (\(availableCount))",
             "\(VehicleStatus.assigned.rawValue) (\(assignedCount))",
+            "\(VehicleStatus.underMaintenance.rawValue) (\(underMaintenanceCount))",
             "Inactive (\(inactiveCount))"
         ]
     }
