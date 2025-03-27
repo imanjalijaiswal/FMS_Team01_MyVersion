@@ -110,7 +110,7 @@ struct MaintenanceScheduleCard: View {
                 VStack(alignment: .leading) {
                     Text(String(format:"#%d", schedule.ticketNumber))
                         .font(.subheadline)
-                        //.foregroundColor(.gray)
+                    
                     Text(schedule.maintenancePersonnel)
                         .font(.headline)
                     
@@ -129,7 +129,8 @@ struct MaintenanceScheduleCard: View {
                 Text("Vehicle Details: ")
                     .font(.subheadline)
                     .foregroundColor(.gray)
-                Text("\(schedule.vehicleModel), \(schedule.vehiclePlate)")
+                
+                Text("\(schedule.vehicleModel) \n \(schedule.vehiclePlate)")
                     .font(.subheadline)
                     .foregroundColor(.black)
                 
@@ -138,6 +139,7 @@ struct MaintenanceScheduleCard: View {
             HStack {
                 Image(systemName: "calendar")
                     .foregroundColor(.gray)
+                
                 Text(schedule.scheduledDateTime.formatted(date: .long, time: .shortened))
                     .font(.subheadline)
                     .foregroundColor(.gray)
@@ -275,8 +277,8 @@ struct MaintenanceScheduleFormView: View {
                     Button("Done") {
                         handleDoneButton()
                     }
-                    .foregroundColor(Color.primaryGradientEnd)
                     .disabled(selectedVehicle == nil)
+                    .foregroundColor(selectedVehicle == nil ? Color.gray : Color.primaryGradientStart)
                     .fontWeight(.regular)
                 }
             }
