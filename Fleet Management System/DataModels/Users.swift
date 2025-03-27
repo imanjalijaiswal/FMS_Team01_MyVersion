@@ -148,6 +148,14 @@ struct AppUser: Codable, Equatable, Identifiable {
         }
     }
     
+    var totalRepairs: Int? {
+        switch userData {
+        case .maintenancePersonnel(let personnel):
+            return personnel.totalRepairs
+        default: return nil
+        }
+    }
+    
     var driverStatus: DriverStatus? {
         switch userData {
         case .driver(let driver):
