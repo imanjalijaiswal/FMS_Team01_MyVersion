@@ -23,7 +23,7 @@ struct TripOverviewView: View {
             .navigationTitle("Trip Overview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {  // ✅ Directly inside .toolbar
+                        ToolbarItem(placement: .navigationBarLeading) {
                             Button(action: { dismiss() }) {
                                 Text("Cancel")
                                     .font(.subheadline)
@@ -79,21 +79,29 @@ struct TripOverviewView: View {
         }
     }
     
-
     
     private var preTripInspectionSheet: some View {
-            PreTripInspectionChecklistView(trip: task) { inspection in
-                let hasAnyFailure = inspection.preInspection.values.contains(false)
-                hasCompletedPreInspection = inspection.preInspection.values.contains(true)
-                requiresMaintenance = hasAnyFailure // Set maintenance flag if any item is false
-            }
-        }
-    
-    private var postTripInspectionSheet: some View {
-        PostTripInspectionChecklistView(trip: task) { inspection in
-            hasCompletedPostInspection = inspection.postInspection.values.contains(true)
+        PreTripInspectionChecklistView(trip: task) { inspectionItems, note in
+            let hasAnyFailure = inspectionItems.values.contains(false)
+            hasCompletedPreInspection = inspectionItems.values.contains(true)
+            requiresMaintenance = hasAnyFailure
+            IFEDataController.shared.addPreTripInspectionForTrip(
+                by: task.id,
+                inspection: inspectionItems,
+                note: note
+            )
         }
     }
+    
+    private var postTripInspectionSheet: some View{
+        PostTripInspectionChecklistView(trip: task) { inspectionItems,note in
+            hasCompletedPostInspection = inspectionItems.values.contains(true)
+            
+            IFEDataController.shared.addPostTripInspectionForTrip(by: task.id, inspection: inspectionItems, note: note)
+            
+        }
+    }
+    
 }
 
 // Sub-view for Trip Status
@@ -310,14 +318,14 @@ struct CheckboxView: View {
         }
     }
 }
-
                   
+
 
 struct PreTripInspectionChecklistView: View {
     let trip: Trip
     @Environment(\.dismiss) private var dismiss
-    let onSave: (TripInspection) -> Void
-    
+    let onSave: ([TripInspectionItem: Bool], String) -> Void
+
     @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
         uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
     )
@@ -327,16 +335,40 @@ struct PreTripInspectionChecklistView: View {
         inspectionItems.values.contains(true)
     }
     
+    @State private var allGood: Bool = false
+    
     var body: some View {
         NavigationView {
             List {
+                Section {
+                    CheckboxView(
+                        title: "All Good",
+                        isChecked: Binding(
+                            get: { allGood },
+                            set: { newValue in
+                                allGood = newValue
+                                // Update all items when "All Good" is toggled
+                                for item in TripInspectionItem.allCases {
+                                    inspectionItems[item] = newValue
+                                }
+                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
+                            }
+                        )
+                    )
+                }
+                
                 Section(header: Text("Pre-Trip Inspection Checklist")) {
                     ForEach(TripInspectionItem.allCases, id: \.self) { item in
                         CheckboxView(
                             title: item.rawValue,
                             isChecked: Binding(
-                                get: { inspectionItems[item] ?? false }, // Changed default to false
-                                set: { inspectionItems[item] = $0 }
+                                get: { inspectionItems[item] ?? false },
+                                set: { newValue in
+                                    inspectionItems[item] = newValue
+                                    // Recalculate allGood based on all items
+                                    allGood = inspectionItems.values.allSatisfy { $0 }
+                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
+                                }
                             )
                         )
                     }
@@ -356,29 +388,26 @@ struct PreTripInspectionChecklistView: View {
                             },
                             alignment: .topLeading
                         )
+                        .onChange(of: preTripNote) { newValue in
+                            print("Pre-Trip Note updated: \(newValue)")
+                        }
                 }
             }
             .navigationTitle("Pre-Trip Inspection")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        onSave(TripInspection(
-                            id: UUID(),
-                            preInspection: [:], postInspection: [:], preInspectionNote: " " , postInspectionNote: ""
-                        ))
+                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
+                        onSave([:], "") // Pass empty dictionary to indicate cancellation
                         dismiss()
                     }
                     .foregroundColor(.primaryGradientStart)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        let inspection = TripInspection(
-                            id: UUID(),
-                            preInspection: inspectionItems,
-                            postInspection: [:],
-                            preInspectionNote: preTripNote, postInspectionNote: ""
-                        )
-                        onSave(inspection)
+                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(preTripNote)")
+                        
+                        onSave(inspectionItems, preTripNote) // Pass current state
                         dismiss()
                     }
                     .disabled(!isAnyItemChecked)
@@ -389,14 +418,17 @@ struct PreTripInspectionChecklistView: View {
     }
 }
 
+
+
+
 // Update PostTripInspectionChecklistView initialization
 struct PostTripInspectionChecklistView: View {
     let trip: Trip
     @Environment(\.dismiss) private var dismiss
-    let onSave: (TripInspection) -> Void
+    let onSave: ([TripInspectionItem: Bool], String) -> Void
     
     @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
-        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }  // Initialize all as false
+        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
     )
     @State private var postTripNote: String = ""
     
@@ -404,16 +436,40 @@ struct PostTripInspectionChecklistView: View {
         inspectionItems.values.contains(true)
     }
     
+    @State private var allGood: Bool = false
+    
     var body: some View {
         NavigationView {
             List {
+                Section {
+                    CheckboxView(
+                        title: "All Good",
+                        isChecked: Binding(
+                            get: { allGood },
+                            set: { newValue in
+                                allGood = newValue
+                                // Update all items when "All Good" is toggled
+                                for item in TripInspectionItem.allCases {
+                                    inspectionItems[item] = newValue
+                                }
+                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
+                            }
+                        )
+                    )
+                }
+                
                 Section(header: Text("Post-Trip Inspection Checklist")) {
                     ForEach(TripInspectionItem.allCases, id: \.self) { item in
                         CheckboxView(
                             title: item.rawValue,
                             isChecked: Binding(
-                                get: { inspectionItems[item] ?? true },
-                                set: { inspectionItems[item] = $0 }
+                                get: { inspectionItems[item] ?? false },
+                                set: { newValue in
+                                    inspectionItems[item] = newValue
+                                    // Recalculate allGood based on all items
+                                    allGood = inspectionItems.values.allSatisfy { $0 }
+                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
+                                }
                             )
                         )
                     }
@@ -433,26 +489,25 @@ struct PostTripInspectionChecklistView: View {
                             },
                             alignment: .topLeading
                         )
+                        .onChange(of: postTripNote) { newValue in
+                            print("Post-Trip Note updated: \(newValue)")
+                        }
                 }
             }
             .navigationTitle("Post-Trip Inspection")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
+                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
+                        onSave([:], "") // Pass empty dictionary to indicate cancellation
                         dismiss()
                     }
                     .foregroundColor(.primaryGradientStart)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        let inspection = TripInspection(
-                            id: UUID(),
-                            preInspection: [:],
-                            postInspection: inspectionItems,
-                            preInspectionNote: "",
-                            postInspectionNote: postTripNote
-                        )
-                        onSave(inspection)
+                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(postTripNote)")
+                        onSave(inspectionItems, postTripNote) // Pass current state
                         dismiss()
                     }
                     .disabled(!isAnyItemChecked)
@@ -462,4 +517,3 @@ struct PostTripInspectionChecklistView: View {
         }
     }
 }
-

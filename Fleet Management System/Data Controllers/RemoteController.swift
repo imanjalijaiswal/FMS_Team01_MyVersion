@@ -27,37 +27,65 @@ class RemoteController: DatabaseAPIIntegrable {
     }
     
     func getTripInspectionForTrip(by id: UUID) async throws -> TripInspection {
-        return try await client
+        struct TripInspectionResponse: Codable {
+            let id: UUID
+            let preInspection: [String: Bool]
+            let postInspection: [String: Bool]
+            let preInspectionNote: String
+            let postInspectionNote: String
+        }
+        
+        let inspection: TripInspectionResponse = try await client
             .rpc("get_trip_inspection_for_trip_id", params: ["p_id": id.uuidString])
             .execute().value
+        
+        let preInspection = Dictionary(uniqueKeysWithValues: inspection.preInspection.compactMap { key, value in
+            TripInspectionItem(rawValue: key).map { ($0, value) }
+        })
+
+        let postInspection = Dictionary(uniqueKeysWithValues: inspection.postInspection.compactMap { key, value in
+            TripInspectionItem(rawValue: key).map { ($0, value) }
+        })
+
+        return TripInspection(
+            id: inspection.id,
+            preInspection: preInspection,
+            postInspection: postInspection,
+            preInspectionNote: inspection.preInspectionNote,
+            postInspectionNote: inspection.postInspectionNote
+        )
     }
     
     func addPreTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
         struct PreInspectionParams: Codable {
             let p_id: String
-            let p_pre_trip_inspection: [TripInspectionItem: Bool]
+            let p_pre_trip_inspection: [String: Bool]
             let p_note: String
         }
         
-        let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspection, p_note: note)
-        
+        let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+
+        let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspectionDictionary, p_note: note)
+
         try await client
             .rpc("add_pre_trip_inspection_for_trip_id", params: params)
-            .execute().value
+            .execute()
     }
     
     func addPostTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
         struct PostInspectionParams: Codable {
             let p_id: String
-            let p_post_trip_inspection: [TripInspectionItem: Bool]
+            let p_post_trip_inspection: [String: Bool]
             let p_note: String
         }
         
-        let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspection, p_note: note)
-        
+        let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+
+        let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspectionDictionary, p_note: note)
+
         try await client
             .rpc("add_post_trip_inspection_for_trip_id", params: params)
-            .execute().value
+            .execute()
     }
     
     func updateTripStatus(by id: UUID, to newStatus: TripStatus) async throws {
