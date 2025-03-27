@@ -29,7 +29,8 @@ class SearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegat
         completer = MKLocalSearchCompleter()
         super.init()
         completer.delegate = self
-        completer.resultTypes = .address
+        completer.resultTypes = [.pointOfInterest, .address, .query]
+        completer.pointOfInterestFilter = .includingAll
     }
     
     func search(with query: String) {
