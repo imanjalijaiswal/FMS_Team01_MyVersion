@@ -12,36 +12,39 @@ struct ForgotPasswordView: View {
             ZStack {
                 Color.white.ignoresSafeArea()
                 
-                VStack(spacing: 20) {
-                    // Title and subtitle
-                    Text(stepTitle)
-                        .font(.title)
-                        .fontWeight(.bold)
-                    
-                    Text(stepSubtitle)
-                        .font(.body)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    // Current step content
-                    Group {
-                        switch viewModel.currentStep {
-                        case .emailEntry:
-                            emailEntryView
-                        case .otpVerification:
-                            otpVerificationView
-                        case .newPasswordEntry:
-                            newPasswordView
-                        case .completed:
-                            completedView
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Title and subtitle
+                        Text(stepTitle)
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        Text(stepSubtitle)
+                            .font(.body)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        // Current step content
+                        Group {
+                            switch viewModel.currentStep {
+                            case .emailEntry:
+                                emailEntryView
+                            case .otpVerification:
+                                otpVerificationView
+                            case .newPasswordEntry:
+                                newPasswordView
+                            case .completed:
+                                completedView
+                            }
                         }
+                        
+                        Spacer(minLength: 30)
                     }
-                    
-                    Spacer()
+                    .padding(.top, 40)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
                 }
-                .padding(.top, 40)
-                .padding(.horizontal)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -152,6 +155,13 @@ struct ForgotPasswordView: View {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.footnote)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -222,6 +232,13 @@ struct ForgotPasswordView: View {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.footnote)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -361,6 +378,20 @@ struct ForgotPasswordView: View {
                 .padding(.top, 5)
             }
             
+            // Show error message if exists
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.footnote)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
             // Update Password Button
             Button(action: updatePassword) {
                 if isLoading {
@@ -377,13 +408,6 @@ struct ForgotPasswordView: View {
             .background(isLoading || !viewModel.isPasswordValid ? Color.gray.opacity(0.5) : Color.primaryGradientStart)
             .cornerRadius(12)
             .disabled(isLoading || !viewModel.isPasswordValid)
-            
-            if let errorMessage = errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.footnote)
-                    .multilineTextAlignment(.center)
-            }
         }
     }
     
