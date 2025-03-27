@@ -236,25 +236,60 @@ class AuthManager{
         UserDefaults.standard.removeObject(forKey: activeFleetManagerKey)
     }
 
+    // Explicitly attempt to restore the fleet manager's session
+    func restoreFleetManagerSession() async throws -> AppUser? {
+        // Check if we have a stored fleet manager ID
+        guard let fleetManagerID = getActiveFleetManagerID() else {
+            return nil
+        }
+        
+        // Try to get the user by the stored ID
+        do {
+            let role = try await getUserRole(userId: fleetManagerID.uuidString)
+            if role == .fleetManager {
+                let appUser = try await getAppUser(byType: role, id: fleetManagerID)
+                currentUser = appUser
+                return appUser
+            }
+        } catch {
+            print("Could not restore fleet manager session: \(error)")
+        }
+        
+        return nil
+    }
+    
     func getCurrentSession() async throws -> AppUser? {
         do {
-            // Check if we have a stored fleet manager ID
-            if let fleetManagerID = getActiveFleetManagerID() {
-                // Try to get the user by the stored ID
-                do {
-                    let role = try await getUserRole(userId: fleetManagerID.uuidString)
-                    let appUser = try await getAppUser(byType: role, id: fleetManagerID)
-                    currentUser = appUser
-                    return appUser
-                } catch {
-                    print("Could not restore fleet manager session: \(error)")
-                    // If we couldn't load the fleet manager, continue with normal flow
+            // First try to get the current session
+            let session: Session
+            
+            do {
+                session = try await client.auth.session
+            } catch {
+                // If we can't get a session, try to restore the fleet manager session
+                print("No active session found: \(error)")
+                
+                // Try to restore the fleet manager session
+                if let fleetManager = try await restoreFleetManagerSession() {
+                    return fleetManager
                 }
+                
+                return nil
             }
             
-            // Try to get the current session
-            let session = try await client.auth.session
             let userId = session.user.id
+            
+            // Check if the user's token is valid
+            let currentTime = Date()
+            if session.expiresAt > 0 {
+                let expirationDate = Date(timeIntervalSince1970: session.expiresAt)
+                if currentTime >= expirationDate {
+                    // Token has expired, force sign out
+                    print("Session expired, signing out")
+                    try await signOut()
+                    return nil
+                }
+            }
             
             // If 2FA is not required or has been completed, return the user
             if !AuthManager.is2FAEnabled || is2FACompleted {
@@ -275,6 +310,8 @@ class AuthManager{
             }
         } catch {
             print("Error in getCurrentSession: \(error)")
+            // Make sure to sign out to clear any partial state
+            try? await signOut()
             return nil
         }
     }
@@ -284,11 +321,12 @@ class AuthManager{
         try await client.auth.signOut()
         is2FACompleted = false
         currentUser = nil  // Clear current user
+        
         // Clear 2FA completion status in UserDefaults
         UserDefaults.standard.set(false, forKey: twoFACompletedKey)
         
-        // DON'T clear the active fleet manager when signing out
-        // This allows the fleet manager to remain the primary user
+        // Clear the active fleet manager when signing out to prevent auto-relogin
+        clearActiveFleetManager()
         
         // Clear the firstTimeLogin cache to ensure fresh state on next login
         firstTimeLoginCache.removeAll()
