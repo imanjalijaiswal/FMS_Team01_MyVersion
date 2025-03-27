@@ -230,15 +230,38 @@ struct VehicleDetailView: View {
             }
         }
     }
-    
 }
 
 struct VehiclesView: View {
     @StateObject private var viewModel = IFEDataController.shared
     @State private var searchText = ""
-    @State private var selectedFilter = "All"
-    let filters = ["All", VehicleStatus.available.rawValue, VehicleStatus.assigned.rawValue, VehicleStatus.inactive.rawValue]
+    @State private var selectedFilter = ""
     @State private var showingAddVehicle = false
+    
+    private var availableCount: Int {
+        viewModel.vehicles.filter { $0.status == .available && $0.activeStatus }.count
+    }
+    
+    private var assignedCount: Int {
+        viewModel.vehicles.filter { $0.status == .assigned }.count
+    }
+    
+    private var inactiveCount: Int {
+        viewModel.vehicles.filter { !$0.activeStatus }.count
+    }
+    
+    private var allCount: Int {
+        viewModel.vehicles.count
+    }
+    
+    private var filtersWithCount: [String] {
+        [
+            "All (\(allCount))",
+            "\(VehicleStatus.available.rawValue) (\(availableCount))",
+            "\(VehicleStatus.assigned.rawValue) (\(assignedCount))",
+            "Inactive (\(inactiveCount))"
+        ]
+    }
     
     var filteredVehicles: [Vehicle] {
         let searchResults = viewModel.vehicles.filter { vehicle in
@@ -248,11 +271,11 @@ struct VehiclesView: View {
         }
         
         switch selectedFilter {
-        case VehicleStatus.available.rawValue:
+        case _ where selectedFilter.contains(VehicleStatus.available.rawValue):
             return searchResults.filter { $0.status == .available && $0.activeStatus }
-        case VehicleStatus.assigned.rawValue:
+        case _ where selectedFilter.contains(VehicleStatus.assigned.rawValue):
             return searchResults.filter { $0.status == .assigned }
-        case VehicleStatus.inactive.rawValue:
+        case _ where selectedFilter.contains("Inactive"):
             return searchResults.filter { !$0.activeStatus }
         default:
             return searchResults.filter { _ in true }
@@ -266,7 +289,7 @@ struct VehiclesView: View {
             
             FilterSection(
                 title: "",
-                filters: filters,
+                filters: filtersWithCount,
                 selectedFilter: $selectedFilter
             )
             
@@ -293,6 +316,11 @@ struct VehiclesView: View {
         }
         .sheet(isPresented: $showingAddVehicle) {
             VehicleDetailsView(viewModel: viewModel)
+        }
+        .onAppear {
+            if selectedFilter.isEmpty {
+                selectedFilter = filtersWithCount[0]
+            }
         }
     }
 }
