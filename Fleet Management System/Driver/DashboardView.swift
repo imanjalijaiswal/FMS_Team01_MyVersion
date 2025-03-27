@@ -85,7 +85,7 @@ struct DashboardView: View {
                 .padding()
             }
             .background(Color(red: 242/255, green: 242/255, blue: 247/255))
-            .navigationTitle("Hello, \(user!.meta_data.fullName.split(separator: " ").first ?? "")")// Empty title to prevent double title
+            .navigationTitle("Driver")// Empty title to prevent double title
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     //                    Button(action: {

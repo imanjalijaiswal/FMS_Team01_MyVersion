@@ -1,35 +1,117 @@
-
 import SwiftUI
+import Foundation
+
 
 struct TripOverviewView: View {
     let task: Trip
     @Environment(\.dismiss) private var dismiss
     
+    @State private var showingPreTripInspection = false
+    @State private var showingPostTripInspection = false
+    @State private var hasCompletedPreInspection = false
+    @State private var hasCompletedPostInspection = false
+    @State private var showPreInspectionAlert = false
+    @State private var showPostInspectionAlert = false
+    @State private var requiresMaintenance = false
+    
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 10) {
-                    TripStatusCard(task: task)
-                    VehicleDetailsCard(task: task)
-                    LocationsCard(task: task)
-                    StartTripButton(task: task)
-                }
-                .padding()
+                contentView
             }
             .background(Color.cardBackground)
             .navigationTitle("Trip Overview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
-                        Text("Cancel")
-                            .font(.subheadline)
-                            .foregroundColor(.primaryGradientStart)
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button(action: { dismiss() }) {
+                                Text("Cancel")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primaryGradientStart)
+                            }
+                        }
                     }
+            .sheet(isPresented: $showingPreTripInspection, onDismiss: {
+                if !hasCompletedPreInspection {
+                    showPreInspectionAlert = true
                 }
+            }) {
+                preTripInspectionSheet
+            }
+            .sheet(isPresented: $showingPostTripInspection, onDismiss: {
+                if !hasCompletedPostInspection {
+                    showPostInspectionAlert = true
+                }
+            }) {
+                postTripInspectionSheet
+            }
+            .alert("Inspection Required", isPresented: $showPreInspectionAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You cannot start journey without filling Pre-Trip Inspection list")
+            }
+            .alert("Inspection Required", isPresented: $showPostInspectionAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You cannot end journey without filling Post-Trip Inspection list")
+            }
+        }
+        .task {
+            // Replace onAppear with task modifier for async operations
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id) {
+                hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                hasCompletedPostInspection = !inspection.postInspection.isEmpty
+                requiresMaintenance = inspection.preInspection.values.contains(false)
             }
         }
     }
+    
+    private var contentView: some View {
+        VStack(spacing: 10) {
+            TripStatusCard(task: task)
+            VehicleDetailsCard(task: task)
+            LocationsCard(task: task)
+            StartTripButton(task: task,isInspectionCompleted: hasCompletedPreInspection,requiresMaintenance: requiresMaintenance,showInspection: $showingPreTripInspection)
+            EndTripButton(task: task, isInspectionCompleted: hasCompletedPostInspection, showInspection: $showingPostTripInspection)
+        }
+        .padding()
+    }
+    
+    private var leadingToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button(action: { dismiss() }) {
+                Text("Cancel")
+                    .font(.subheadline)
+                    .foregroundColor(.primaryGradientStart)
+            }
+        }
+    }
+    
+    
+    private var preTripInspectionSheet: some View {
+        PreTripInspectionChecklistView(trip: task) { inspectionItems, note in
+            let hasAnyFailure = inspectionItems.values.contains(false)
+            hasCompletedPreInspection = !inspectionItems.isEmpty
+            requiresMaintenance = hasAnyFailure
+            IFEDataController.shared.addPreTripInspectionForTrip(
+                by: task.id,
+                inspection: inspectionItems,
+                note: note
+            )
+        }
+    }
+    
+    private var postTripInspectionSheet: some View {
+        PostTripInspectionChecklistView(trip: task) { inspectionItems, note in
+            hasCompletedPostInspection = !inspectionItems.isEmpty
+            IFEDataController.shared.addPostTripInspectionForTrip(
+                by: task.id,
+                inspection: inspectionItems,
+                note: note
+            )
+        }
+    }
+    
 }
 
 // Sub-view for Trip Status
@@ -144,43 +226,304 @@ struct LocationsCard: View {
     }
 }
 
-// Sub-view for Start Trip Button
+
+
 struct StartTripButton: View {
     let task: Trip
+    let isInspectionCompleted: Bool
+    let requiresMaintenance: Bool // New parameter
+    @Binding var showInspection: Bool
+    @State private var showCancelAlert = false
     
     var body: some View {
         if task.status == .scheduled {
-//            Button(action: {
-//                // Start trip action will be implemented later
-//            }) {
-//                Text("Start Trip")
-//                    .font(.headline)
-//                    .foregroundColor(.white)
-//                    .frame(maxWidth: .infinity)
-//                    .padding()
-//                    .background(Color.primaryGradientStart)
-//                    .cornerRadius(12)
-//            }
-//            .padding(.top)
+            VStack {
+                if requiresMaintenance {
+                    Text("You Cannot Start Trip As Vehicle is Lined Up for Maintenance")
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(12)
+                } else {
+                    Button(action: {
+                        if !isInspectionCompleted {
+                            showInspection = true
+                        } else {
+                            // Start trip action will be implemented later
+                        }
+                    }) {
+                        Text(isInspectionCompleted ? "Start Trip" : "Pre-Trip Inspection")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(isInspectionCompleted ? Color.primaryGradientStart : Color.primaryGradientStart)
+                            .cornerRadius(12)
+                    }
+                    .alert("Inspection Required", isPresented: $showCancelAlert) {
+                        Button("OK", role: .cancel) { }
+                    } message: {
+                        Text("You cannot start journey without filling Pre-Trip Inspection list")
+                    }
+                }
+            }
+            .padding(.top)
         }
     }
 }
 
-#Preview {
-    TripOverviewView(task: Trip(
-        id: UUID(),
-        tripID: 1,
-        assignedByFleetManagerID: UUID(),
-        assignedDriverIDs: [UUID()],
-        assignedVehicleID: 1,
-        pickupLocation: "Bhiwandi Logistics Park, Mumbai-Nashik Highway, Maharashtra",
-        destination: "Attibele Industrial Area, Hosur Road, Bangalore",
-        estimatedArrivalDateTime: Date().addingTimeInterval(14*3600),
-        totalDistance: 985,
-        totalTripDuration: Date().addingTimeInterval(14*3600),
-        description: "Electronics, 2500 kg",
-        scheduledDateTime: Date(),
-        createdAt: Date(),
-        status: .scheduled
-    ))
+struct EndTripButton: View {
+    let task: Trip
+    let isInspectionCompleted: Bool
+    @Binding var showInspection: Bool
+    @State private var showCancelAlert = false
+    
+    var body: some View {
+        if task.status == .inProgress {
+            Button(action: {
+                if !isInspectionCompleted {
+                    showInspection = true
+                } else {
+                    // End trip action will be implemented later
+                }
+            }) {
+                Text(isInspectionCompleted ? "End Trip" : "Post-Trip Inspection")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isInspectionCompleted ? Color.primaryGradientStart : Color.primaryGradientStart)
+                    .cornerRadius(12)
+            }
+            .padding(.top)
+            .alert("Inspection Required", isPresented: $showCancelAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You cannot end journey without filling Post-Trip Inspection list")
+            }
+        }
+    }
+}
+
+
+// Add this custom checkbox view before the inspection views
+struct CheckboxView: View {
+    let title: String
+    @Binding var isChecked: Bool
+    
+    var body: some View {
+        Button(action: {
+            isChecked.toggle()
+        }) {
+            HStack {
+                Text(title)
+                    .foregroundColor(.primary)
+                Spacer()
+                Image(systemName: isChecked ? "checkmark.square.fill" : "xmark.square.fill")
+                    .foregroundColor(isChecked ? .primaryGradientStart : .red)
+            }
+            .contentShape(Rectangle())
+        }
+    }
+}
+                  
+
+
+struct PreTripInspectionChecklistView: View {
+    let trip: Trip
+    @Environment(\.dismiss) private var dismiss
+    let onSave: ([TripInspectionItem: Bool], String) -> Void
+
+    @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
+        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
+    )
+    @State private var preTripNote: String = ""
+    
+    private var isAnyItemChecked: Bool {
+        inspectionItems.values.contains(true)
+    }
+    
+    @State private var allGood: Bool = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    CheckboxView(
+                        title: "All Good",
+                        isChecked: Binding(
+                            get: { allGood },
+                            set: { newValue in
+                                allGood = newValue
+                                // Update all items when "All Good" is toggled
+                                for item in TripInspectionItem.allCases {
+                                    inspectionItems[item] = newValue
+                                }
+                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
+                            }
+                        )
+                    )
+                }
+                
+                Section(header: Text("Pre-Trip Inspection Checklist")) {
+                    ForEach(TripInspectionItem.allCases, id: \.self) { item in
+                        CheckboxView(
+                            title: item.rawValue,
+                            isChecked: Binding(
+                                get: { inspectionItems[item] ?? false },
+                                set: { newValue in
+                                    inspectionItems[item] = newValue
+                                    // Recalculate allGood based on all items
+                                    allGood = inspectionItems.values.allSatisfy { $0 }
+                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
+                                }
+                            )
+                        )
+                    }
+                }
+                
+                Section(header: Text("Description (Optional)")) {
+                    TextEditor(text: $preTripNote)
+                        .frame(minHeight: 100)
+                        .overlay(
+                            Group {
+                                if preTripNote.isEmpty {
+                                    Text("Enter the issue in vehicle")
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 8)
+                                }
+                            },
+                            alignment: .topLeading
+                        )
+                        .onChange(of: preTripNote) { newValue in
+                            print("Pre-Trip Note updated: \(newValue)")
+                        }
+                }
+            }
+            .navigationTitle("Pre-Trip Inspection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
+                        onSave([:], "") // Pass empty dictionary to indicate cancellation
+                        dismiss()
+                    }
+                    .foregroundColor(.primaryGradientStart)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(preTripNote)")
+                        
+                        onSave(inspectionItems, preTripNote) // Pass current state
+                        dismiss()
+                    }
+                    .disabled(!isAnyItemChecked)
+                    .foregroundColor(isAnyItemChecked ? .primaryGradientStart : .gray)
+                }
+            }
+        }
+    }
+}
+
+
+
+
+// Update PostTripInspectionChecklistView initialization
+struct PostTripInspectionChecklistView: View {
+    let trip: Trip
+    @Environment(\.dismiss) private var dismiss
+    let onSave: ([TripInspectionItem: Bool], String) -> Void
+    
+    @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
+        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
+    )
+    @State private var postTripNote: String = ""
+    
+    private var isAnyItemChecked: Bool {
+        inspectionItems.values.contains(true)
+    }
+    
+    @State private var allGood: Bool = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    CheckboxView(
+                        title: "All Good",
+                        isChecked: Binding(
+                            get: { allGood },
+                            set: { newValue in
+                                allGood = newValue
+                                // Update all items when "All Good" is toggled
+                                for item in TripInspectionItem.allCases {
+                                    inspectionItems[item] = newValue
+                                }
+                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
+                            }
+                        )
+                    )
+                }
+                
+                Section(header: Text("Post-Trip Inspection Checklist")) {
+                    ForEach(TripInspectionItem.allCases, id: \.self) { item in
+                        CheckboxView(
+                            title: item.rawValue,
+                            isChecked: Binding(
+                                get: { inspectionItems[item] ?? false },
+                                set: { newValue in
+                                    inspectionItems[item] = newValue
+                                    // Recalculate allGood based on all items
+                                    allGood = inspectionItems.values.allSatisfy { $0 }
+                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
+                                }
+                            )
+                        )
+                    }
+                }
+                
+                Section(header: Text("Description (Optional)")) {
+                    TextEditor(text: $postTripNote)
+                        .frame(minHeight: 100)
+                        .overlay(
+                            Group {
+                                if postTripNote.isEmpty {
+                                    Text("Enter the issue in vehicle")
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 8)
+                                }
+                            },
+                            alignment: .topLeading
+                        )
+                        .onChange(of: postTripNote) { newValue in
+                            print("Post-Trip Note updated: \(newValue)")
+                        }
+                }
+            }
+            .navigationTitle("Post-Trip Inspection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
+                        onSave([:], "") // Pass empty dictionary to indicate cancellation
+                        dismiss()
+                    }
+                    .foregroundColor(.primaryGradientStart)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(postTripNote)")
+                        onSave(inspectionItems, postTripNote) // Pass current state
+                        dismiss()
+                    }
+                    .disabled(!isAnyItemChecked)
+                    .foregroundColor(isAnyItemChecked ? .primaryGradientStart : .gray)
+                }
+            }
+        }
+    }
 }
