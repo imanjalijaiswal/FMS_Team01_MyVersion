@@ -45,13 +45,13 @@ enum TripStatus: String, Codable {
 
 struct TripInspection: Codable, Equatable, Identifiable {
     var id: UUID
-    var tripUUID: UUID
     var preInspection: [TripInspectionItem: Bool]
     var postInspection: [TripInspectionItem: Bool]
-    var note: String
+    var preInspectionNote: String
+    var postInspectionNote: String
 }
 
-enum TripInspectionItem: String, Codable , CaseIterable{
+enum TripInspectionItem: String, Codable, CaseIterable{
     case tireCondition = "Tire Condition"
     case brakeSystem = "Brake System"
     case lights = "Lights"

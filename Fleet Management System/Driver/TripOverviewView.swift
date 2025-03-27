@@ -63,7 +63,6 @@ struct TripOverviewView: View {
             TripStatusCard(task: task)
             VehicleDetailsCard(task: task)
             LocationsCard(task: task)
-//            StartTripButton(task: task, isInspectionCompleted: hasCompletedPreInspection, showInspection: $showingPreTripInspection)
             StartTripButton(task: task,isInspectionCompleted: hasCompletedPreInspection,requiresMaintenance: requiresMaintenance,showInspection: $showingPreTripInspection)
             EndTripButton(task: task, isInspectionCompleted: hasCompletedPostInspection, showInspection: $showingPostTripInspection)
         }
@@ -322,7 +321,7 @@ struct PreTripInspectionChecklistView: View {
     @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
         uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
     )
-    @State private var notes: String = ""
+    @State private var preTripNote: String = ""
     
     private var isAnyItemChecked: Bool {
         inspectionItems.values.contains(true)
@@ -344,11 +343,11 @@ struct PreTripInspectionChecklistView: View {
                 }
                 
                 Section(header: Text("Description (Optional)")) {
-                    TextEditor(text: $notes)
+                    TextEditor(text: $preTripNote)
                         .frame(minHeight: 100)
                         .overlay(
                             Group {
-                                if notes.isEmpty {
+                                if preTripNote.isEmpty {
                                     Text("Enter the issue in vehicle")
                                         .foregroundColor(.gray)
                                         .padding(.horizontal, 4)
@@ -365,10 +364,7 @@ struct PreTripInspectionChecklistView: View {
                     Button("Cancel") {
                         onSave(TripInspection(
                             id: UUID(),
-                            tripUUID: trip.id,
-                            preInspection: [:],
-                            postInspection: [:],
-                            note: ""
+                            preInspection: [:], postInspection: [:], preInspectionNote: " " , postInspectionNote: ""
                         ))
                         dismiss()
                     }
@@ -378,10 +374,9 @@ struct PreTripInspectionChecklistView: View {
                     Button("Save") {
                         let inspection = TripInspection(
                             id: UUID(),
-                            tripUUID: trip.id,
                             preInspection: inspectionItems,
                             postInspection: [:],
-                            note: notes
+                            preInspectionNote: preTripNote, postInspectionNote: ""
                         )
                         onSave(inspection)
                         dismiss()
@@ -403,7 +398,7 @@ struct PostTripInspectionChecklistView: View {
     @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
         uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }  // Initialize all as false
     )
-    @State private var notes: String = ""
+    @State private var postTripNote: String = ""
     
     private var isAnyItemChecked: Bool {
         inspectionItems.values.contains(true)
@@ -425,11 +420,11 @@ struct PostTripInspectionChecklistView: View {
                 }
                 
                 Section(header: Text("Description (Optional)")) {
-                    TextEditor(text: $notes)
+                    TextEditor(text: $postTripNote)
                         .frame(minHeight: 100)
                         .overlay(
                             Group {
-                                if notes.isEmpty {
+                                if postTripNote.isEmpty {
                                     Text("Enter the issue in vehicle")
                                         .foregroundColor(.gray)
                                         .padding(.horizontal, 4)
@@ -452,10 +447,10 @@ struct PostTripInspectionChecklistView: View {
                     Button("Save") {
                         let inspection = TripInspection(
                             id: UUID(),
-                            tripUUID: trip.id,
                             preInspection: [:],
                             postInspection: inspectionItems,
-                            note: ""
+                            preInspectionNote: "",
+                            postInspectionNote: postTripNote
                         )
                         onSave(inspection)
                         dismiss()
