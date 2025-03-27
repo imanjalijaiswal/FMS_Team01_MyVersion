@@ -21,6 +21,36 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func addNewMaintenancePersonnelMetaData(by id: UUID, phoneNumber: String, fullName: String, employeeID: Int) async throws -> MaintenancePersonnel {
+        struct AddDriverParams: Encodable {
+            let p_id: UUID
+            let p_phone: String
+            let p_display_name: String
+            let p_employee_id: Int
+            let p_created_at: String
+        }
+        
+        let params = AddDriverParams(p_id: id, p_phone: phoneNumber, p_display_name: fullName,
+                                     p_employee_id: employeeID,
+                                     p_created_at: ISO8601DateFormatter().string(from: .now))
+        
+        let personnel: MaintenancePersonnel = try await client
+            .rpc("add_new_maintenance_personnel", params: params).execute().value
+        
+        return personnel
+    }
+    
+    func getRegisteredMaintenancePersonnels() async throws -> [MaintenancePersonnel] {
+        return try await client
+            .rpc("get_registered_maintenance_personnels").execute().value
+    }
+    
+    func getRegisteredMaintenancePersonnel(by id: UUID) async throws -> MaintenancePersonnel {
+        return try await client
+            .rpc("get_maintenance_personnel_data_by_id", params: ["p_id": id.uuidString])
+            .execute().value
+    }
+    
     func getUserMetaData(by id: UUID) async throws -> UserMetaData {
         return try await client
             .rpc("get_user_meta_data_for_id", params: ["p_id": id.uuidString])
@@ -33,19 +63,45 @@ class RemoteController: DatabaseAPIIntegrable {
     }
     
     func getTripInspectionForTrip(by id: UUID) async throws -> TripInspection {
-        return try await client
+        struct TripInspectionResponse: Codable {
+            let id: UUID
+            let preInspection: [String: Bool]
+            let postInspection: [String: Bool]
+            let preInspectionNote: String
+            let postInspectionNote: String
+        }
+        
+        let inspection: TripInspectionResponse = try await client
             .rpc("get_trip_inspection_for_trip_id", params: ["p_id": id.uuidString])
             .execute().value
+        
+        let preInspection = Dictionary(uniqueKeysWithValues: inspection.preInspection.compactMap { key, value in
+            TripInspectionItem(rawValue: key).map { ($0, value) }
+        })
+        
+        let postInspection = Dictionary(uniqueKeysWithValues: inspection.postInspection.compactMap { key, value in
+            TripInspectionItem(rawValue: key).map { ($0, value) }
+        })
+        
+        return TripInspection(
+            id: inspection.id,
+            preInspection: preInspection,
+            postInspection: postInspection,
+            preInspectionNote: inspection.preInspectionNote,
+            postInspectionNote: inspection.postInspectionNote
+        )
     }
     
     func addPreTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
         struct PreInspectionParams: Codable {
             let p_id: String
-            let p_pre_trip_inspection: [TripInspectionItem: Bool]
+            let p_pre_trip_inspection: [String: Bool]
             let p_note: String
         }
         
-        let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspection, p_note: note)
+        let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+        
+        let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspectionDictionary, p_note: note)
         
         try await client
             .rpc("add_pre_trip_inspection_for_trip_id", params: params)
@@ -55,11 +111,13 @@ class RemoteController: DatabaseAPIIntegrable {
     func addPostTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
         struct PostInspectionParams: Codable {
             let p_id: String
-            let p_post_trip_inspection: [TripInspectionItem: Bool]
+            let p_post_trip_inspection: [String: Bool]
             let p_note: String
         }
         
-        let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspection, p_note: note)
+        let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+        
+        let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspectionDictionary, p_note: note)
         
         try await client
             .rpc("add_post_trip_inspection_for_trip_id", params: params)
@@ -110,6 +168,25 @@ class RemoteController: DatabaseAPIIntegrable {
     }
     
     func createNewDriver(_ email: String, password: String) async throws -> UUID {
+        // Store the current session before creating a new driver
+        let currentSession = try? await client.auth.session
+        
+        // Create the new driver account
+        let authResponse = try await client.auth.signUp(email: email, password: password)
+        
+        // Extract the new driver's user ID
+        let userId = authResponse.user.id
+        
+        // If we had a session before and the new user creation changed it, restore it
+        if let session = currentSession, try await client.auth.session.user.id != session.user.id {
+            // Re-authenticate with the stored session token to restore the fleet manager's session
+            try await client.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+        }
+        
+        return userId
+    }
+    
+    func createNewMaintenancePersonnel(_ email: String, password: String) async throws -> UUID {
         // Store the current session before creating a new driver
         let currentSession = try? await client.auth.session
         
@@ -335,13 +412,14 @@ class RemoteController: DatabaseAPIIntegrable {
     
     func getRegisteredVehicles() async throws -> [Vehicle] {
         let response = try await client
-                .rpc("get_regsitered_vehicles")
+                .rpc("get_registered_vehicles")
                 .execute()
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         
         let vehicles = try decoder.decode([Vehicle].self, from: response.data)
+        
         return vehicles
     }
     

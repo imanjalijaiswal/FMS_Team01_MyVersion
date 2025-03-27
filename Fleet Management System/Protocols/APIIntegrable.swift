@@ -15,6 +15,8 @@ protocol DatabaseAPIIntegrable {
     
     func createNewDriver(_ email: String, password: String) async throws -> UUID
     
+    func createNewMaintenancePersonnel(_ email: String, password: String) async throws -> UUID
+    
     func updateUserPhone(by id: UUID, _ phone: String) async throws
     
     func addNewDriverMetaData(by id: UUID,
@@ -22,6 +24,15 @@ protocol DatabaseAPIIntegrable {
                    fullName: String,
                    employeeID: Int,
                    licenseNumber: String) async throws -> Driver
+    
+    func addNewMaintenancePersonnelMetaData(by id: UUID,
+                                            phoneNumber: String,
+                                            fullName: String,
+                                            employeeID: Int) async throws -> MaintenancePersonnel
+    
+    func getRegisteredMaintenancePersonnels() async throws -> [MaintenancePersonnel]
+    
+    func getRegisteredMaintenancePersonnel(by id: UUID) async throws -> MaintenancePersonnel
     
     func updateDriverStatus(by id: UUID, _ newStatus: DriverStatus) async throws
     
@@ -36,6 +47,7 @@ protocol DatabaseAPIIntegrable {
     func getOfflineDrivers() async throws -> [Driver]
     
     func getMaxEmployeeID(ofType type: Role) async throws -> Int
+    
     
     
     //MARK: Vehicle APIs

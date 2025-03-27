@@ -8,6 +8,9 @@
 import Foundation
 import SwiftUI
 
+import PDFKit  // For PDF generation
+
+
 struct MaintenanceView: View {
     @Binding var user: AppUser?
     @Binding var role : Role?
