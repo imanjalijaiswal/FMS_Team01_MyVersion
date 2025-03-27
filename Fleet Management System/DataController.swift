@@ -249,8 +249,6 @@ class IFEDataController: ObservableObject {
                 print("Error assigning the new trip: \(error.localizedDescription)")
             }
         }
-//
-//        try await remoteController.a
     }
     
     func getFilteredTrips(status: TripStatus?) -> [Trip] {
@@ -521,6 +519,31 @@ class IFEDataController: ObservableObject {
             } catch {
                 print("Error while adding post-trip inspection: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    /// Fetches the metadata for a user by their unique identifier.
+    ///
+    /// - Parameter id: The unique identifier (UUID) of the user.
+    /// - Returns: A `UserMetaData` object if the request is successful, otherwise `nil`.
+    /// - Note: This function performs an asynchronous network request.
+    /// - Throws: Prints an error message if fetching metadata fails.
+    ///
+    /// Usage:
+    /// ```swift
+    /// let userMetaData = await getUserMetaData(by: userId)
+    /// if let metaData = userMetaData {
+    ///     print("User metadata fetched: \(metaData)")
+    /// } else {
+    ///     print("Failed to fetch user metadata.")
+    /// }
+    /// ```
+    func getUserMetaData(by id: UUID) async -> UserMetaData? {
+        do {
+            return try await remoteController.getUserMetaData(by: id)
+        } catch {
+            print("Error while fetching user meta data: \(error.localizedDescription)")
+            return nil
         }
     }
 }

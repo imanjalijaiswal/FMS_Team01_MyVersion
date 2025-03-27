@@ -21,6 +21,12 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func getUserMetaData(by id: UUID) async throws -> UserMetaData {
+        return try await client
+            .rpc("get_user_meta_data_for_id", params: ["p_id": id.uuidString])
+            .execute().value
+    }
+    
     func getOfflineDrivers() async throws -> [Driver] {
         return try await client
             .rpc("get_offline_drivers").execute().value

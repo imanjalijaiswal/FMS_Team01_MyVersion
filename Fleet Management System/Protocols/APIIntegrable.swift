@@ -9,6 +9,8 @@ import Foundation
 
 protocol DatabaseAPIIntegrable {
     //MARK: User APIs
+    func getUserMetaData(by id: UUID) async throws -> UserMetaData
+    
     func getFleetManager(by id: UUID) async throws -> FleetManager
     
     func createNewDriver(_ email: String, password: String) async throws -> UUID

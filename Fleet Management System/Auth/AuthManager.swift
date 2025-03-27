@@ -61,6 +61,19 @@ struct Driver: User {
     var id: UUID { meta_data.id }
 }
 
+struct MaintenancePersonnel: User {
+    var meta_data: UserMetaData
+    var totalRepairs: Int
+    
+    var id: UUID { meta_data.id }
+    
+    var activeStatus: Bool { meta_data.activeStatus }
+    
+    var employeeID: Int { meta_data.employeeID }
+    
+    var role: Role { meta_data.role }
+}
+
 struct AppUser: Codable, Equatable, Identifiable {
     var userData: UserSpecificData
 
