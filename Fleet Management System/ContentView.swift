@@ -23,12 +23,12 @@ struct ContentView: View {
                 PasswordResetView(user: $user, isFirstTimeLogin: $isFirstTimeLogin)
             } else if let user = user {
                 switch user.role {
-                case .fleetManager, .maintenancePersonnel:
+                case .fleetManager:
                     FleetManagerView(user: $user, role: $role)
                 case .driver:
                     DriverView(user: $user, role: $role)
-//                case .maintenancePersonal:
-//                    MaintenanceView(user: $user, role: $role)
+                case .maintenancePersonnel:
+                    MaintenanceView(user: $user, role: $role)
                 }
             } else {
                 LoginFormView(user: $user)
