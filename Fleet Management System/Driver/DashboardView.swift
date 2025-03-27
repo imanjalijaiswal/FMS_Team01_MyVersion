@@ -7,6 +7,7 @@ struct DashboardView: View {
     @Binding var role : Role?
     @State private var showingProfile = false
     @State private var selectedFilter: TaskFilter = .assigned
+    @Binding var selectedTab: Int
     //@State private var viewModel.tripsForDriver: [Trip] = []
     
     var filteredTrips: [Trip] {
@@ -35,7 +36,7 @@ struct DashboardView: View {
                         .padding(.horizontal)
                     
                     if let activeTrip = activeTrip {
-                        TaskCard(task: activeTrip)
+                        TaskCard(task: activeTrip, selectedTab: $selectedTab)
                             .padding(.horizontal)
                             .shadow(radius: 2, x: 2, y: 2)
                     } else {
@@ -78,7 +79,7 @@ struct DashboardView: View {
                 // Task list
                 VStack(spacing: 16) {
                     ForEach(filteredTrips, id: \.id) { trip in
-                        TaskCard(task: trip)
+                        TaskCard(task: trip, selectedTab: $selectedTab)
                             .shadow(radius: 2, x: 2, y: 2)
                     }
                 }
@@ -153,6 +154,7 @@ struct TaskCard: View {
     let task: Trip
     @State private var showingTripOverview = false
     @State private var vehicle: Vehicle?
+    @Binding var selectedTab: Int
     var remoteController = RemoteController()
     var statusColor: Color {
         switch task.status {
@@ -235,7 +237,7 @@ struct TaskCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingTripOverview) {
-            TripOverviewView(task: task)
+            TripOverviewView(task: task, selectedTab: $selectedTab)
         }
         .task {
             await fetchVehicle() // Fetch vehicle data when TaskCard appears

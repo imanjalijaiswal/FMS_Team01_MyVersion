@@ -5,7 +5,7 @@ import Foundation
 struct TripOverviewView: View {
     let task: Trip
     @Environment(\.dismiss) private var dismiss
-    
+    @Binding var selectedTab: Int
     @State private var showingPreTripInspection = false
     @State private var showingPostTripInspection = false
     @State private var hasCompletedPreInspection = false
@@ -71,7 +71,7 @@ struct TripOverviewView: View {
             TripStatusCard(task: task)
             VehicleDetailsCard(task: task)
             LocationsCard(task: task)
-            StartTripButton(task: task,isInspectionCompleted: hasCompletedPreInspection,requiresMaintenance: requiresMaintenance,showInspection: $showingPreTripInspection)
+            StartTripButton(task: task,isInspectionCompleted: hasCompletedPreInspection,requiresMaintenance: requiresMaintenance,showInspection: $showingPreTripInspection, selectedTab: $selectedTab)
             EndTripButton(task: task, isInspectionCompleted: hasCompletedPostInspection, showInspection: $showingPostTripInspection)
         }
         .padding()
@@ -229,11 +229,14 @@ struct LocationsCard: View {
 
 
 struct StartTripButton: View {
+    @Environment(\.dismiss) private var dismiss
     let task: Trip
     let isInspectionCompleted: Bool
     let requiresMaintenance: Bool // New parameter
     @Binding var showInspection: Bool
     @State private var showCancelAlert = false
+    @Binding var selectedTab: Int
+    let dataController = IFEDataController.shared
     
     var body: some View {
         if task.status == .scheduled {
@@ -252,6 +255,8 @@ struct StartTripButton: View {
                             showInspection = true
                         } else {
                             // Start trip action will be implemented later
+                            dataController.updateTripStatus(task, to: .inProgress)
+                            selectedTab = 1
                         }
                     }) {
                         Text(isInspectionCompleted ? "Start Trip" : "Pre-Trip Inspection")
@@ -279,6 +284,7 @@ struct EndTripButton: View {
     let isInspectionCompleted: Bool
     @Binding var showInspection: Bool
     @State private var showCancelAlert = false
+    var dataController = IFEDataController.shared
     
     var body: some View {
         if task.status == .inProgress {
@@ -287,6 +293,7 @@ struct EndTripButton: View {
                     showInspection = true
                 } else {
                     // End trip action will be implemented later
+                    dataController.updateTripStatus(task, to: .completed)
                 }
             }) {
                 Text(isInspectionCompleted ? "End Trip" : "Post-Trip Inspection")

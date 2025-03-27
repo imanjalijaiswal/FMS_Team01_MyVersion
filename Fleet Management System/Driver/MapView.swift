@@ -778,7 +778,7 @@ struct MapView: View {
                 } else {
                     EmptyTripCard(selectedTab: $selectedTab)
                         .padding()
-                        .padding(.bottom, tabBarHeight + bottomSafeArea) // Add padding for tab bar
+                        .padding(.bottom, bottomSafeArea) // Add padding for tab bar
                 }
             }
         }
@@ -982,10 +982,10 @@ struct MapViewRepresentable: UIViewRepresentable {
             if let circle = overlay as? MKCircle {
                 let renderer = MKCircleRenderer(circle: circle)
                 if overlay === parent.viewModel.pickupGeofenceOverlay {
-                    renderer.fillColor = UIColor.orange.withAlphaComponent(0.1)
+                    renderer.fillColor = UIColor.orange.withAlphaComponent(0.5)
                     renderer.strokeColor = UIColor.orange.withAlphaComponent(0.8)
                 } else if overlay === parent.viewModel.destinationGeofenceOverlay {
-                    renderer.fillColor = UIColor.green.withAlphaComponent(0.1)
+                    renderer.fillColor = UIColor.green.withAlphaComponent(0.5)
                     renderer.strokeColor = UIColor.green.withAlphaComponent(0.8)
                 }
                 renderer.lineWidth = 2

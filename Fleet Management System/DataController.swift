@@ -166,12 +166,6 @@ class IFEDataController: ObservableObject {
     }
     
 
-    func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) -> Trip{
-        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
-            trips[index].status = newStatus
-        }
-        return trip
-    }
     func addVehicle(_ vehicle: Vehicle) {
         Task {
             do {
