@@ -14,11 +14,6 @@ struct PasswordResetView: View {
     @State private var isLoading = false
     @State private var showSuccess = false
     
-    private var isPasswordValid: Bool {
-        !newPassword.isEmpty && !confirmPassword.isEmpty && 
-        newPassword == confirmPassword && newPassword.count >= 8
-    }
-    
     private var shouldShowPandaEyesOpen: Bool {
         isPasswordVisible || isConfirmPasswordVisible
     }
@@ -59,8 +54,18 @@ struct PasswordResetView: View {
                     HStack {
                         if isPasswordVisible {
                             TextField("Enter new password", text: $newPassword)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .onChange(of: newPassword) { _ in
+                                    viewModel.validatePasswordCriteria(password: newPassword, confirmPassword: confirmPassword)
+                                }
                         } else {
                             SecureField("Enter new password", text: $newPassword)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .onChange(of: newPassword) { _ in
+                                    viewModel.validatePasswordCriteria(password: newPassword, confirmPassword: confirmPassword)
+                                }
                         }
                         
                         Button(action: {
@@ -74,11 +79,35 @@ struct PasswordResetView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
                     
-                    // Password requirements hint
-                    Text("Password must be at least 8 characters")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.leading, 4)
+                    // Password validation criteria feedback
+                    VStack(alignment: .leading, spacing: 5) {
+                        PasswordRequirementRow(
+                            isMet: viewModel.hasMinLength,
+                            text: "At least 8 characters long"
+                        )
+                        
+                        PasswordRequirementRow(
+                            isMet: viewModel.hasLowercase,
+                            text: "Include at least 1 lowercase letter"
+                        )
+                        
+                        PasswordRequirementRow(
+                            isMet: viewModel.hasUppercase,
+                            text: "Include at least 1 uppercase letter"
+                        )
+                        
+                        PasswordRequirementRow(
+                            isMet: viewModel.hasDigit,
+                            text: "Include at least 1 number"
+                        )
+                        
+                        PasswordRequirementRow(
+                            isMet: viewModel.hasSpecialChar,
+                            text: "Include at least 1 special character (!@#$%^&*)"
+                        )
+                    }
+                    .padding(.top, 8)
+                    .padding(.leading, 4)
                 }
                 .padding(.horizontal)
                 
@@ -90,8 +119,18 @@ struct PasswordResetView: View {
                     HStack {
                         if isConfirmPasswordVisible {
                             TextField("Confirm new password", text: $confirmPassword)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .onChange(of: confirmPassword) { _ in
+                                    viewModel.validatePasswordCriteria(password: newPassword, confirmPassword: confirmPassword)
+                                }
                         } else {
                             SecureField("Confirm new password", text: $confirmPassword)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                                .onChange(of: confirmPassword) { _ in
+                                    viewModel.validatePasswordCriteria(password: newPassword, confirmPassword: confirmPassword)
+                                }
                         }
                         
                         Button(action: {
@@ -104,8 +143,31 @@ struct PasswordResetView: View {
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    
+                    // Password match validation
+                    if !confirmPassword.isEmpty {
+                        PasswordRequirementRow(
+                            isMet: viewModel.passwordsMatch,
+                            text: "Passwords match"
+                        )
+                        .padding(.top, 5)
+                        .padding(.leading, 4)
+                    }
                 }
                 .padding(.horizontal)
+                
+                // Password strength feedback
+                if viewModel.isPasswordValid {
+                    HStack {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                        Text("Strong password!")
+                            .foregroundColor(.green)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.top, 5)
+                }
                 
                 // Reset Button
                 Button(action: {
@@ -122,10 +184,10 @@ struct PasswordResetView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(isLoading ? Color.gray : (isPasswordValid ? Color.primaryGradientStart : Color.gray.opacity(0.5)))
+                    .background(isLoading ? Color.gray : (viewModel.isPasswordValid ? Color.primaryGradientStart : Color.gray.opacity(0.5)))
                     .cornerRadius(12)
                 }
-                .disabled(isLoading || !isPasswordValid)
+                .disabled(isLoading || !viewModel.isPasswordValid)
                 .padding(.horizontal)
                 
                 // Show error message if reset fails
@@ -202,24 +264,49 @@ struct PasswordResetView: View {
                 }
             }
         }
+        .onAppear {
+            // Initialize validation on first appearance
+            viewModel.validatePasswordCriteria(password: newPassword, confirmPassword: confirmPassword)
+        }
+    }
+    
+    // Password requirement row
+    private struct PasswordRequirementRow: View {
+        let isMet: Bool
+        let text: String
+        
+        var body: some View {
+            HStack(spacing: 10) {
+                Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isMet ? .green : .gray)
+                
+                Text(text)
+                    .font(.caption)
+                    .foregroundColor(isMet ? .green : .gray)
+            }
+        }
     }
     
     private func resetPassword() {
         hideKeyboard()
         
-        // Validate passwords
-        guard !newPassword.isEmpty, !confirmPassword.isEmpty else {
-            errorMessage = "⚠️ Please enter both passwords."
-            return
-        }
-        
-        guard newPassword.count >= 8 else {
-            errorMessage = "⚠️ Password must be at least 8 characters."
-            return
-        }
-        
-        guard newPassword == confirmPassword else {
-            errorMessage = "⚠️ Passwords do not match."
+        // Only proceed if we have a user and all validation criteria are met
+        guard viewModel.isPasswordValid else {
+            if !viewModel.hasMinLength {
+                errorMessage = "⚠️ Password must be at least 8 characters long."
+            } else if !viewModel.hasLowercase {
+                errorMessage = "⚠️ Include at least 1 lowercase letter."
+            } else if !viewModel.hasUppercase {
+                errorMessage = "⚠️ Include at least 1 uppercase letter."
+            } else if !viewModel.hasDigit {
+                errorMessage = "⚠️ Include at least 1 number."
+            } else if !viewModel.hasSpecialChar {
+                errorMessage = "⚠️ Include at least 1 special character."
+            } else if !viewModel.passwordsMatch {
+                errorMessage = "⚠️ Passwords do not match."
+            } else {
+                errorMessage = "⚠️ Password doesn't meet all requirements."
+            }
             return
         }
         
