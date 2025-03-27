@@ -73,6 +73,20 @@ struct VehicleRowView: View {
                             .background(Color.orange.opacity(0.1))
                             .cornerRadius(8)
                         }
+                        else if vehicle.status == .underMaintenance && vehicle.activeStatus {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.gray)
+                                    .frame(width: 4, height: 4)
+                                Text("Maintenance")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(8)
+                        }
                     }
                 }
                 
@@ -282,6 +296,8 @@ struct VehiclesView: View {
             return searchResults.filter { $0.status == .assigned }
         case _ where selectedFilter.contains("Inactive"):
             return searchResults.filter { !$0.activeStatus }
+        case _ where selectedFilter.contains(VehicleStatus.underMaintenance.rawValue):
+            return searchResults.filter { $0.status == .underMaintenance}
         default:
             return searchResults.filter { _ in true }
         }

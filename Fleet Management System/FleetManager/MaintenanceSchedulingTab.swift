@@ -7,7 +7,7 @@ struct MaintenanceSchedulingView: View {
     @StateObject private var viewModel = IFEDataController.shared
     @State private var maintenanceSchedules: [MaintenanceSchedule] = [
         MaintenanceSchedule(
-            ticketNumber: 1001,
+            taskID: 1001,
             maintenancePersonnel: "John Smith",
             vehiclePlate: "ABC-123",
             vehicleModel: "Toyota Camry",
@@ -15,7 +15,7 @@ struct MaintenanceSchedulingView: View {
             status: "Scheduled"
         ),
         MaintenanceSchedule(
-            ticketNumber: 1002,
+            taskID: 1002,
             maintenancePersonnel: "Mike Johnson",
             vehiclePlate: "XYZ-789",
             vehicleModel: "Honda Civic",
@@ -23,7 +23,7 @@ struct MaintenanceSchedulingView: View {
             status: "In Progress"
         ),
         MaintenanceSchedule(
-            ticketNumber: 1003,
+            taskID: 1003,
             maintenancePersonnel: "Sarah Wilson",
             vehiclePlate: "DEF-456",
             vehicleModel: "Ford F-150",
@@ -108,7 +108,7 @@ struct MaintenanceScheduleCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading) {
-                    Text(String(format:"#%d", schedule.ticketNumber))
+                    Text(String(format:"#%d", schedule.taskID))
                         .font(.subheadline)
                     
                     Text(schedule.maintenancePersonnel)
@@ -293,8 +293,19 @@ struct MaintenanceScheduleFormView: View {
     }
     
     private func handleDoneButton() {
+        
+        // Update vehicle status to under maintenance
+        if let vehicle = selectedVehicle {
+            // Update the local state immediately after calling the update method
+            if let index = viewModel.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                viewModel.vehicles[index].status = .underMaintenance
+            }
+            viewModel.updateVehicleStatus(vehicle, with: .underMaintenance)
+        }
+        
+        
+        // add new schedule to the maintenance schedules list
         let newSchedule = MaintenanceSchedule(
-            
             maintenancePersonnel: "John Smith",
             vehiclePlate: selectedVehicle?.licenseNumber ?? "",
             vehicleModel: selectedVehicle?.model ?? "",
@@ -303,14 +314,13 @@ struct MaintenanceScheduleFormView: View {
         )
         
         onScheduleComplete?(newSchedule)
-        
         showSuccessAlert = true
     }
 }
 
 struct MaintenanceSchedule: Identifiable {
     let id = UUID()
-    var ticketNumber: Int = 0
+    var taskID: Int = 0
     let maintenancePersonnel: String
     let vehiclePlate: String
     let vehicleModel: String
