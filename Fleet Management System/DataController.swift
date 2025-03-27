@@ -395,6 +395,145 @@ class IFEDataController: ObservableObject {
             return nil
         }
     }
+    
+    /// Fetches offline drivers from the remote controller.
+    ///
+    /// This function asynchronously retrieves the list of offline drivers
+    /// and returns them using a completion handler.
+    ///
+    /// - Parameter completion: A closure that receives an optional array of `Driver`.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// getOfflineDrivers { drivers in
+    ///     if let drivers = drivers {
+    ///         print("Fetched offline drivers: \(drivers)")
+    ///     } else {
+    ///         print("Failed to fetch offline drivers.")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Note: This function runs asynchronously using a `Task`, so the callback
+    ///   executes after the network request completes.
+    func getOfflineDrivers(completion: @escaping ([Driver]?) -> Void) {
+        Task {
+            do {
+                let drivers = try await remoteController.getOfflineDrivers()
+                completion(drivers)
+            } catch {
+                print("Error while fetching offline drivers: \(error.localizedDescription)")
+                completion(nil)
+            }
+        }
+    }
+    
+    /// Fetches the trip inspection for a given trip ID.
+    ///
+    /// This function asynchronously retrieves the `TripInspection` record
+    /// associated with a specific trip. If an error occurs, it returns `nil`.
+    ///
+    /// - Parameter id: The unique identifier (`UUID`) of the trip.
+    /// - Returns: An optional `TripInspection` object. Returns `nil` if an error occurs.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// let tripId = UUID()
+    /// Task {
+    ///     if let inspection = await getTripInspectionForTrip(by: tripId) {
+    ///         print("Fetched trip inspection: \(inspection)")
+    ///     } else {
+    ///         print("Failed to fetch trip inspection.")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Note: This function uses `async/await` and should be called within an async context.
+    ///   Any errors encountered are logged but not thrown.
+    func getTripInspectionForTrip(by id: UUID) async -> TripInspection? {
+        do {
+            return try await remoteController.getTripInspectionForTrip(by: id)
+        } catch {
+            print("Error while fetching trip inspection: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Adds a pre-trip inspection for a specific trip.
+    ///
+    /// This function asynchronously sends a pre-trip inspection report for a given trip ID.
+    /// It includes a dictionary of `TripInspectionItem` values mapped to `Bool`
+    /// to indicate whether each inspection item passed or failed.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier (`UUID`) of the trip.
+    ///   - inspection: A dictionary where keys are `TripInspectionItem` (an enum) and
+    ///     values are `Bool`, indicating the status of each inspection item.
+    ///   - note: A `String` containing any additional notes related to the inspection.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// let tripId = UUID()
+    /// let inspectionData: [TripInspectionItem: Bool] = [
+    ///     .tireCondition: true,
+    ///     .mirros: false
+    /// ]
+    /// let note = "Tire pressure needs to be checked."
+    ///
+    /// addPreTripInspectionForTrip(by: tripId, inspection: inspectionData, note: note)
+    /// ```
+    ///
+    /// - Note: This function runs asynchronously inside a `Task`, so it should be called
+    ///   within an async-safe context. Errors are logged but not thrown.
+    func addPreTripInspectionForTrip(by id: UUID,
+                                     inspection: [TripInspectionItem: Bool],
+                                     note: String) {
+        Task {
+            do {
+                try await remoteController.addPreTripInspectionForTrip(by: id, inspection: inspection, note: note)
+            } catch {
+                print("Error while adding pre-trip inspection: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Adds a post-trip inspection for a specific trip.
+    ///
+    /// This function asynchronously sends a post-trip inspection report for a given trip ID.
+    /// It includes a dictionary of `TripInspectionItem` values mapped to `Bool`
+    /// to indicate whether each inspection item passed or failed.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier (`UUID`) of the trip.
+    ///   - inspection: A dictionary where keys are `TripInspectionItem` (an enum) and
+    ///     values are `Bool`, indicating the status of each inspection item.
+    ///   - note: A `String` containing any additional notes related to the inspection.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// let tripId = UUID()
+    /// let inspectionData: [TripInspectionItem: Bool] = [
+    ///     .tireCondition: true,
+    ///     .mirros: false
+    /// ]
+    /// let note = "Tire pressure needs to be checked."
+    ///
+    /// addPostTripInspectionForTrip(by: tripId, inspection: inspectionData, note: note)
+    /// ```
+    ///
+    /// - Note: This function runs asynchronously inside a `Task`, so it should be called
+    ///   within an async-safe context. Errors are logged but not thrown.
+    func addPostTripInspectionForTrip(by id: UUID,
+                                      inspection: [TripInspectionItem: Bool],
+                                      note: String) {
+        Task {
+            do {
+                try await remoteController.addPostTripInspectionForTrip(by: id, inspection: inspection, note: note)
+            } catch {
+                print("Error while adding post-trip inspection: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {
