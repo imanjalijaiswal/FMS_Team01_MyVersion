@@ -365,19 +365,6 @@ struct ForgotPasswordView: View {
                 }
             }
             
-            // Password strength feedback
-            if viewModel.isPasswordValid {
-                HStack {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
-                    Text("Strong password!")
-                        .foregroundColor(.green)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-                .padding(.top, 5)
-            }
-            
             // Show error message if exists
             if let errorMessage = errorMessage {
                 Text(errorMessage)

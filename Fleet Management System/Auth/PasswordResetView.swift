@@ -157,19 +157,6 @@ struct PasswordResetView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Password strength feedback
-                    if viewModel.isPasswordValid {
-                        HStack {
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundColor(.green)
-                            Text("Strong password!")
-                                .foregroundColor(.green)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .padding(.top, 5)
-                    }
-                    
                     // Show error message if reset fails
                     if let errorMessage = errorMessage {
                         Text(errorMessage)
