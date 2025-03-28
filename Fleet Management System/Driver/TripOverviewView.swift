@@ -6,6 +6,7 @@ struct TripOverviewView: View {
     let task: Trip
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedTab: Int
+    let isInDestinationGeofence: Bool
     @State private var showingPreTripInspection = false
     @State private var showingPostTripInspection = false
     @State private var hasCompletedPreInspection = false
@@ -13,6 +14,7 @@ struct TripOverviewView: View {
     @State private var showPreInspectionAlert = false
     @State private var showPostInspectionAlert = false
     @State private var requiresMaintenance = false
+    let dataController = IFEDataController.shared
     
     var body: some View {
         NavigationView {
@@ -23,14 +25,14 @@ struct TripOverviewView: View {
             .navigationTitle("Trip Overview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button(action: { dismiss() }) {
-                                Text("Cancel")
-                                    .font(.subheadline)
-                                    .foregroundColor(.primaryGradientStart)
-                            }
-                        }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Text("Cancel")
+                            .font(.subheadline)
+                            .foregroundColor(.primaryGradientStart)
                     }
+                }
+            }
             .sheet(isPresented: $showingPreTripInspection, onDismiss: {
                 if !hasCompletedPreInspection {
                     showPreInspectionAlert = true
@@ -71,8 +73,13 @@ struct TripOverviewView: View {
             TripStatusCard(task: task)
             VehicleDetailsCard(task: task)
             LocationsCard(task: task)
-            StartTripButton(task: task,isInspectionCompleted: hasCompletedPreInspection,requiresMaintenance: requiresMaintenance,showInspection: $showingPreTripInspection, selectedTab: $selectedTab)
-            EndTripButton(task: task, isInspectionCompleted: hasCompletedPostInspection, showInspection: $showingPostTripInspection)
+            StartTripButton(task: task, isInspectionCompleted: hasCompletedPreInspection, requiresMaintenance: requiresMaintenance, showInspection: $showingPreTripInspection, selectedTab: $selectedTab, onStartTrip: {
+                selectedTab = 1
+                // Update trip status to inProgress
+                    dataController.updateTripStatus(task, to: .inProgress)
+                dismiss()
+            })
+            EndTripButton(task: task, isInspectionCompleted: hasCompletedPostInspection, showInspection: $showingPostTripInspection, isInDestinationGeofence: isInDestinationGeofence)
         }
         .padding()
     }
@@ -229,13 +236,13 @@ struct LocationsCard: View {
 
 
 struct StartTripButton: View {
-    @Environment(\.dismiss) private var dismiss
     let task: Trip
     let isInspectionCompleted: Bool
-    let requiresMaintenance: Bool // New parameter
+    let requiresMaintenance: Bool
     @Binding var showInspection: Bool
     @State private var showCancelAlert = false
     @Binding var selectedTab: Int
+    let onStartTrip: () -> Void
     let dataController = IFEDataController.shared
     
     var body: some View {
@@ -254,12 +261,11 @@ struct StartTripButton: View {
                         if !isInspectionCompleted {
                             showInspection = true
                         } else {
-                            // Start trip action will be implemented later
-                            dataController.updateTripStatus(task, to: .inProgress)
-                            selectedTab = 1
+                            // Start trip action and dismiss modal
+                            onStartTrip()
                         }
                     }) {
-                        Text(isInspectionCompleted ? "Start Trip" : "Pre-Trip Inspection")
+                        Text(isInspectionCompleted ? "Go to Navigation to Start Trip" : "Pre-Trip Inspection")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -284,25 +290,37 @@ struct EndTripButton: View {
     let isInspectionCompleted: Bool
     @Binding var showInspection: Bool
     @State private var showCancelAlert = false
+    let isInDestinationGeofence: Bool
     var dataController = IFEDataController.shared
     
     var body: some View {
         if task.status == .inProgress {
-            Button(action: {
-                if !isInspectionCompleted {
-                    showInspection = true
-                } else {
-                    // End trip action will be implemented later
-                    dataController.updateTripStatus(task, to: .completed)
+            VStack(spacing: 8) {
+                if !isInDestinationGeofence {
+                    Text("You must be at the destination to complete the trip")
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
-            }) {
-                Text(isInspectionCompleted ? "End Trip" : "Post-Trip Inspection")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(isInspectionCompleted ? Color.primaryGradientStart : Color.primaryGradientStart)
-                    .cornerRadius(12)
+                
+                Button(action: {
+                    if !isInspectionCompleted {
+                        showInspection = true
+                    } else {
+                        // End trip action will be implemented later
+                        dataController.updateTripStatus(task, to: .completed)
+                    }
+                }) {
+                    Text(isInspectionCompleted ? "End Trip" : "Post-Trip Inspection")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isInDestinationGeofence ? Color.primaryGradientStart : Color.gray)
+                        .cornerRadius(12)
+                }
+                .disabled(!isInDestinationGeofence)
             }
             .padding(.top)
             .alert("Inspection Required", isPresented: $showCancelAlert) {
