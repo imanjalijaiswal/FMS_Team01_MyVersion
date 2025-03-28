@@ -501,6 +501,7 @@ struct DriverSelectionView: View {
             driver.activeStatus &&
             driver.status == .available &&
             driver.role == .driver &&
+            driver.meta_data.firstTimeLogin == false &&
             driver.id != excludeDriver?.id
         }
         
