@@ -417,7 +417,7 @@ struct FleetManagerTabBarView: View {
                 VehiclesView()
             }
             .tabItem {
-                Label("Vehicles", systemImage: "car.fill")
+                Label("Vehicles", systemImage: "truck.box.fill")
             }
             
             NavigationView {

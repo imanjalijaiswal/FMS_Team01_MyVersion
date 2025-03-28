@@ -22,7 +22,7 @@ struct Fleet_Management_SystemApp: App {
     }
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SpashScreen()
         }
     }
 }

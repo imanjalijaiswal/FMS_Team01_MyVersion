@@ -16,11 +16,11 @@ struct VehicleRowView: View {
     var body: some View {
         NavigationLink(destination: VehicleDetailView(vehicle: vehicle, viewModel: viewModel)) {
             HStack(spacing: 12) {
-                Image(systemName: "car.fill")
+                Image(systemName: "truck.box.fill")
                     .font(.system(size: 25))
-                    .foregroundColor(.green)
+                    .foregroundColor(Color.setForegroundColor(vehicle: vehicle))
                     .padding(6)
-                    .background(Color.green.opacity(0.1))
+                    .background(Color.setForegroundColor(vehicle: vehicle).opacity(0.1))
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -48,7 +48,7 @@ struct VehicleRowView: View {
                         if vehicle.status == .available && vehicle.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color.green)
+                                    .fill(Color.setForegroundColor(vehicle: vehicle))
                                     .frame(width: 4, height: 4)
                                 Text(vehicle.status.rawValue)
                                     .font(.caption)
@@ -56,35 +56,35 @@ struct VehicleRowView: View {
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.1))
+                            .background(Color.setForegroundColor(vehicle: vehicle).opacity(0.1))
                             .cornerRadius(8)
                         }
                         else if vehicle.status == .assigned && vehicle.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color.statusOrange)
+                                    .fill(Color.setForegroundColor(vehicle: vehicle))
                                     .frame(width: 4, height: 4)
                                 Text(vehicle.status.rawValue)
                                     .font(.caption)
-                                    .foregroundColor(.statusOrange)
+                                    .foregroundColor(Color.setForegroundColor(vehicle: vehicle))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.1))
+                            .background(Color.setForegroundColor(vehicle: vehicle).opacity(0.1))
                             .cornerRadius(8)
                         }
                         else if vehicle.status == .underMaintenance && vehicle.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(Color.gray)
+                                    .fill(Color.setForegroundColor(vehicle: vehicle))
                                     .frame(width: 4, height: 4)
                                 Text("Maintenance")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(Color.setForegroundColor(vehicle: vehicle))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color.setForegroundColor(vehicle: vehicle).opacity(0.1))
                             .cornerRadius(8)
                         }
                     }
@@ -186,11 +186,11 @@ struct VehicleDetailView: View {
                         showingDisableAlert = true
                     }) {
                         Text("Make Inactive")
-                            .foregroundColor((vehicle.status == .assigned) ? .gray : .red)
+                            .foregroundColor((vehicle.status == .assigned || vehicle.status == .underMaintenance) ? .gray : .red)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
                     }
-                    .disabled((vehicle.status == .assigned))
+                    .disabled(vehicle.status == .assigned || vehicle.status == .underMaintenance)
                 } else {
                     Button(action: {
                         viewModel.enableVehicle(vehicle)
@@ -297,7 +297,7 @@ struct VehiclesView: View {
         case _ where selectedFilter.contains("Inactive"):
             return searchResults.filter { !$0.activeStatus }
         case _ where selectedFilter.contains(VehicleStatus.underMaintenance.rawValue):
-            return searchResults.filter { $0.status == .underMaintenance}
+            return searchResults.filter { $0.status == .underMaintenance && $0.activeStatus }
         default:
             return searchResults.filter { _ in true }
         }
@@ -762,3 +762,5 @@ struct VehicleDetailsView: View {
         }
     }
 }
+
+

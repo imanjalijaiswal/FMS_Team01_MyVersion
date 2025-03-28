@@ -29,9 +29,10 @@ struct DriverRowView: View {
             HStack(spacing: 12) {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.blue)
+                    .foregroundColor(driver.activeStatus ?
+                                     Color.foregroundColorForDriver(driver: driver) : .red)
                     .padding(6)
-                    .background(Color.blue.opacity(0.1))
+                    .background(driver.activeStatus ? Color.foregroundColorForDriver(driver: driver).opacity(0.1) : .red.opacity(0.1))
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -53,15 +54,15 @@ struct DriverRowView: View {
                         if driver.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? Color.green : Color.gray) : Color.red)
+                                    .fill(Color.foregroundColorForDriver(driver: driver))
                                     .frame(width: 4, height: 4)
                                 Text(!driver.meta_data.firstTimeLogin ? driver.status.rawValue : "Offline")
                                     .font(.caption)
-                                    .foregroundColor(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? .green : .gray) : .red)
+                                    .foregroundColor(Color.foregroundColorForDriver(driver: driver))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? Color.green.opacity(0.1) : Color.gray.opacity(0.1)) : Color.red.opacity(0.1))
+                            .background(Color.foregroundColorForDriver(driver: driver).opacity(0.1))
                             .cornerRadius(8)
                         }
                     }
@@ -220,7 +221,7 @@ struct DriverDetailView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 80))
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color.foregroundColorForDriver(driver: driver))
                     
                     Text(driver.meta_data.fullName)
                         .font(.title2)
@@ -542,6 +543,85 @@ struct AddDriverView: View {
     }
 }
 
-#Preview{
-    StaffView()
+#Preview {
+    // Create a preview with sample data
+    let mockController = IFEDataController.shared
+    mockController.drivers = [
+        // Available driver
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Arnav Chauhan",
+                email: "arnav@example.com",
+                phone: "+917043788123",
+                role: .driver,
+                employeeID: 1001,
+                firstTimeLogin: false,
+                createdAt: Date(),
+                activeStatus: true
+            ),
+            licenseNumber: "DL0120230000001",
+            totalTrips: 24,
+            status: .available
+        ),
+        
+        // On Trip driver
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Raj Kumar",
+                email: "raj@example.com",
+                phone: "+919876543210",
+                role: .driver,
+                employeeID: 1002,
+                firstTimeLogin: false,
+                createdAt: Date(),
+                activeStatus: true
+            ),
+            licenseNumber: "DL0120230000002",
+            totalTrips: 15,
+            status: .onTrip
+        ),
+        
+        // Inactive driver
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Meera Singh",
+                email: "meera@example.com",
+                phone: "+919876543211",
+                role: .driver,
+                employeeID: 1003,
+                firstTimeLogin: false,
+                createdAt: Date(),
+                activeStatus: false
+            ),
+            licenseNumber: "DL0120230000003",
+            totalTrips: 32,
+            status: .available
+        ),
+        
+        // Offline driver (first time login)
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Anil Patel",
+                email: "anil@example.com",
+                phone: "+919876543212",
+                role: .driver,
+                employeeID: 1004,
+                firstTimeLogin: true,
+                createdAt: Date(),
+                activeStatus: true
+            ),
+            licenseNumber: "DL0120230000004",
+            totalTrips: 0,
+            status: .Offline
+        )
+    ]
+    
+    return NavigationView {
+        StaffView()
+            .environmentObject(mockController)
+    }
 }

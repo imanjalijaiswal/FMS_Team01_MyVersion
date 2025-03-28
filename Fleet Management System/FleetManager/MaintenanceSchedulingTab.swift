@@ -120,8 +120,8 @@ struct MaintenanceScheduleCard: View {
                     .font(.subheadline)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.orange.opacity(0.2))
-                    .foregroundColor(.orange)
+                    .background(Color.setMaintaiencePersonalColor(status: MaintenanceStatus(rawValue: schedule.status) ?? .scheduled).opacity(0.2))
+                    .foregroundColor(Color.setMaintaiencePersonalColor(status: MaintenanceStatus(rawValue: schedule.status) ?? .scheduled))
                     .cornerRadius(15)
             }
 
@@ -249,11 +249,28 @@ struct MaintenanceScheduleFormView: View {
 
                     
                     // Notes Card
-                    TextField("Maintenance Description", text: $notes)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Maintenance Description")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        TextEditor(text: $notes)
+                            .frame(minHeight: 100)
+                            .overlay(
+                                Group {
+                                    if notes.isEmpty {
+                                        Text("Enter maintenance details, issues, or special instructions")
+                                            .foregroundColor(.gray)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 8)
+                                    }
+                                },
+                                alignment: .topLeading
+                            )
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
                         
                         
                 }

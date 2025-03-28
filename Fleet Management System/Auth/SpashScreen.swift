@@ -8,8 +8,50 @@
 import SwiftUI
 
 struct SpashScreen: View {
+    @State private var isActive = false
+    @State private var textLocation : CGFloat = 50
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        if isActive {
+            ContentView()
+        } else {
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.primaryGradientStart,
+                        Color.primaryGradientEnd,
+                        Color.primaryGradientStart
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    HStack(spacing: 0) {
+                        Text("InFleet")
+                            .foregroundStyle(.white)
+                            .fontWeight(.semibold) +
+                        Text("Express")
+                            .foregroundStyle(Color.primaryGradientStart1)
+                            .fontWeight(.semibold)
+                    }
+                    .font(.system(size: 40))
+                    .offset(y: textLocation)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 2)) {
+                            self.textLocation = -60
+                        }
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                self.isActive = true
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
