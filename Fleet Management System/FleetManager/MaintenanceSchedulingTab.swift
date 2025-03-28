@@ -293,7 +293,20 @@ struct MaintenanceScheduleFormView: View {
     }
     
     private func handleDoneButton() {
+        
+        // Update vehicle status to under maintenance
+        if let vehicle = selectedVehicle {
+            // Update the local state immediately after calling the update method
+            if let index = viewModel.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
+                viewModel.vehicles[index].status = .underMaintenance
+            }
+            viewModel.updateVehicleStatus(vehicle, with: .underMaintenance)
+        }
+        
+        
+        // add new schedule to the maintenance schedules list
         let newSchedule = MaintenanceSchedule(
+
             
             maintenancePersonnel: "John Smith",
             vehiclePlate: selectedVehicle?.licenseNumber ?? "",
@@ -303,6 +316,7 @@ struct MaintenanceScheduleFormView: View {
         )
         
         onScheduleComplete?(newSchedule)
+
         
         showSuccessAlert = true
     }
@@ -310,6 +324,7 @@ struct MaintenanceScheduleFormView: View {
 
 struct MaintenanceSchedule: Identifiable {
     let id = UUID()
+
     var ticketNumber: Int = 0
     let maintenancePersonnel: String
     let vehiclePlate: String
