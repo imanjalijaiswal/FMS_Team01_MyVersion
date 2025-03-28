@@ -20,7 +20,310 @@ extension Date {
     }
 }
 
-class RemoteController: DatabaseAPIIntegrable{
+class RemoteController: DatabaseAPIIntegrable {
+    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID, for vehicleID: Int, ofType type: MaintenanceTaskType, _ issueNote: String) async throws -> MaintenanceTask {
+        struct AssignMaintenanceTaskParams: Codable {
+            let p_assigned_by: String
+            let p_assigned_to: String
+            let p_vehicle_id: Int
+            let p_task_type: MaintenanceTaskType
+            let p_note: String
+        }
+        
+        let params = AssignMaintenanceTaskParams(p_assigned_by: managerID.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type, p_note: issueNote)
+        
+        return try await client
+            .rpc("assign_new_maintenance_task", params: params)
+            .execute().value
+    }
+    
+    func getManagerAssignedMaintenanceTasks(by id: UUID) async throws -> [MaintenanceTask] {
+        struct MaintenanceTaskResponse: Codable {
+            let id: UUID
+            let type: MaintenanceTaskType
+            let status: MaintenanceStatus
+            let taskID: Int
+            let expenses: [String: Double]?
+            let createdAt: Date
+            let issueNote: String
+            let vehicleID: Int
+            let assignedBy: UUID
+            let assignedTo: UUID
+            let repairNote: String
+            let completionDate: String?
+            let estimatedCompletionDate: String?
+            
+            private static let dateFormatter: DateFormatter = {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd" // Supabase date format for DATE fields
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                return formatter
+            }()
+
+            // Convert completionDate string (YYYY-MM-DD) to Date
+            var parsedCompletionDate: Date? {
+                guard let completionDate else { return nil }
+                return Self.dateFormatter.date(from: completionDate)
+            }
+            
+            var parsedEstimatedCompletionDate: Date? {
+                guard let estimatedCompletionDate else { return nil }
+                return Self.dateFormatter.date(from: estimatedCompletionDate)
+            }
+            
+            var parsedExpenses: [MaintenanceExpenseType: Double]? {
+                if let expenses {
+                    return Dictionary(uniqueKeysWithValues: expenses.compactMap { key, value in
+                        MaintenanceExpenseType(rawValue: key).map { ($0, value) }
+                    })
+                } else { return nil }
+            }
+        }
+        
+        let response: [MaintenanceTaskResponse] = try await client
+            .rpc("get_maintenance_task_by_manager_id", params: ["p_id": id.uuidString])
+            .execute().value
+        
+        var tasks: [MaintenanceTask] = []
+        
+        response.forEach({ task in
+            tasks.append(MaintenanceTask(
+                id: task.id,
+                taskID: task.taskID,
+                vehicleID: task.vehicleID,
+                assignedTo: task.assignedTo, assignedBy: task.assignedBy,
+                type: task.type, status: task.status,
+                estimatedCompletionDate: task.parsedEstimatedCompletionDate,
+                createdAt: task.createdAt,
+                issueNote: task.issueNote, repairNote: task.repairNote,
+                expenses: task.parsedExpenses,
+                completionDate: task.parsedCompletionDate
+            ))
+        })
+        
+        return tasks;
+    }
+    
+    func getMaintenancePersonnelTasks(by id: UUID) async throws -> [MaintenanceTask] {
+        struct MaintenanceTaskResponse: Codable {
+            let id: UUID
+            let type: MaintenanceTaskType
+            let status: MaintenanceStatus
+            let taskID: Int
+            let expenses: [String: Double]?
+            let createdAt: Date
+            let issueNote: String
+            let vehicleID: Int
+            let assignedBy: UUID
+            let assignedTo: UUID
+            let repairNote: String
+            let completionDate: String?
+            let estimatedCompletionDate: String?
+            
+            private static let dateFormatter: DateFormatter = {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd" // Supabase date format for DATE fields
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                return formatter
+            }()
+
+            // Convert completionDate string (YYYY-MM-DD) to Date
+            var parsedCompletionDate: Date? {
+                guard let completionDate else { return nil }
+                return Self.dateFormatter.date(from: completionDate)
+            }
+            
+            var parsedEstimatedCompletionDate: Date? {
+                guard let estimatedCompletionDate else { return nil }
+                return Self.dateFormatter.date(from: estimatedCompletionDate)
+            }
+            
+            var parsedExpenses: [MaintenanceExpenseType: Double]? {
+                if let expenses {
+                    return Dictionary(uniqueKeysWithValues: expenses.compactMap { key, value in
+                        MaintenanceExpenseType(rawValue: key).map { ($0, value) }
+                    })
+                } else { return nil }
+            }
+        }
+        
+        let response: [MaintenanceTaskResponse] = try await client
+            .rpc("get_maintenance_task_by_maintenance_personnel_id", params: ["p_id": id.uuidString])
+            .execute().value
+        
+        var tasks: [MaintenanceTask] = []
+        
+        response.forEach({ task in
+            tasks.append(MaintenanceTask(
+                id: task.id,
+                taskID: task.taskID,
+                vehicleID: task.vehicleID,
+                assignedTo: task.assignedTo, assignedBy: task.assignedBy,
+                type: task.type, status: task.status,
+                estimatedCompletionDate: task.parsedEstimatedCompletionDate,
+                createdAt: task.createdAt,
+                issueNote: task.issueNote, repairNote: task.repairNote,
+                expenses: task.parsedExpenses,
+                completionDate: task.parsedCompletionDate
+            ))
+        })
+        
+        return tasks;
+    }
+    
+    func makeMaintenanceTaskInProgress(by id: UUID) async throws {
+        struct UpdateMaintenanceTaskStatusParams: Codable {
+            let p_id: String
+            let p_new_status: MaintenanceStatus
+        }
+        
+        let params = UpdateMaintenanceTaskStatusParams(p_id: id.uuidString, p_new_status: .inProgress)
+        
+        try await client
+            .rpc("update_maintenance_task_status_by_id", params: params)
+            .execute()
+    }
+    
+    func updateMaintenanceTaskEstimatedDate(by id: UUID, _ date: Date) async throws {
+        struct UpdateMaintenanceTaskEstimatedDateParams: Codable {
+            let p_id: String
+            let p_date: String
+        }
+        
+        let params = UpdateMaintenanceTaskEstimatedDateParams(p_id: id.uuidString, p_date: ISO8601DateFormatter().string(from: date))
+        
+        try await client
+            .rpc("add_estimated_completion_date_for_maintenance_task_id", params: params)
+            .execute().value
+    }
+    
+    func createInvoiceForMaintenanceTask(by id: UUID, expenses: [MaintenanceExpenseType : Double], _ repairNote: String) async throws {
+        struct CreateInvoiceParams: Codable {
+            let p_id: String
+            let p_expenses: [String : Double]
+            let p_note: String
+        }
+        
+        let expensesDictionary = Dictionary(uniqueKeysWithValues: expenses.map { ($0.rawValue, $1) })
+        
+        let params = CreateInvoiceParams(p_id: id.uuidString, p_expenses: expensesDictionary, p_note: repairNote)
+        
+        try await client
+            .rpc("create_invoice_for_maintenance_task_id", params: params)
+            .execute().value
+    }
+    
+    func addNewMaintenancePersonnelMetaData(by id: UUID, phoneNumber: String, fullName: String, employeeID: Int) async throws -> MaintenancePersonnel {
+        struct AddDriverParams: Encodable {
+            let p_id: UUID
+            let p_phone: String
+            let p_display_name: String
+            let p_employee_id: Int
+            let p_created_at: String
+        }
+        
+        let params = AddDriverParams(p_id: id, p_phone: phoneNumber, p_display_name: fullName,
+                                     p_employee_id: employeeID,
+                                     p_created_at: ISO8601DateFormatter().string(from: .now))
+        
+        let personnel: MaintenancePersonnel = try await client
+            .rpc("add_new_maintenance_personnel", params: params).execute().value
+        
+        return personnel
+    }
+    
+    func getRegisteredMaintenancePersonnels() async throws -> [MaintenancePersonnel] {
+        return try await client
+            .rpc("get_registered_maintenance_personnels").execute().value
+    }
+    
+    func getRegisteredMaintenancePersonnel(by id: UUID) async throws -> MaintenancePersonnel {
+        return try await client
+            .rpc("get_maintenance_personnel_data_by_id", params: ["p_id": id.uuidString])
+            .execute().value
+    }
+    
+    func getUserMetaData(by id: UUID) async throws -> UserMetaData {
+        return try await client
+            .rpc("get_user_meta_data_for_id", params: ["p_id": id.uuidString])
+            .execute().value
+    }
+    
+    func getOfflineDrivers() async throws -> [Driver] {
+        return try await client
+            .rpc("get_offline_drivers").execute().value
+    }
+    
+    func getTripInspectionForTrip(by id: UUID) async throws -> TripInspection {
+        struct TripInspectionResponse: Codable {
+            let id: UUID
+            let preInspection: [String: Bool]
+            let postInspection: [String: Bool]
+            let preInspectionNote: String
+            let postInspectionNote: String
+        }
+        
+        let inspection: TripInspectionResponse = try await client
+            .rpc("get_trip_inspection_for_trip_id", params: ["p_id": id.uuidString])
+            .execute().value
+        
+        let preInspection = Dictionary(uniqueKeysWithValues: inspection.preInspection.compactMap { key, value in
+            TripInspectionItem(rawValue: key).map { ($0, value) }
+        })
+
+        
+        let postInspection = Dictionary(uniqueKeysWithValues: inspection.postInspection.compactMap { key, value in
+            TripInspectionItem(rawValue: key).map { ($0, value) }
+        })
+        
+
+        return TripInspection(
+            id: inspection.id,
+            preInspection: preInspection,
+            postInspection: postInspection,
+            preInspectionNote: inspection.preInspectionNote,
+            postInspectionNote: inspection.postInspectionNote
+        )
+    }
+    
+    func addPreTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
+        struct PreInspectionParams: Codable {
+            let p_id: String
+            let p_pre_trip_inspection: [String: Bool]
+            let p_note: String
+        }
+        
+        let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+
+        
+        let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspectionDictionary, p_note: note)
+        
+
+        try await client
+            .rpc("add_pre_trip_inspection_for_trip_id", params: params)
+            .execute()
+    }
+    
+    func addPostTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
+        struct PostInspectionParams: Codable {
+            let p_id: String
+            let p_post_trip_inspection: [String: Bool]
+            let p_note: String
+        }
+        
+        let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+
+        
+        let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspectionDictionary, p_note: note)
+        
+
+        try await client
+            .rpc("add_post_trip_inspection_for_trip_id", params: params)
+            .execute()
+    }
+    
     func updateTripStatus(by id: UUID, to newStatus: TripStatus) async throws {
         try await client
             .rpc("update_trip_status_for_id", params: [
@@ -65,9 +368,40 @@ class RemoteController: DatabaseAPIIntegrable{
     }
     
     func createNewDriver(_ email: String, password: String) async throws -> UUID {
+        // Store the current session before creating a new driver
+        let currentSession = try? await client.auth.session
+        
+        // Create the new driver account
         let authResponse = try await client.auth.signUp(email: email, password: password)
-        // Step 2: Extract user ID
+        
+        // Extract the new driver's user ID
         let userId = authResponse.user.id
+        
+        // If we had a session before and the new user creation changed it, restore it
+        if let session = currentSession, try await client.auth.session.user.id != session.user.id {
+            // Re-authenticate with the stored session token to restore the fleet manager's session
+            try await client.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+        }
+        
+        return userId
+    }
+    
+    func createNewMaintenancePersonnel(_ email: String, password: String) async throws -> UUID {
+        // Store the current session before creating a new driver
+        let currentSession = try? await client.auth.session
+        
+        // Create the new driver account
+        let authResponse = try await client.auth.signUp(email: email, password: password)
+        
+        // Extract the new driver's user ID
+        let userId = authResponse.user.id
+        
+        // If we had a session before and the new user creation changed it, restore it
+        if let session = currentSession, try await client.auth.session.user.id != session.user.id {
+            // Re-authenticate with the stored session token to restore the fleet manager's session
+            try await client.auth.setSession(accessToken: session.accessToken, refreshToken: session.refreshToken)
+        }
+        
         return userId
     }
     
@@ -278,13 +612,14 @@ class RemoteController: DatabaseAPIIntegrable{
     
     func getRegisteredVehicles() async throws -> [Vehicle] {
         let response = try await client
-                .rpc("get_regsitered_vehicles")
+                .rpc("get_registered_vehicles")
                 .execute()
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         
         let vehicles = try decoder.decode([Vehicle].self, from: response.data)
+        
         return vehicles
     }
     
@@ -313,6 +648,25 @@ class RemoteController: DatabaseAPIIntegrable{
             .rpc("get_registered_drivers")
             .execute()
             .value
+    }
+    
+    func getUserRole(by userId: String) async throws -> Role {
+        struct UserRole: Codable {
+            let role: String
+        }
+        
+        let response = try await client
+            .from("UserRoles").select("role").eq("id", value: userId).single()
+            .execute()
+        
+        let userRole = try JSONDecoder().decode(UserRole.self, from: response.data)
+        if userRole.role == "driver" { 
+            return .driver 
+        } else if userRole.role == "maintenancePersonnel" {
+            return .maintenancePersonnel
+        } else {
+            return .fleetManager
+        }
     }
    
     private let client = AuthManager.shared.client

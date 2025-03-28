@@ -23,12 +23,12 @@ struct ContentView: View {
                 PasswordResetView(user: $user, isFirstTimeLogin: $isFirstTimeLogin)
             } else if let user = user {
                 switch user.role {
-                case .fleetManager, .maintenancePersonnel:
+                case .fleetManager:
                     FleetManagerView(user: $user, role: $role)
                 case .driver:
                     DriverView(user: $user, role: $role)
-//                case .maintenancePersonal:
-//                    MaintenanceView(user: $user, role: $role)
+                case .maintenancePersonnel:
+                    MaintenanceView(user: $user, role: $role)
                 }
             } else {
                 LoginFormView(user: $user)
@@ -38,7 +38,16 @@ struct ContentView: View {
             do {
                 // Set isFirstTimeLogin to false by default - assume no first time login until proven otherwise
                 isFirstTimeLogin = false
+                
+                // Try to get the current session
                 user = try await AuthManager.shared.getCurrentSession()
+                
+                // If no user was found but we have a stored fleet manager ID, try to restore that session
+                if user == nil {
+                    if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                        user = try await AuthManager.shared.restoreFleetManagerSession()
+                    }
+                }
                 
                 // Check if it's first-time login only if we have a valid user
                 if let currentUser = user {

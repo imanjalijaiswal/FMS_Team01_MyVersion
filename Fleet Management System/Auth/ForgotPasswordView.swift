@@ -12,36 +12,39 @@ struct ForgotPasswordView: View {
             ZStack {
                 Color.white.ignoresSafeArea()
                 
-                VStack(spacing: 20) {
-                    // Title and subtitle
-                    Text(stepTitle)
-                        .font(.title)
-                        .fontWeight(.bold)
-                    
-                    Text(stepSubtitle)
-                        .font(.body)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    // Current step content
-                    Group {
-                        switch viewModel.currentStep {
-                        case .emailEntry:
-                            emailEntryView
-                        case .otpVerification:
-                            otpVerificationView
-                        case .newPasswordEntry:
-                            newPasswordView
-                        case .completed:
-                            completedView
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Title and subtitle
+                        Text(stepTitle)
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        Text(stepSubtitle)
+                            .font(.body)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        // Current step content
+                        Group {
+                            switch viewModel.currentStep {
+                            case .emailEntry:
+                                emailEntryView
+                            case .otpVerification:
+                                otpVerificationView
+                            case .newPasswordEntry:
+                                newPasswordView
+                            case .completed:
+                                completedView
+                            }
                         }
+                        
+                        Spacer(minLength: 30)
                     }
-                    
-                    Spacer()
+                    .padding(.top, 40)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
                 }
-                .padding(.top, 40)
-                .padding(.horizontal)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -152,6 +155,13 @@ struct ForgotPasswordView: View {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.footnote)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -222,6 +232,13 @@ struct ForgotPasswordView: View {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.footnote)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -249,8 +266,18 @@ struct ForgotPasswordView: View {
                 HStack {
                     if viewModel.isNewPasswordVisible {
                         TextField("Enter new password", text: $viewModel.newPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.newPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     } else {
                         SecureField("Enter new password", text: $viewModel.newPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.newPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     }
                     
                     Button(action: {
@@ -265,9 +292,34 @@ struct ForgotPasswordView: View {
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
                 
-                Text("Password must be at least 8 characters")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                // Password validation criteria feedback
+                VStack(alignment: .leading, spacing: 5) {
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasMinLength,
+                        text: "At least 8 characters long"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasLowercase,
+                        text: "Include at least 1 lowercase letter"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasUppercase,
+                        text: "Include at least 1 uppercase letter"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasDigit,
+                        text: "Include at least 1 number"
+                    )
+                    
+                    PasswordRequirementRow(
+                        isMet: viewModel.hasSpecialChar,
+                        text: "Include at least 1 special character (!@#$%^&*)"
+                    )
+                }
+                .padding(.top, 8)
             }
             
             VStack(alignment: .leading, spacing: 8) {
@@ -277,8 +329,18 @@ struct ForgotPasswordView: View {
                 HStack {
                     if viewModel.isConfirmPasswordVisible {
                         TextField("Confirm new password", text: $viewModel.confirmPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.confirmPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     } else {
                         SecureField("Confirm new password", text: $viewModel.confirmPassword)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .onChange(of: viewModel.confirmPassword) { _ in
+                                viewModel.validatePasswordCriteria()
+                            }
                     }
                     
                     Button(action: {
@@ -292,6 +354,29 @@ struct ForgotPasswordView: View {
                 .padding()
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
+                
+                // Password match validation
+                if !viewModel.confirmPassword.isEmpty {
+                    PasswordRequirementRow(
+                        isMet: viewModel.passwordsMatch,
+                        text: "Passwords match"
+                    )
+                    .padding(.top, 5)
+                }
+            }
+            
+            // Show error message if exists
+            if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.footnote)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             // Update Password Button
@@ -310,12 +395,22 @@ struct ForgotPasswordView: View {
             .background(isLoading || !viewModel.isPasswordValid ? Color.gray.opacity(0.5) : Color.primaryGradientStart)
             .cornerRadius(12)
             .disabled(isLoading || !viewModel.isPasswordValid)
-            
-            if let errorMessage = errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.footnote)
-                    .multilineTextAlignment(.center)
+        }
+    }
+    
+    // Password requirement row
+    private struct PasswordRequirementRow: View {
+        let isMet: Bool
+        let text: String
+        
+        var body: some View {
+            HStack(spacing: 10) {
+                Image(systemName: isMet ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isMet ? .green : .gray)
+                
+                Text(text)
+                    .font(.caption)
+                    .foregroundColor(isMet ? .green : .gray)
             }
         }
     }

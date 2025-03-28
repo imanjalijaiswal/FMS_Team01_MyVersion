@@ -7,6 +7,7 @@ struct DashboardView: View {
     @Binding var role : Role?
     @State private var showingProfile = false
     @State private var selectedFilter: TaskFilter = .assigned
+    @Binding var selectedTab: Int
     //@State private var viewModel.tripsForDriver: [Trip] = []
     
     var filteredTrips: [Trip] {
@@ -35,7 +36,7 @@ struct DashboardView: View {
                         .padding(.horizontal)
                     
                     if let activeTrip = activeTrip {
-                        TaskCard(task: activeTrip)
+                        TaskCard(task: activeTrip, selectedTab: $selectedTab)
                             .padding(.horizontal)
                             .shadow(radius: 2, x: 2, y: 2)
                     } else {
@@ -58,7 +59,7 @@ struct DashboardView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 32)
-                        .background(Color.white.opacity(0.1))
+                        .background(Color.white.opacity(0.7))
                         .cornerRadius(12)
                         .padding(.horizontal)
                     }
@@ -78,7 +79,7 @@ struct DashboardView: View {
                 // Task list
                 VStack(spacing: 16) {
                     ForEach(filteredTrips, id: \.id) { trip in
-                        TaskCard(task: trip)
+                        TaskCard(task: trip, selectedTab: $selectedTab)
                             .shadow(radius: 2, x: 2, y: 2)
                     }
                 }
@@ -152,14 +153,26 @@ struct FilterButton: View {
 struct TaskCard: View {
     let task: Trip
     @State private var showingTripOverview = false
-    
+    @State private var vehicle: Vehicle?
+    @Binding var selectedTab: Int
+    var remoteController = RemoteController()
+    var statusColor: Color {
+        switch task.status {
+        case .inProgress:
+            return .blue
+        case .completed:
+            return .green
+        case .scheduled:
+            return .orange
+        }
+    }
     var body: some View {
         Button(action: { showingTripOverview = true }) {
             VStack(alignment: .leading, spacing: 16) {
                 // Task header
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        HStack{
+                        HStack {
                             Text("Trip ID: \(task.tripID)")
                                 .font(.headline)
                                 .foregroundColor(.textPrimary)
@@ -170,25 +183,25 @@ struct TaskCard: View {
                         }
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 4) {
-                                //Text(task.truckType)
-                                    //.foregroundColor(.textSecondary)
-                                Text("\(task.assignedVehicleID)")
-                                    .foregroundColor(.statusOrange)
+                                if let vehicle = vehicle {
+                                    Text("\(vehicle.make) \(vehicle.model) \n \(vehicle.licenseNumber)") // Show vehicle name instead of ID
+                                        .foregroundColor(.statusOrange)
+                                } else {
+                                    Text("Loading...")
+                                        .foregroundColor(.gray)
+                                }
                             }
                             .font(.subheadline)
                             Spacer()
                             Text(task.status.rawValue)
                                 .font(.caption)
-                                .fontWeight(.medium)
+                                .foregroundColor(statusColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                //.background(task.status.color.opacity(0.2))
-                                //.foregroundColor(task.status.color)
-                                //.cornerRadius(4)
+                                .background(statusColor.opacity(0.1))
+                                .cornerRadius(8)
                         }
                     }
-                    
-                    
                 }
                 
                 // Task details
@@ -196,29 +209,27 @@ struct TaskCard: View {
                     Text("\(task.scheduledDateTime)")
                         .fontWeight(.medium)
                     if let description = task.description, !description.isEmpty {
-                                            Text("•")
-                                            Text(description)
+                        Text("•")
+                        Text(description)
                     }
                 }
                 .font(.subheadline)
                 .foregroundColor(.textSecondary)
                 
-                //if !task.pickup.address.isEmpty {
-                    // Locations
+                // Locations
                 LocationViewWrapper(coordinate: task.pickupLocation, type: .pickup)
                 LocationViewWrapper(coordinate: task.destination, type: .destination)
-                    
-                    // Distance and time
-                    HStack {
-                        Image(systemName: "arrow.up.right")
-                            .foregroundColor(.primaryGradientStart)
-                        Text("\(task.totalDistance)")
-                        Text("-")
-                        Text("\(task.totalTripDuration)")
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.textSecondary)
-                //}
+                
+                // Distance and time
+                HStack {
+                    Image(systemName: "arrow.up.right")
+                        .foregroundColor(.primaryGradientStart)
+                    Text("\(task.totalDistance)")
+                    Text("-")
+                    Text("\(task.totalTripDuration)")
+                }
+                .font(.subheadline)
+                .foregroundColor(.textSecondary)
             }
             .padding()
             .background(Color.white)
@@ -226,9 +237,20 @@ struct TaskCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingTripOverview) {
-            TripOverviewView(task: task)
+            TripOverviewView(task: task, selectedTab: $selectedTab)
+        }
+        .task {
+            await fetchVehicle() // Fetch vehicle data when TaskCard appears
         }
     }
+
+    private func fetchVehicle() async {
+            do {
+                vehicle = try await remoteController.getRegisteredVehicle(by: task.assignedVehicleID)
+            } catch {
+                print("Error fetching vehicle: \(error)")
+            }
+        }
 }
 struct LocationViewWrapper: View {
     let coordinate: String

@@ -8,6 +8,8 @@ struct LoginFormView: View {
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var isPasswordVisible: Bool = false
+    @State private var pandaEyesOpen: Bool = true  // New explicit state for panda eyes
+    @FocusState private var isEmailFocused: Bool
     @FocusState private var isPasswordFocused: Bool
     @State private var isBlinking = false
     @State private var isLoading = false
@@ -25,12 +27,12 @@ struct LoginFormView: View {
                         .fill(Color.primaryGradientStart)
                         .frame(width: 150, height: 150)
                     
-                    Image(shouldShowPandaEyesOpen ? "panda-open" : "panda-closed")
+                    Image(pandaEyesOpen ? "panda-open" : "panda-closed")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 135, height: 135)
                         .scaleEffect(1.0)
-                        .animation(.easeInOut(duration: 0.2), value: shouldShowPandaEyesOpen)
+                        .animation(.easeInOut(duration: 0.3), value: pandaEyesOpen)
                 }
                 .padding(.bottom, 20)
                 
@@ -48,6 +50,7 @@ struct LoginFormView: View {
                         .padding(.leading)
                     
                     TextField("Enter your email", text: $email)
+                        .focused($isEmailFocused)
                         .padding()
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
@@ -71,15 +74,51 @@ struct LoginFormView: View {
                         }
                         
                         Button(action: {
+                            // Toggle password visibility and explicitly update panda eyes
                             isPasswordVisible.toggle()
+                            
+                            // Use explicit animation and make sure it's applied
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                // Always update panda eyes based on password visibility
+                                // when the eye button is pressed
+                                pandaEyesOpen = isPasswordVisible
+                            }
+                            
+                            // Double-check the update with slight delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    pandaEyesOpen = isPasswordVisible
+                                }
+                            }
                         }) {
                             Image(systemName: isPasswordVisible ? "eye.fill" : "eye.slash.fill")
                                 .foregroundColor(.gray)
+                                .contentShape(Rectangle())
+                                .frame(width: 35, height: 35) // Larger tap target
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(12)
+                    .onTapGesture {
+                        // Force close eyes immediately when tapping on password field
+                        pandaEyesOpen = false
+                        
+                        // Set focus with slight delay to avoid race conditions
+                        DispatchQueue.main.async {
+                            isPasswordFocused = true
+                            
+                            // Ensure eyes are still closed after focus change
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if !isPasswordVisible {
+                                        pandaEyesOpen = false
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal)
                 
@@ -134,18 +173,43 @@ struct LoginFormView: View {
                 ForgotPasswordView(isPresented: $showForgotPassword)
             }
         }
+        .onChange(of: isPasswordFocused) { _, newValue in
+            if newValue {
+                // When password field is focused, ALWAYS close eyes
+                // Use DispatchQueue to ensure this happens reliably
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        pandaEyesOpen = false
+                    }
+                }
+                
+                // Add a second update with slight delay to ensure the change persists
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        // Only update if still focused and eye icon is not showing
+                        if isPasswordFocused && !isPasswordVisible {
+                            pandaEyesOpen = false
+                        }
+                    }
+                }
+            } else {
+                // When password field loses focus, eyes open
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    pandaEyesOpen = true
+                }
+            }
+        }
+        .onChange(of: isEmailFocused) { _, newValue in
+            withAnimation(.easeInOut(duration: 0.3)) {
+                // Email field always has open eyes
+                pandaEyesOpen = true
+            }
+        }
         .sheet(isPresented: $show2FAView) {
             if let tempUser = tempAuthenticatedUser {
                 TwoFactorView(authenticatedUser: tempUser, user: $user)
             }
         }
-    }
-    
-    private var shouldShowPandaEyesOpen: Bool {
-        // Show open eyes if:
-        // 1. Password is visible (user toggled visibility)
-        // 2. Password field is not focused (user is not entering password)
-        isPasswordVisible || !isPasswordFocused
     }
     
     // MARK: - Authentication Handlers

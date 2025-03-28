@@ -9,9 +9,13 @@ import Foundation
 
 protocol DatabaseAPIIntegrable {
     //MARK: User APIs
+    func getUserMetaData(by id: UUID) async throws -> UserMetaData
+    
     func getFleetManager(by id: UUID) async throws -> FleetManager
     
     func createNewDriver(_ email: String, password: String) async throws -> UUID
+    
+    func createNewMaintenancePersonnel(_ email: String, password: String) async throws -> UUID
     
     func updateUserPhone(by id: UUID, _ phone: String) async throws
     
@@ -20,6 +24,15 @@ protocol DatabaseAPIIntegrable {
                    fullName: String,
                    employeeID: Int,
                    licenseNumber: String) async throws -> Driver
+    
+    func addNewMaintenancePersonnelMetaData(by id: UUID,
+                                            phoneNumber: String,
+                                            fullName: String,
+                                            employeeID: Int) async throws -> MaintenancePersonnel
+    
+    func getRegisteredMaintenancePersonnels() async throws -> [MaintenancePersonnel]
+    
+    func getRegisteredMaintenancePersonnel(by id: UUID) async throws -> MaintenancePersonnel
     
     func updateDriverStatus(by id: UUID, _ newStatus: DriverStatus) async throws
     
@@ -31,7 +44,10 @@ protocol DatabaseAPIIntegrable {
     
     func updateUserActiveStatus(by id: UUID, with status: Bool) async throws
     
+    func getOfflineDrivers() async throws -> [Driver]
+    
     func getMaxEmployeeID(ofType type: Role) async throws -> Int
+    
     
     
     //MARK: Vehicle APIs
@@ -67,4 +83,30 @@ protocol DatabaseAPIIntegrable {
     func getManagerAssignedTrips(by id: UUID) async throws -> [Trip]
     
     func getDriverTrips(by id: UUID) async throws -> [Trip]
+    
+    
+    func getTripInspectionForTrip(by id: UUID) async throws -> TripInspection
+    
+    func addPreTripInspectionForTrip(by id: UUID,
+                                     inspection: [TripInspectionItem: Bool],
+                                     note: String) async throws
+    
+    func addPostTripInspectionForTrip(by id: UUID,
+                                      inspection: [TripInspectionItem: Bool],
+                                      note: String) async throws
+    
+    //MARK: Maintenance Task
+    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID,
+                                  for vehicleID: Int, ofType type: MaintenanceTaskType,
+                                  _ issueNote: String) async throws -> MaintenanceTask
+    
+    func getManagerAssignedMaintenanceTasks(by id: UUID) async throws -> [MaintenanceTask]
+    
+    func getMaintenancePersonnelTasks(by id: UUID) async throws -> [MaintenanceTask]
+    
+    func makeMaintenanceTaskInProgress(by id: UUID) async throws
+    
+    func updateMaintenanceTaskEstimatedDate(by id: UUID, _ date: Date) async throws
+    
+    func createInvoiceForMaintenanceTask(by id: UUID, expenses: [MaintenanceExpenseType: Double], _ repairNote: String) async throws
 }
