@@ -143,7 +143,7 @@ struct StaffView: View {
             let availableDrivers = searchResults.filter{ $0.status == .available && $0.activeStatus && !$0.meta_data.firstTimeLogin }
             let onTripDrivers = searchResults.filter { $0.status == .onTrip && $0.activeStatus && !$0.meta_data.firstTimeLogin }
             let inactiveDrivers = searchResults.filter { !$0.activeStatus }
-            let offlineDrivers = searchResults.filter { $0.meta_data.firstTimeLogin }
+            let offlineDrivers = searchResults.filter { $0.activeStatus && $0.meta_data.firstTimeLogin }
             
             var results: [Driver] = []
             

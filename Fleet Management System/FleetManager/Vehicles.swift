@@ -297,9 +297,21 @@ struct VehiclesView: View {
         case _ where selectedFilter.contains("Inactive"):
             return searchResults.filter { !$0.activeStatus }
         case _ where selectedFilter.contains(VehicleStatus.underMaintenance.rawValue):
-            return searchResults.filter { $0.status == .underMaintenance}
+            return searchResults.filter { $0.status == .underMaintenance && $0.activeStatus }
         default:
-            return searchResults.filter { _ in true }
+            let availableVehicles = searchResults.filter{ $0.status == .available && $0.activeStatus }
+            let assignedVehicles = searchResults.filter { $0.status == .assigned }
+            let inactiveVehicles = searchResults.filter { !$0.activeStatus }
+            let underMaintenanceVehicles = searchResults.filter { $0.status == .underMaintenance && $0.activeStatus }
+            
+            var results: [Vehicle] = []
+            
+            results.append(contentsOf: availableVehicles)
+            results.append(contentsOf: assignedVehicles)
+            results.append(contentsOf: underMaintenanceVehicles)
+            results.append(contentsOf: inactiveVehicles)
+            
+            return results
         }
     }
     
