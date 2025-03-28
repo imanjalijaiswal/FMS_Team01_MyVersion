@@ -472,8 +472,13 @@ struct VehicleDetailsView: View {
                 Section("Required Details") {
                     TextField("Model", text: $model)
                         .textContentType(.none)
-                    TextField("Company Name", text: $make)
-                        .textContentType(.organizationName)
+                    
+                    Picker("Company Name", selection: $make) {
+                        ForEach(viewModel.vehicleCompanies, id: \.self) { company in
+                            Text(company).tag(company)
+                        }
+                    }
+                    
                     VStack(alignment: .leading, spacing: 4) {
                         TextField("VIN", text: $vinNumber)
                             .textContentType(.none)
@@ -757,6 +762,11 @@ struct VehicleDetailsView: View {
                     }
                     .foregroundColor(isFormValid ? Color.primaryGradientEnd : Color.gray)
                     .disabled(!isFormValid)
+                }
+            }
+            .onAppear {
+                if !viewModel.vehicleCompanies.isEmpty {
+                    make = viewModel.vehicleCompanies[0]
                 }
             }
         }
