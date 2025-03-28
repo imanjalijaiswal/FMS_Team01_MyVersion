@@ -379,13 +379,30 @@ class IFEDataController: ObservableObject {
     }
     
     func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
-        if let index = trips.firstIndex(where: { $0.id == trip.id }) {
-            Task {
-                do {
-                    try await remoteController.updateTripStatus(by: trip.id, to: newStatus)
-                    trips[index].status = newStatus
-                } catch {
-                    print("Error while updating the trip status: \(error.localizedDescription)")
+        if let user {
+            let tripsToSearch: [Trip]
+            
+            if user.role == .fleetManager {
+                tripsToSearch = trips
+            } else if user.role == .driver {
+                tripsToSearch = tripsForDriver
+            } else {
+                tripsToSearch = []
+            }
+            
+            if let index = tripsToSearch.firstIndex(where: { $0.id == trip.id }) {
+                Task {
+                    do {
+                        try await remoteController.updateTripStatus(by: trip.id, to: newStatus)
+                        
+                        if user.role == .fleetManager {
+                            trips[index].status = newStatus
+                        } else if user.role == .driver {
+                            tripsForDriver[index].status = newStatus
+                        }
+                    } catch {
+                        print("Error while updating the trip status: \(error.localizedDescription)")
+                    }
                 }
             }
         }
