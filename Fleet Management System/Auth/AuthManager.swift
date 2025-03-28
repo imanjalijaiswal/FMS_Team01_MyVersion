@@ -9,165 +9,6 @@ import Foundation
 import Supabase
 import Auth
 
-protocol User: Codable, Equatable, Identifiable {
-    var meta_data: UserMetaData { get set }
-    
-    var id: UUID { get }
-    
-    var activeStatus: Bool { get }
-    var employeeID: Int { get }
-    var role: Role { get }
-}
-
-struct UserMetaData: Codable, Equatable, Identifiable {
-    var id: UUID
-    var fullName: String
-    var email: String
-    var phone: String
-    var role: Role
-    var employeeID: Int
-    var firstTimeLogin: Bool
-    var createdAt: Date
-    var activeStatus: Bool
-    
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.id == rhs.id
-    }
-}
-
-struct FleetManager: User {
-    var activeStatus: Bool { return meta_data.activeStatus }
-    
-    var employeeID: Int { return meta_data.employeeID }
-    
-    var role: Role { return meta_data.role }
-    
-    var meta_data: UserMetaData
-    var id: UUID { meta_data.id }
-}
-
-struct Driver: User {
-    var activeStatus: Bool { return meta_data.activeStatus }
-    
-    var employeeID: Int { return meta_data.employeeID }
-    
-    var role: Role { return meta_data.role }
-    
-    var meta_data: UserMetaData
-    var licenseNumber: String
-    var totalTrips: Int
-    var status: DriverStatus
-    
-    var id: UUID { meta_data.id }
-}
-
-struct AppUser: Codable, Equatable, Identifiable {
-    var userData: UserSpecificData
-
-    enum UserSpecificData: Codable, Equatable {
-        case driver(Driver)
-        case fleetManager(FleetManager)
-
-        enum CodingKeys: String, CodingKey {
-            case type, data
-        }
-
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            switch self {
-            case .driver(let driver):
-                try container.encode("driver", forKey: .type)
-                try container.encode(driver, forKey: .data)
-            case .fleetManager(let manager):
-                try container.encode("fleetManager", forKey: .type)
-                try container.encode(manager, forKey: .data)
-            }
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let type = try container.decode(String.self, forKey: .type)
-
-            switch type {
-            case "driver":
-                let driver = try container.decode(Driver.self, forKey: .data)
-                self = .driver(driver)
-            case "fleetManager":
-                let manager = try container.decode(FleetManager.self, forKey: .data)
-                self = .fleetManager(manager)
-            default:
-                throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Invalid role type")
-            }
-        }
-    }
-
-    var meta_data: UserMetaData {
-        switch userData {
-        case .driver(let driver):
-            return driver.meta_data
-        case .fleetManager(let fleetManager):
-            return fleetManager.meta_data
-        }
-    }
-    
-    var role: Role { return meta_data.role }
-    
-    var licenseNumber: String? {
-        switch userData {
-        case .driver(let driver):
-            return driver.licenseNumber
-        default: return nil
-        }
-    }
-    
-    var totalTrips: Int? {
-        switch userData {
-        case .driver(let driver):
-            return driver.totalTrips
-        default: return nil
-        }
-    }
-    
-    var driverStatus: DriverStatus? {
-        switch userData {
-        case .driver(let driver):
-            return driver.status
-        default: return nil
-        }
-    }
-    
-    var id: UUID {  return meta_data.id }
-    
-    var activeStatus: Bool { return meta_data.activeStatus }
-    
-    var employeeID: Int { return meta_data.employeeID }
-}
-
-
-//struct AppUser: Equatable {
-//   var id: String
-//   var email: String?
-//   var role: Role
-////   var workingStatus: Bool
-//   
-//   static func == (lhs: AppUser, rhs: AppUser) -> Bool {
-//       return lhs.id == rhs.id && lhs.email == rhs.email && lhs.role == rhs.role
-//   }
-//}
-//
-//struct UserRoles:Codable{
-//    var id : UUID
-//    var role : Role
-//    var workingStatus : Bool
-//    var firstTimeLogin : Bool
-//    var createdAt : Date
-//}
-
-enum Role: String, Codable {
-    case fleetManager = "fleetManager"
-    case driver = "driver"
-    case maintenancePersonnel = "maintenancePersonnel"
-}
 
 //enum AuthError: Error {
 //    case inactiveUser
@@ -377,12 +218,17 @@ class AuthManager{
                 .execute()
                 .value
             return AppUser(userData: .driver(driverData))
-        case .fleetManager, .maintenancePersonnel:
+        case .fleetManager:
             let managerData: FleetManager = try await client
                 .rpc("get_fleet_manager_data_by_id", params: ["p_id": id.uuidString])
                 .execute()
                 .value
             return AppUser(userData: .fleetManager(managerData))
+        case .maintenancePersonnel:
+            let personnelData: MaintenancePersonnel = try await client
+                .rpc("get_maintenance_personnel_data_by_id", params: ["p_id": id.uuidString])
+                .execute().value
+            return AppUser(userData: .maintenancePersonnel(personnelData))
         }
     }
     
@@ -404,7 +250,8 @@ class AuthManager{
             
             let userRole = try JSONDecoder().decode(UserRole.self, from: response.data)
             if userRole.role == "driver" { return .driver }
-            else { return .fleetManager }
+            else if userRole.role == "fleetManager" { return .fleetManager }
+            else { return .maintenancePersonnel }
 //            print("JSON: \(json)")
 //            if let json = try? JSONSerialization.jsonObject(with: response.data, options: []) as? [String: Any] {
 //                   let roleString = json["role"] as? String
@@ -425,7 +272,7 @@ class AuthManager{
             return cachedValue
         }
         
-        guard let userUUID = UUID(uuidString: userId) else {
+        guard let _ = UUID(uuidString: userId) else {
             print("Invalid UUID format: \(userId)")
             return false // Default to false if UUID is invalid
         }
@@ -446,7 +293,7 @@ class AuthManager{
 
     /// Updates the firstTimeLogin status for a user in the UserRoles table
     func updateFirstTimeLoginStatus(userId: String, firstTimeLogin: Bool) async throws {
-        guard let userUUID = UUID(uuidString: userId) else {
+        guard let _ = UUID(uuidString: userId) else {
             throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
         }
         
@@ -466,7 +313,7 @@ class AuthManager{
     }
     
     func getWorkingStatus(userId: String) async throws -> Bool {
-        guard let userUUID = UUID(uuidString: userId) else {
+        guard let _ = UUID(uuidString: userId) else {
             throw NSError(domain: "Invalid UUID format", code: 0, userInfo: nil)
         }
 

@@ -18,4 +18,14 @@ extension Color {
     static let textSecondary = Color(red: 119/255, green: 119/255, blue: 119/255)
     static let statusRed = Color.primaryGradientStart
 
+    
+    
+    static let tealGreen = Color(red : 102/255, green : 204/255, blue : 153/255)
+    static let backgroundTealGreen = Color(red : 83/255, green : 204/255, blue : 153/255)
+    static let lightOrange = Color(red: 201/255, green: 181/255, blue: 169/255)
+    static let orange = Color(red : 206/255,green: 143/255,blue: 113/255)
+    static let darkOrange = Color(red: 212/255, green: 97/255, blue: 53/255)
+    static let lightwhite = Color(red: 253/255, green: 253/255, blue: 253/255)
+    static let lightWhiteGrey = Color(red: 228/255, green: 228/255, blue: 228/255)
+    static let blackFont = Color(red: 24/255, green: 24/255, blue: 24/255)
 }

@@ -18,6 +18,7 @@ class IFEDataController: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
     @Published var tripsForDriver: [Trip] = []
+    @Published var maintenancePersonnels: [MaintenancePersonnel] = []
     @Published var vehicleCompanies: [String] = []
     let remoteController = RemoteController.shared
     
@@ -30,6 +31,7 @@ class IFEDataController: ObservableObject {
                 } else {
                     await loadDrivers()
                     await loadVehicles()
+                    await loadMaintenancePersonnels()
                     await loadTrips()
                     await loadVehicleCompanies()
                 }
@@ -61,6 +63,15 @@ class IFEDataController: ObservableObject {
             vehicles = try await remoteController.getRegisteredVehicles()
         } catch {
             print("Error while fetching registered vehicles: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func loadMaintenancePersonnels() async {
+        do {
+            maintenancePersonnels = try await remoteController.getRegisteredMaintenancePersonnels()
+        } catch {
+            print("Error while fetching registered maintenance personnels: \(error.localizedDescription)")
         }
     }
     
@@ -165,6 +176,7 @@ class IFEDataController: ObservableObject {
         }
     }
     
+
     func addVehicle(_ vehicle: Vehicle) {
         Task {
             do {
@@ -260,8 +272,6 @@ class IFEDataController: ObservableObject {
                 print("Error assigning the new trip: \(error.localizedDescription)")
             }
         }
-//
-//        try await remoteController.a
     }
     
     func getFilteredTrips(status: TripStatus?) -> [Trip] {
@@ -395,6 +405,242 @@ class IFEDataController: ObservableObject {
             return nil
         }
     }
+    
+    /// Fetches offline drivers from the remote controller.
+    ///
+    /// This function asynchronously retrieves the list of offline drivers
+    /// and returns them using a completion handler.
+    ///
+    /// - Parameter completion: A closure that receives an optional array of `Driver`.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// getOfflineDrivers { drivers in
+    ///     if let drivers = drivers {
+    ///         print("Fetched offline drivers: \(drivers)")
+    ///     } else {
+    ///         print("Failed to fetch offline drivers.")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Note: This function runs asynchronously using a `Task`, so the callback
+    ///   executes after the network request completes.
+    func getOfflineDrivers(completion: @escaping ([Driver]?) -> Void) {
+        Task {
+            do {
+                let drivers = try await remoteController.getOfflineDrivers()
+                completion(drivers)
+            } catch {
+                print("Error while fetching offline drivers: \(error.localizedDescription)")
+                completion(nil)
+            }
+        }
+    }
+    
+    /// Fetches the trip inspection for a given trip ID.
+    ///
+    /// This function asynchronously retrieves the `TripInspection` record
+    /// associated with a specific trip. If an error occurs, it returns `nil`.
+    ///
+    /// - Parameter id: The unique identifier (`UUID`) of the trip.
+    /// - Returns: An optional `TripInspection` object. Returns `nil` if an error occurs.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// let tripId = UUID()
+    /// Task {
+    ///     if let inspection = await getTripInspectionForTrip(by: tripId) {
+    ///         print("Fetched trip inspection: \(inspection)")
+    ///     } else {
+    ///         print("Failed to fetch trip inspection.")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Note: This function uses `async/await` and should be called within an async context.
+    ///   Any errors encountered are logged but not thrown.
+    func getTripInspectionForTrip(by id: UUID) async -> TripInspection? {
+        do {
+            return try await remoteController.getTripInspectionForTrip(by: id)
+        } catch {
+            print("Error while fetching trip inspection: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Adds a pre-trip inspection for a specific trip.
+    ///
+    /// This function asynchronously sends a pre-trip inspection report for a given trip ID.
+    /// It includes a dictionary of `TripInspectionItem` values mapped to `Bool`
+    /// to indicate whether each inspection item passed or failed.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier (`UUID`) of the trip.
+    ///   - inspection: A dictionary where keys are `TripInspectionItem` (an enum) and
+    ///     values are `Bool`, indicating the status of each inspection item.
+    ///   - note: A `String` containing any additional notes related to the inspection.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// let tripId = UUID()
+    /// let inspectionData: [TripInspectionItem: Bool] = [
+    ///     .tireCondition: true,
+    ///     .mirros: false
+    /// ]
+    /// let note = "Tire pressure needs to be checked."
+    ///
+    /// addPreTripInspectionForTrip(by: tripId, inspection: inspectionData, note: note)
+    /// ```
+    ///
+    /// - Note: This function runs asynchronously inside a `Task`, so it should be called
+    ///   within an async-safe context. Errors are logged but not thrown.
+    func addPreTripInspectionForTrip(by id: UUID,
+                                     inspection: [TripInspectionItem: Bool],
+                                     note: String) {
+        Task {
+            do {
+                try await remoteController.addPreTripInspectionForTrip(by: id, inspection: inspection, note: note)
+            } catch {
+                print("Error while adding pre-trip inspection: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Adds a post-trip inspection for a specific trip.
+    ///
+    /// This function asynchronously sends a post-trip inspection report for a given trip ID.
+    /// It includes a dictionary of `TripInspectionItem` values mapped to `Bool`
+    /// to indicate whether each inspection item passed or failed.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier (`UUID`) of the trip.
+    ///   - inspection: A dictionary where keys are `TripInspectionItem` (an enum) and
+    ///     values are `Bool`, indicating the status of each inspection item.
+    ///   - note: A `String` containing any additional notes related to the inspection.
+    ///
+    /// ## Example Usage:
+    /// ```swift
+    /// let tripId = UUID()
+    /// let inspectionData: [TripInspectionItem: Bool] = [
+    ///     .tireCondition: true,
+    ///     .mirros: false
+    /// ]
+    /// let note = "Tire pressure needs to be checked."
+    ///
+    /// addPostTripInspectionForTrip(by: tripId, inspection: inspectionData, note: note)
+    /// ```
+    ///
+    /// - Note: This function runs asynchronously inside a `Task`, so it should be called
+    ///   within an async-safe context. Errors are logged but not thrown.
+    func addPostTripInspectionForTrip(by id: UUID,
+                                      inspection: [TripInspectionItem: Bool],
+                                      note: String) {
+        Task {
+            do {
+                try await remoteController.addPostTripInspectionForTrip(by: id, inspection: inspection, note: note)
+            } catch {
+                print("Error while adding post-trip inspection: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Fetches the metadata for a user by their unique identifier.
+    ///
+    /// - Parameter id: The unique identifier (UUID) of the user.
+    /// - Returns: A `UserMetaData` object if the request is successful, otherwise `nil`.
+    /// - Note: This function performs an asynchronous network request.
+    /// - Throws: Prints an error message if fetching metadata fails.
+    ///
+    /// Usage:
+    /// ```swift
+    /// let userMetaData = await getUserMetaData(by: userId)
+    /// if let metaData = userMetaData {
+    ///     print("User metadata fetched: \(metaData)")
+    /// } else {
+    ///     print("Failed to fetch user metadata.")
+    /// }
+    /// ```
+    func getUserMetaData(by id: UUID) async -> UserMetaData? {
+        do {
+            return try await remoteController.getUserMetaData(by: id)
+        } catch {
+            print("Error while fetching user meta data: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Adds a new maintenance personnel to the system asynchronously.
+    ///
+    /// - Parameters:
+    ///   - personnel: The `MaintenancePersonnel` object containing metadata like email, phone number, and full name.
+    ///   - password: The password to be associated with the new maintenance personnel account.
+    ///
+    /// - Discussion:
+    ///   - This function follows these steps:
+    ///     1. Saves the current fleet manager’s ID before performing any operations.
+    ///     2. Creates a new maintenance personnel account with the given email and password.
+    ///     3. Retrieves the highest existing employee ID and increments it for the new personnel.
+    ///     4. Saves the personnel metadata (phone number, full name, and employee ID).
+    ///     5. Ensures that the fleet manager session remains active after personnel creation.
+    ///     6. Updates the UI by appending the new personnel to the `maintenancePersonnels` array on the main thread.
+    ///
+    /// - Throws: An error if any of the async operations fail.
+    ///
+    /// - Note: If the fleet manager session is lost during personnel creation, an attempt is made to restore it.
+    ///
+    func addMaintenancePersonnel(_ personnel: MaintenancePersonnel, password: String) async {
+        do {
+            // Save the current fleet manager ID before any operations
+            if let currentUser = user, currentUser.role == .fleetManager {
+                AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
+            }
+            
+            // Create the new driver
+            let new_personnel_uid = try await remoteController.createNewMaintenancePersonnel(personnel.meta_data.email, password: password)
+            let employeeID = try await remoteController.getMaxEmployeeID(ofType: .maintenancePersonnel)
+            
+            // Add the driver metadata
+            let newPersonnel = try await remoteController.addNewMaintenancePersonnelMetaData(by: new_personnel_uid, phoneNumber: personnel.meta_data.phone, fullName: personnel.meta_data.fullName, employeeID: employeeID+1)
+            
+            // Make sure the current user is still set correctly after driver creation
+            if user == nil || user?.role != .fleetManager {
+                // Attempt to restore the fleet manager session
+                if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                    let role = try await remoteController.getUserRole(by: fleetManagerId.uuidString)
+                    if role == .fleetManager {
+                        user = try await AuthManager.shared.getAppUser(byType: role, id: fleetManagerId)
+                    }
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.maintenancePersonnels.append(newPersonnel)
+            }
+        } catch {
+            print("Error adding maintenance personnel: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Retrieves a registered maintenance personnel by their unique identifier.
+    ///
+    /// - Parameter id: The `UUID` of the maintenance personnel to fetch.
+    /// - Returns: A `MaintenancePersonnel` object if found, otherwise `nil`.
+    ///
+    /// - Discussion:
+    ///   - This function attempts to fetch a registered maintenance personnel from `remoteController`.
+    ///   - If the operation fails, an error message is printed, and `nil` is returned.
+    ///
+    /// - Throws: This function handles errors internally and does not propagate them.
+    ///
+    func getRegisteredMaintenancePersonnel(by id: UUID) async -> MaintenancePersonnel? {
+        do {
+            return try await remoteController.getRegisteredMaintenancePersonnel(by: id)
+        } catch {
+            print("Error while fetching the maintenance personnel by id: \(error.localizedDescription)")
+            return nil
+        }
+    }
 }
 
 func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {
@@ -444,4 +690,9 @@ func getCoordinates(from address: String) async -> String? {
         print("Geocoding failed: \(error.localizedDescription)")
     }
     return nil
+}
+
+func estimatedDate(from startDate: Date, hours: Float) -> Date {
+    let secondsToAdd = Int(hours * 3600)// Convert hours to seconds
+    return Calendar.current.date(byAdding: .second, value: secondsToAdd, to: startDate) ?? startDate
 }
