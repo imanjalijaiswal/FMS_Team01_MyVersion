@@ -19,6 +19,8 @@ class IFEDataController: ObservableObject {
     @Published var trips: [Trip] = []
     @Published var tripsForDriver: [Trip] = []
     @Published var maintenancePersonnels: [MaintenancePersonnel] = []
+    @Published var managerAssignedMaintenanceTasks: [MaintenanceTask] = []
+    @Published var personnelTasks: [MaintenanceTask] = []
     @Published var vehicleCompanies: [String] = []
     let remoteController = RemoteController.shared
     
@@ -28,11 +30,14 @@ class IFEDataController: ObservableObject {
             if let user = user {
                 if user.role == .driver {
                     await loadTripsForDriver()
+                } else if user.role == .maintenancePersonnel {
+                    await loadPersonnelTasks()
                 } else {
                     await loadDrivers()
                     await loadVehicles()
                     await loadMaintenancePersonnels()
                     await loadTrips()
+                    await loadManagerAssignedMaintenanceTasks()
                     await loadVehicleCompanies()
                 }
             }
@@ -80,7 +85,6 @@ class IFEDataController: ObservableObject {
         do {
             if let user = user {
                 if user.role == .fleetManager {
-                    print(user.id.uuidString)
                     trips = try await remoteController.getManagerAssignedTrips(by: user.id)
                 }
             }
@@ -103,12 +107,37 @@ class IFEDataController: ObservableObject {
         do {
             if let user = user {
                 if user.role == .driver{
-                    print(user.id.uuidString)
                     tripsForDriver = try await remoteController.getDriverTrips(by: user.id)
                 }
             }
         }catch {
             print("Error while fetching trips for driver : \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    func loadPersonnelTasks() async {
+        do {
+            if let user = user {
+                if user.role == .maintenancePersonnel{
+                    personnelTasks = try await remoteController.getMaintenancePersonnelTasks(by: user.id)
+                }
+            }
+        }catch {
+            print("Error while fetching tasks assigned to maintenance personnel: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    func loadManagerAssignedMaintenanceTasks() async {
+        do {
+            if let user = user {
+                if user.role == .fleetManager{
+                    managerAssignedMaintenanceTasks = try await remoteController.getManagerAssignedMaintenanceTasks(by: user.id)
+                }
+            }
+        }catch {
+            print("Error while fetching tasks assigned by fleet manager to maintenance personnel : \(error.localizedDescription)")
         }
     }
     
@@ -639,6 +668,112 @@ class IFEDataController: ObservableObject {
         } catch {
             print("Error while fetching the maintenance personnel by id: \(error.localizedDescription)")
             return nil
+        }
+    }
+    
+
+    /// Assigns a new maintenance task to the specified personnel for a given vehicle.
+    ///
+    /// This asynchronous function communicates with a remote controller to assign a new maintenance task.
+    /// It takes the manager's ID, personnel's ID, vehicle ID, the type of maintenance task, and an issue note
+    /// describing the problem. In case of an error during the assignment, the function returns `nil`
+    /// and prints an error message to the console.
+    ///
+    /// - Parameters:
+    ///   - managerID: The unique identifier of the manager assigning the task.
+    ///   - personnelID: The unique identifier of the personnel to whom the task is being assigned.
+    ///   - vehicleID: The ID of the vehicle requiring maintenance.
+    ///   - type: The type of maintenance task to be performed.
+    ///   - issueNote: A string describing the issue to be addressed.
+    /// - Returns: A `MaintenanceTask` object if the assignment is successful, or `nil` if an error occurs.
+    ///
+    /// - Throws: This function does not throw errors directly, but errors encountered during
+    ///          the assignment process are caught and logged.
+    ///
+    /// # Example Usage:
+    /// ```swift
+    /// let task = await assignNewMaintenanceTask(by: UUID(), to: UUID(), for: 101, ofType: .oilChange, "Oil leakage from the engine.")
+    /// if let task = task {
+    ///     print("Maintenance task assigned: \(task)")
+    /// } else {
+    ///     print("Failed to assign maintenance task.")
+    /// }
+    /// ```
+    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID,
+                                  for vehicleID: Int, ofType type: MaintenanceTaskType,
+                                  _ issueNote: String) async -> MaintenanceTask? {
+        do {
+            return try await remoteController.assignNewMaintenanceTask(by: managerID, to: personnelID, for: vehicleID, ofType: type, issueNote)
+        } catch {
+            print("Error while assigning new maintenance tasks: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Updates the status of a maintenance task to "in-progress".
+    ///
+    /// This asynchronous function communicates with a remote controller to update the status
+    /// of a specified maintenance task to "in-progress". In case of an error during the update,
+    /// it catches the error and logs the message to the console.
+    ///
+    /// - Parameter id: The unique identifier of the maintenance task to be updated.
+    ///
+    /// # Example Usage:
+    /// ```swift
+    /// await makeMaintenanceTaskInProgress(by: UUID())
+    /// ```
+    func makeMaintenanceTaskInProgress(by id: UUID) async {
+        do {
+            try await remoteController.makeMaintenanceTaskInProgress(by: id)
+        } catch {
+            print("Error while updating the maintenance task status to in-progress: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Updates the estimated completion date of a maintenance task.
+    ///
+    /// This asynchronous function communicates with a remote controller to update the estimated
+    /// completion date of a specified maintenance task. If an error occurs during the update process,
+    /// it catches the error and logs the message to the console.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the maintenance task whose estimated date needs to be updated.
+    ///   - date: The new estimated completion date for the maintenance task.
+    ///
+    /// # Example Usage:
+    /// ```swift
+    /// await updateMaintenanceTaskEstimatedDate(by: UUID(), Date())
+    /// ```
+    func updateMaintenanceTaskEstimatedDate(by id: UUID, _ date: Date) async {
+        do {
+            try await remoteController.updateMaintenanceTaskEstimatedDate(by: id, date)
+        } catch {
+            print("Error while updating the estimated date of maintenance task: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Creates an invoice for a maintenance task, including detailed expenses and a repair note.
+    ///
+    /// This asynchronous function communicates with a remote controller to generate an invoice
+    /// for a specified maintenance task. It accepts the task ID, a dictionary of expenses categorized
+    /// by maintenance expense type, and a repair note detailing the work done. If an error occurs
+    /// during invoice creation, it catches the error and logs the message to the console.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the maintenance task for which the invoice is being created.
+    ///   - expenses: A dictionary mapping `MaintenanceExpenseType` to the associated cost of each expense.
+    ///   - repairNote: A string providing details about the repair work performed.
+    ///
+    /// # Example Usage:
+    /// ```swift
+    /// let expenses: [MaintenanceExpenseType: Double] = [.laborsCost: 150.0, .partsCost: 300.0]
+    /// await createInvoiceForMaintenanceTask(by: UUID(), expenses: expenses, "Replaced brake pads and performed an oil change.")
+    /// ```
+    func createInvoiceForMaintenanceTask(by id: UUID, expenses: [MaintenanceExpenseType: Double], _ repairNote: String) async {
+        do {
+            try await remoteController.createInvoiceForMaintenanceTask(by: id, expenses: expenses, repairNote)
+        } catch {
+            print("Error while creating the invoice for maintenance task: \(error.localizedDescription)")
         }
     }
 }
