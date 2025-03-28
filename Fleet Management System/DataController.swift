@@ -209,8 +209,25 @@ class IFEDataController: ObservableObject {
     func addVehicle(_ vehicle: Vehicle) {
         Task {
             do {
-                var newVehicle = vehicle
-                newVehicle.id = try await remoteController.addNewVehicle(vehicle)
+                let newVehicle = Vehicle(
+                    id: try await remoteController.addNewVehicle(vehicle),
+                    make: vehicle.make,
+                    model: vehicle.model.uppercased(),
+                    vinNumber: vehicle.vinNumber,
+                    licenseNumber: vehicle.licenseNumber,
+                    fuelType: vehicle.fuelType,
+                    loadCapacity: vehicle.loadCapacity,
+                    insurancePolicyNumber: vehicle.insurancePolicyNumber,
+                    insuranceExpiryDate: vehicle.insuranceExpiryDate,
+                    pucCertificateNumber: vehicle.pucCertificateNumber,
+                    pucExpiryDate: vehicle.pucExpiryDate,
+                    rcNumber: vehicle.rcNumber,
+                    rcExpiryDate: vehicle.rcExpiryDate,
+                    currentCoordinate: vehicle.currentCoordinate,
+                    status: vehicle.status,
+                    activeStatus: vehicle.activeStatus
+                )
+                
                 DispatchQueue.main.async {
                     self.vehicles.append(newVehicle)
                 }
