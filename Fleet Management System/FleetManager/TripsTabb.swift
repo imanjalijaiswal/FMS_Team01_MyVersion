@@ -102,7 +102,10 @@ struct TripCard: View {
     }
     
     var vehicleNumber: String {
-        viewModel.vehicles.first { $0.id == trip.assignedVehicleID }?.vinNumber ?? "Unknown Vehicle"
+        if let vehicle = viewModel.vehicles.first(where: { $0.id == trip.assignedVehicleID }) {
+            return "\(vehicle.make) • \(vehicle.licenseNumber)"
+        }
+        return "Unknown Vehicle"
     }
     
     var body: some View {
@@ -635,8 +638,8 @@ struct LocationSearchBar: View {
                                         .foregroundColor(.gray)
                                 }
                             }
-                            .padding(.vertical, 4)
-                            Divider()
+                                    .padding(.vertical, 4)
+                                    Divider()
                         }
                     }
                     .padding()
@@ -781,10 +784,11 @@ struct LocationRow: View {
     let location: String
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack {
             Text(title)
                 .font(.caption)
                 .foregroundColor(.gray)
+                .frame(width: 50, alignment: .leading)
             Text(location)
                 .font(.subheadline)
         }
@@ -839,9 +843,9 @@ struct VehicleCardContent: View {
                             .foregroundColor(.gray)
                     }
                 Label(vehicleAddress, systemImage: "location.fill")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding(.trailing, 5)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.trailing, 5)
                 // Fuel and Weight
         
                     Label(vehicle.fuelType.rawValue, systemImage: "fuelpump.fill")
@@ -863,12 +867,12 @@ struct VehicleCardContent: View {
                     
                     VStack(alignment: .leading){
                         Text("Insurance Number: \(vehicle.insurancePolicyNumber)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                        .font(.caption)
+                        .foregroundColor(.gray)
                        
                         Text("Expires At: \(vehicle.insuranceExpiryDate.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                        .font(.caption)
+                        .foregroundColor(.gray)
                     }
                     .padding(.leading, 15)
                 }
@@ -1010,4 +1014,3 @@ struct VehicleSelectionView: View {
 #Preview{
     TripsView()
 }
-
