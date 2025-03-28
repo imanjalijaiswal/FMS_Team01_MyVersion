@@ -96,13 +96,13 @@ protocol DatabaseAPIIntegrable {
                                       note: String) async throws
     
     //MARK: Maintenance Task
-    func assignNewMaintenanceTask(byManagerID: UUID, to personnelID: UUID,
+    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID,
                                   for vehicleID: Int, ofType type: MaintenanceTaskType,
                                   _ issueNote: String) async throws -> MaintenanceTask
     
     func getManagerAssignedMaintenanceTasks(by id: UUID) async throws -> [MaintenanceTask]
     
-    func getMaintenancePersonnelTasks(bu id: UUID) async throws -> [MaintenanceTask]
+    func getMaintenancePersonnelTasks(by id: UUID) async throws -> [MaintenanceTask]
     
     func makeMaintenanceTaskInProgress(by id: UUID) async throws
     

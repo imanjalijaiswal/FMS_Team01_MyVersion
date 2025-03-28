@@ -21,7 +21,7 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
-    func assignNewMaintenanceTask(byManagerID: UUID, to personnelID: UUID, for vehicleID: Int, ofType type: MaintenanceTaskType, _ issueNote: String) async throws -> MaintenanceTask {
+    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID, for vehicleID: Int, ofType type: MaintenanceTaskType, _ issueNote: String) async throws -> MaintenanceTask {
         struct AssignMaintenanceTaskParams: Codable {
             let p_assigned_by: String
             let p_assigned_to: String
@@ -30,7 +30,7 @@ class RemoteController: DatabaseAPIIntegrable {
             let p_note: String
         }
         
-        let params = AssignMaintenanceTaskParams(p_assigned_by: byManagerID.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type, p_note: issueNote)
+        let params = AssignMaintenanceTaskParams(p_assigned_by: managerID.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type, p_note: issueNote)
         
         return try await client
             .rpc("assign_new_maintenance_task", params: params)
@@ -105,7 +105,7 @@ class RemoteController: DatabaseAPIIntegrable {
         return tasks;
     }
     
-    func getMaintenancePersonnelTasks(bu id: UUID) async throws -> [MaintenanceTask] {
+    func getMaintenancePersonnelTasks(by id: UUID) async throws -> [MaintenanceTask] {
         struct MaintenanceTaskResponse: Codable {
             let id: UUID
             let type: MaintenanceTaskType
