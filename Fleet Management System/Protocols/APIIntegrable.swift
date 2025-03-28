@@ -94,4 +94,19 @@ protocol DatabaseAPIIntegrable {
     func addPostTripInspectionForTrip(by id: UUID,
                                       inspection: [TripInspectionItem: Bool],
                                       note: String) async throws
+    
+    //MARK: Maintenance Task
+    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID,
+                                  for vehicleID: Int, ofType type: MaintenanceTaskType,
+                                  _ issueNote: String) async throws -> MaintenanceTask
+    
+    func getManagerAssignedMaintenanceTasks(by id: UUID) async throws -> [MaintenanceTask]
+    
+    func getMaintenancePersonnelTasks(by id: UUID) async throws -> [MaintenanceTask]
+    
+    func makeMaintenanceTaskInProgress(by id: UUID) async throws
+    
+    func updateMaintenanceTaskEstimatedDate(by id: UUID, _ date: Date) async throws
+    
+    func createInvoiceForMaintenanceTask(by id: UUID, expenses: [MaintenanceExpenseType: Double], _ repairNote: String) async throws
 }

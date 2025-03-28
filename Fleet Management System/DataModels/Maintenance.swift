@@ -34,7 +34,9 @@ struct Invoice {
     var id: UUID   // this id is same as maintenance task uuid
     var taskID: Int // this id is same as maintenance task id
     var expenses: [MaintenanceExpenseType: Double]
-    var note: String
+    var issueNote: String
+    var repairNote: String
+    var createdAt: Date
     var completionDate: Date
     var vehicleID: Int
     var vehicleLicenseNumber: String
@@ -45,7 +47,7 @@ struct Invoice {
     }
 }
 
-struct MaintenanceTask: Identifiable, Equatable {
+struct MaintenanceTask: Codable, Identifiable, Equatable {
     var id: UUID
     var taskID: Int
     var vehicleID: Int
@@ -57,11 +59,13 @@ struct MaintenanceTask: Identifiable, Equatable {
     var status: MaintenanceStatus
     
     // Estimated values
-    var estimatedCompletionDate: Date? // given by maintenance personnel
-    var note: String
+    var estimatedCompletionDate: Date? // given by maintenance personnel only date no time e.g "2025-03-31"
+    var createdAt: Date
+    var issueNote: String
+    var repairNote: String
     var expenses: [MaintenanceExpenseType: Double]?
 
-    var completionDate: Date?
+    var completionDate: Date? // only date no time e.g "2025-03-31"
     
     // Computed properties
     //MARK: TODO := REVIEW THIS FUNCITONALITY FOR WHERE AND WHY IT IS USING AND TELL ME
@@ -95,7 +99,9 @@ struct MaintenanceTask: Identifiable, Equatable {
                 id: self.id, // this id is same as maintenance task uuid
                 taskID: self.taskID, // this id is same as maintenance task id
                 expenses: expenses,
-                note: self.note,
+                issueNote: self.issueNote,
+                repairNote: self.repairNote,
+                createdAt: self.createdAt,
                 completionDate: completionDate,
                 vehicleID: self.vehicleID,
                 vehicleLicenseNumber: vehicleLicenseNumber,
