@@ -28,4 +28,64 @@ extension Color {
     static let lightwhite = Color(red: 253/255, green: 253/255, blue: 253/255)
     static let lightWhiteGrey = Color(red: 228/255, green: 228/255, blue: 228/255)
     static let blackFont = Color(red: 24/255, green: 24/255, blue: 24/255)
+    
+    
+    
+    static func setColor(status : DriverStatus)->Color{
+            switch status {
+            case .available:
+                return Color.primaryGradientStart
+            case .onTrip:
+                return Color.statusOrange
+            default:
+                return Color.blue
+            }
+        }
+        static func foregroundColorForDriver(driver: Driver) -> Color {
+            if driver.meta_data.firstTimeLogin {
+                return .gray // Offline (firstTimeLogin)
+            } else if !driver.activeStatus {
+                return .red // Inactive (activeStatus)
+            } else {
+                return setColor(status: driver.status) // Status color
+            }
+        }
+        static func setVechicleColor(status : VehicleStatus) -> Color{
+            switch status{
+            case .assigned :
+                .statusOrange
+            case .available :
+                    .primaryGradientStart
+            case .inactive :
+                    .red
+            default:
+                    .blue
+            }
+        }
+        static func setForegroundColor(vehicle : Vehicle) -> Color{
+            if !vehicle.activeStatus {
+                return .red
+            }else{
+                return setVechicleColor(status : vehicle.status)
+            }
+        }
+    static func setMaintaiencePersonalColor(status : MaintenanceStatus) -> Color{
+        switch status{
+        case .completed :
+            return Color.primaryGradientStart
+        case .inProgress :
+            return Color.statusOrange
+        case .scheduled :
+            return Color.blue
+        default:
+            return Color.blue
+        }
+    }
+    static func setMaintaienceColor(maintaiencePersonal : MaintenancePersonnel) -> Color{
+        if maintaiencePersonal.activeStatus{
+            return setMaintaiencePersonalColor(status: .scheduled)
+        }else{
+            return Color.gray
+        }
+    }
 }

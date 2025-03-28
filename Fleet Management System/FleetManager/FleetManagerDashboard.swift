@@ -207,11 +207,11 @@ struct FleetManagerDashboardView: View {
     @StateObject private var viewModel = IFEDataController.shared
     
     var availableDrivers: Int {
-        viewModel.drivers.filter { $0.status == .available && $0.activeStatus}.count
+        viewModel.drivers.filter { $0.status == .available && $0.activeStatus && !$0.meta_data.firstTimeLogin }.count
     }
 
     var onTripDrivers: Int {
-        viewModel.drivers.filter { $0.status == .onTrip && $0.activeStatus}.count
+        viewModel.drivers.filter { $0.status == .onTrip && $0.activeStatus && !$0.meta_data.firstTimeLogin }.count
     }
     
     var inactiveDrivers: Int {
@@ -235,7 +235,7 @@ struct FleetManagerDashboardView: View {
     }
     
     var availableMaintenancePersonnel: Int {
-        viewModel.maintenancePersonnels.filter { $0.activeStatus }.count
+        viewModel.maintenancePersonnels.filter { $0.activeStatus && !$0.meta_data.firstTimeLogin }.count
     }
     
     var inactiveMaintenancePersonnel: Int {
@@ -250,7 +250,6 @@ struct FleetManagerDashboardView: View {
     var completedTrips: Int {
         viewModel.trips.filter { $0.status == .completed }.count
     }
-    
     
     var body: some View {
         ScrollView {
@@ -469,7 +468,7 @@ struct FleetManagerTabBarView: View {
                 VehiclesView()
             }
             .tabItem {
-                Label("Vehicles", systemImage: "car.fill")
+                Label("Vehicles", systemImage: "truck.box.fill")
             }
             
             NavigationView {
