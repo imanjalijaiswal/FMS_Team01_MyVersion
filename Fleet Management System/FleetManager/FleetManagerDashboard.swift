@@ -80,17 +80,38 @@ struct ProgressBarView: View {
                                 }
                                 .frame(height: 8)
             
-            HStack(spacing: 16) {
-                ForEach(items, id: \.0) { item in
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(item.2)
-                            .frame(width: 8, height: 8)
-                        Text("\(item.0)")
-                            .font(.caption)
-                        Text("(\(item.1))")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+            VStack(spacing: 8) {
+                HStack(spacing: 16) {
+                    ForEach(Array(items.prefix(2)), id: \.0) { item in
+                        HStack(spacing: 3) {
+                            Circle()
+                                .fill(item.2)
+                                .frame(width: 8, height: 8)
+                            Text("\(item.0)")
+                                .font(.caption)
+                            Text("(\(item.1))")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Spacer()
+                        }
+                    }
+                }
+                
+                if items.count > 2 {
+                    HStack(spacing: 16) {
+                        ForEach(Array(items.dropFirst(items.count / 2 + items.count % 2)), id: \.0) { item in
+                            HStack(spacing: 3) {
+                                Circle()
+                                    .fill(item.2)
+                                    .frame(width: 8, height: 8)
+                                Text("\(item.0)")
+                                    .font(.caption)
+                                Text("(\(item.1))")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                Spacer()
+                            }
+                        }
                     }
                 }
             }
@@ -208,7 +229,28 @@ struct FleetManagerDashboardView: View {
     var inactiveVehicles: Int {
         viewModel.vehicles.filter { $0.activeStatus == false }.count
     }
-
+    
+    var underMaintenanceVehicles: Int {
+        viewModel.vehicles.filter { $0.status == .underMaintenance && $0.activeStatus }.count
+    }
+    
+    var availableMaintenancePersonnel: Int {
+        viewModel.maintenancePersonnels.filter { $0.activeStatus }.count
+    }
+    
+    var inactiveMaintenancePersonnel: Int {
+        viewModel.maintenancePersonnels.filter { !$0.activeStatus }.count
+    }
+    var scheduledTrips: Int {
+        viewModel.trips.filter { $0.status == .scheduled }.count
+    }
+    var inProgressTrips: Int {
+        viewModel.trips.filter { $0.status == .inProgress }.count
+    }
+    var completedTrips: Int {
+        viewModel.trips.filter { $0.status == .completed }.count
+    }
+    
     
     var body: some View {
         ScrollView {
@@ -233,14 +275,14 @@ struct FleetManagerDashboardView: View {
                         ]
                     )
                     
-//                    ProgressBarView(
-//                        title: "Maintenance",
-//                        total: 4,
-//                        items: [
-//                            ("Completed", 2, Color.mint),
-//                            ("In Progress", 2, Color.primaryGradientEnd)
-//                        ]
-//                    )
+                    ProgressBarView(
+                        title: "Maintenance Personnel",
+                        total: viewModel.maintenancePersonnels.count,
+                        items: [
+                            ("Available", availableMaintenancePersonnel, Color.mint),
+                            ("Inactive", inactiveMaintenancePersonnel, Color.orange)
+                        ]
+                    )
                     
                     ProgressBarView(
                         title: "Trucks",
@@ -248,7 +290,17 @@ struct FleetManagerDashboardView: View {
                         items: [
                             (VehicleStatus.available.rawValue, availableVehicles, Color.mint),
                             (VehicleStatus.assigned.rawValue, assignedVehicles, Color.primaryGradientEnd),
-                            (VehicleStatus.inactive.rawValue, inactiveVehicles, Color.statusOrange)
+                            (VehicleStatus.underMaintenance.rawValue, underMaintenanceVehicles, Color.statusOrange),
+                            (VehicleStatus.inactive.rawValue, inactiveVehicles, Color.gray)
+                        ]
+                    )
+                    ProgressBarView(
+                        title: "Trips",
+                        total: viewModel.trips.count,
+                        items: [
+                            ("Scheduled", scheduledTrips, Color.mint),
+                            ("In Progress", inProgressTrips, Color.primaryGradientStart),
+                            ("Completed ", completedTrips, Color.orange)
                         ]
                     )
                 }

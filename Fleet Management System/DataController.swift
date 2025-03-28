@@ -684,6 +684,34 @@ class IFEDataController: ObservableObject {
             print("Error adding maintenance personnel: \(error.localizedDescription)")
         }
     }
+    func removeMaintenancePersonnel(_ personnel: MaintenancePersonnel) {
+        Task {
+            do {
+                var inactiveMaintainencePersonnel = personnel
+                inactiveMaintainencePersonnel.meta_data.activeStatus = false
+                try await remoteController.updateUserActiveStatus(by: inactiveMaintainencePersonnel.id, with: false)
+                DispatchQueue.main.async {
+                    self.maintenancePersonnels.removeAll { $0 == personnel }
+                    self.maintenancePersonnels.append(inactiveMaintainencePersonnel)
+                }
+            } catch {
+                print("Error while removing the Maintenance Personnel: \(error.localizedDescription)")
+            }
+        }
+    }
+    func enableMaintenancePersonnel(_ personnel: MaintenancePersonnel) {
+        Task {
+            do {
+                var activePersonnel = personnel
+                activePersonnel.meta_data.activeStatus = true
+                try await remoteController.updateUserActiveStatus(by: personnel.id, with: true)
+                maintenancePersonnels.removeAll { $0 == personnel }
+                maintenancePersonnels.append(activePersonnel)
+            } catch {
+                print("Error while enabling the driver: \(error.localizedDescription)")
+            }
+        }
+    }
     
     /// Retrieves a registered maintenance personnel by their unique identifier.
     ///
