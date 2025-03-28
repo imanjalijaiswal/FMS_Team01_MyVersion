@@ -18,6 +18,7 @@ class IFEDataController: ObservableObject {
     @Published var vehicles: [Vehicle] = []
     @Published var trips: [Trip] = []
     @Published var tripsForDriver: [Trip] = []
+    @Published var maintenancePersonnels: [MaintenancePersonnel] = []
     @Published var vehicleCompanies: [String] = []
     let remoteController = RemoteController.shared
     
@@ -30,6 +31,7 @@ class IFEDataController: ObservableObject {
                 } else {
                     await loadDrivers()
                     await loadVehicles()
+                    await loadMaintenancePersonnels()
                     await loadTrips()
                     await loadVehicleCompanies()
                 }
@@ -61,6 +63,15 @@ class IFEDataController: ObservableObject {
             vehicles = try await remoteController.getRegisteredVehicles()
         } catch {
             print("Error while fetching registered vehicles: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func loadMaintenancePersonnels() async {
+        do {
+            maintenancePersonnels = try await remoteController.getRegisteredMaintenancePersonnels()
+        } catch {
+            print("Error while fetching registered maintenance personnels: \(error.localizedDescription)")
         }
     }
     
@@ -261,8 +272,6 @@ class IFEDataController: ObservableObject {
                 print("Error assigning the new trip: \(error.localizedDescription)")
             }
         }
-//
-//        try await remoteController.a
     }
     
     func getFilteredTrips(status: TripStatus?) -> [Trip] {
@@ -533,6 +542,103 @@ class IFEDataController: ObservableObject {
             } catch {
                 print("Error while adding post-trip inspection: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    /// Fetches the metadata for a user by their unique identifier.
+    ///
+    /// - Parameter id: The unique identifier (UUID) of the user.
+    /// - Returns: A `UserMetaData` object if the request is successful, otherwise `nil`.
+    /// - Note: This function performs an asynchronous network request.
+    /// - Throws: Prints an error message if fetching metadata fails.
+    ///
+    /// Usage:
+    /// ```swift
+    /// let userMetaData = await getUserMetaData(by: userId)
+    /// if let metaData = userMetaData {
+    ///     print("User metadata fetched: \(metaData)")
+    /// } else {
+    ///     print("Failed to fetch user metadata.")
+    /// }
+    /// ```
+    func getUserMetaData(by id: UUID) async -> UserMetaData? {
+        do {
+            return try await remoteController.getUserMetaData(by: id)
+        } catch {
+            print("Error while fetching user meta data: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Adds a new maintenance personnel to the system asynchronously.
+    ///
+    /// - Parameters:
+    ///   - personnel: The `MaintenancePersonnel` object containing metadata like email, phone number, and full name.
+    ///   - password: The password to be associated with the new maintenance personnel account.
+    ///
+    /// - Discussion:
+    ///   - This function follows these steps:
+    ///     1. Saves the current fleet manager’s ID before performing any operations.
+    ///     2. Creates a new maintenance personnel account with the given email and password.
+    ///     3. Retrieves the highest existing employee ID and increments it for the new personnel.
+    ///     4. Saves the personnel metadata (phone number, full name, and employee ID).
+    ///     5. Ensures that the fleet manager session remains active after personnel creation.
+    ///     6. Updates the UI by appending the new personnel to the `maintenancePersonnels` array on the main thread.
+    ///
+    /// - Throws: An error if any of the async operations fail.
+    ///
+    /// - Note: If the fleet manager session is lost during personnel creation, an attempt is made to restore it.
+    ///
+    func addMaintenancePersonnel(_ personnel: MaintenancePersonnel, password: String) async {
+        do {
+            // Save the current fleet manager ID before any operations
+            if let currentUser = user, currentUser.role == .fleetManager {
+                AuthManager.shared.saveActiveFleetManager(id: currentUser.id)
+            }
+            
+            // Create the new driver
+            let new_personnel_uid = try await remoteController.createNewMaintenancePersonnel(personnel.meta_data.email, password: password)
+            let employeeID = try await remoteController.getMaxEmployeeID(ofType: .maintenancePersonnel)
+            
+            // Add the driver metadata
+            let newPersonnel = try await remoteController.addNewMaintenancePersonnelMetaData(by: new_personnel_uid, phoneNumber: personnel.meta_data.phone, fullName: personnel.meta_data.fullName, employeeID: employeeID+1)
+            
+            // Make sure the current user is still set correctly after driver creation
+            if user == nil || user?.role != .fleetManager {
+                // Attempt to restore the fleet manager session
+                if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
+                    let role = try await remoteController.getUserRole(by: fleetManagerId.uuidString)
+                    if role == .fleetManager {
+                        user = try await AuthManager.shared.getAppUser(byType: role, id: fleetManagerId)
+                    }
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.maintenancePersonnels.append(newPersonnel)
+            }
+        } catch {
+            print("Error adding maintenance personnel: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Retrieves a registered maintenance personnel by their unique identifier.
+    ///
+    /// - Parameter id: The `UUID` of the maintenance personnel to fetch.
+    /// - Returns: A `MaintenancePersonnel` object if found, otherwise `nil`.
+    ///
+    /// - Discussion:
+    ///   - This function attempts to fetch a registered maintenance personnel from `remoteController`.
+    ///   - If the operation fails, an error message is printed, and `nil` is returned.
+    ///
+    /// - Throws: This function handles errors internally and does not propagate them.
+    ///
+    func getRegisteredMaintenancePersonnel(by id: UUID) async -> MaintenancePersonnel? {
+        do {
+            return try await remoteController.getRegisteredMaintenancePersonnel(by: id)
+        } catch {
+            print("Error while fetching the maintenance personnel by id: \(error.localizedDescription)")
+            return nil
         }
     }
 }
