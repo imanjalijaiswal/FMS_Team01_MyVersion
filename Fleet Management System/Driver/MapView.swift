@@ -65,6 +65,8 @@ class MapViewModel: NSObject, ObservableObject {
     
     private let geocoder = CLGeocoder()
     
+    private let tripViewModel = IFEDataController.shared
+    
     private func convertCoordinateToAddress(_ coordinate: CLLocationCoordinate2D, completion: @escaping (String) -> Void) {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         geocoder.reverseGeocodeLocation(location) { placemarks, error in
@@ -310,6 +312,11 @@ class MapViewModel: NSObject, ObservableObject {
             return
         }
         
+        // Update trip status to completed
+        if let trip = currentTrip {
+            tripViewModel.updateTripStatus(trip, to: .completed)
+        }
+        
         isNavigating = false
         isInNavigationMode = false
         navigationUpdateTimer?.invalidate()
@@ -472,6 +479,7 @@ class MapViewModel: NSObject, ObservableObject {
         
         // Create pickup region
         let pickupCoordinates = parseCoordinates(trip.pickupLocation)
+        print("Setting up pickup geofence at coordinates: \(pickupCoordinates)")
         pickupRegion = CLCircularRegion(
             center: pickupCoordinates,
             radius: geofenceRadius,
@@ -482,6 +490,7 @@ class MapViewModel: NSObject, ObservableObject {
         
         // Create destination region
         let destinationCoordinates = parseCoordinates(trip.destination)
+        print("Setting up destination geofence at coordinates: \(destinationCoordinates)")
         destinationRegion = CLCircularRegion(
             center: destinationCoordinates,
             radius: geofenceRadius,
@@ -492,17 +501,21 @@ class MapViewModel: NSObject, ObservableObject {
         
         // Create circle overlays for visualization
         DispatchQueue.main.async {
+            print("Creating geofence circle overlays")
             self.pickupGeofenceOverlay = MKCircle(center: pickupCoordinates, radius: self.geofenceRadius)
             self.destinationGeofenceOverlay = MKCircle(center: destinationCoordinates, radius: self.geofenceRadius)
+            print("Geofence circle overlays created")
         }
         
         // Start monitoring regions if available
         if CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) {
             if let pickupRegion = pickupRegion {
                 locationManager?.startMonitoring(for: pickupRegion)
+                print("Started monitoring pickup region")
             }
             if let destinationRegion = destinationRegion {
                 locationManager?.startMonitoring(for: destinationRegion)
+                print("Started monitoring destination region")
             }
         } else {
             print("Region monitoring is not available on this device")
@@ -659,6 +672,10 @@ struct MapView: View {
     @Binding var selectedTab: Int
     @State private var cardOffset: CGFloat = 100 // Controls card position
     @State private var cardExpanded: Bool = true
+    @State private var preInspectionCompletedTrips: Set<UUID> = []
+    @State private var tripsRequiringMaintenance: Set<UUID> = []
+    @State private var showingTripOverview = false
+    @State private var selectedTrip: Trip?
     
     // Add constants for card positions
     private let expandedOffset: CGFloat = 90
@@ -667,7 +684,14 @@ struct MapView: View {
     private let bottomSafeArea: CGFloat = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
     
     var activeTrip: Trip? {
-        tripViewModel.tripsForDriver.first { $0.status == .inProgress }
+        tripViewModel.tripsForDriver.first { trip in
+            // Include trips that are either in progress or have completed pre-inspection
+            // but exclude trips that require maintenance
+            trip.status == .inProgress || 
+            (preInspectionCompletedTrips.contains(trip.id) && 
+             trip.status == .scheduled && 
+             !tripsRequiringMaintenance.contains(trip.id))
+        }
     }
     
     var body: some View {
@@ -743,6 +767,18 @@ struct MapView: View {
                             }
                             
                             Spacer()
+                            
+                            Button(action: {
+                                selectedTrip = trip
+                                showingTripOverview = true
+                            }) {
+                                Image(systemName: "info.circle")
+                                    .font(.title3)
+                                    .foregroundColor(.primaryGradientStart)
+                                    .padding(8)
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                            }
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
@@ -782,10 +818,38 @@ struct MapView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingTripOverview) {
+            if let trip = selectedTrip {
+                TripOverviewView(
+                    task: trip,
+                    selectedTab: $selectedTab,
+                    isInDestinationGeofence: viewModel.hasReachedDestination
+                )
+            }
+        }
         .onAppear {
             viewModel.setupLocationManager()
             if let trip = activeTrip {
                 viewModel.setCurrentTrip(trip)
+            }
+        }
+        .task {
+            await checkPreInspections()
+        }
+    }
+    
+    private func checkPreInspections() async {
+        for trip in tripViewModel.tripsForDriver {
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+                let hasAnyFailure = inspection.preInspection.values.contains(false)
+                let hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                
+                if hasCompletedPreInspection {
+                    preInspectionCompletedTrips.insert(trip.id)
+                    if hasAnyFailure {
+                        tripsRequiringMaintenance.insert(trip.id)
+                    }
+                }
             }
         }
     }
@@ -925,6 +989,18 @@ struct MapViewRepresentable: UIViewRepresentable {
         // Remove existing overlays
         mapView.removeOverlays(currentOverlays)
         
+        // Show geofencing circles if we have a trip
+        if let _ = viewModel.currentTrip {
+            if let pickupCircle = viewModel.pickupGeofenceOverlay {
+                print("Adding pickup geofence circle to map")
+                mapView.addOverlay(pickupCircle)
+            }
+            if let destinationCircle = viewModel.destinationGeofenceOverlay {
+                print("Adding destination geofence circle to map")
+                mapView.addOverlay(destinationCircle)
+            }
+        }
+        
         // Add route overlays based on navigation state
         if viewModel.isNavigating {
             // Show only destination route during navigation
@@ -935,14 +1011,6 @@ struct MapViewRepresentable: UIViewRepresentable {
             // Show pickup route when not navigating
             if viewModel.showingPickupRoute, let pickupRoute = viewModel.pickupRoute {
                 mapView.addOverlay(pickupRoute.polyline)
-            }
-            
-            // Show geofencing circles only when not navigating
-            if let pickupCircle = viewModel.pickupGeofenceOverlay {
-                mapView.addOverlay(pickupCircle)
-            }
-            if let destinationCircle = viewModel.destinationGeofenceOverlay {
-                mapView.addOverlay(destinationCircle)
             }
         }
         
@@ -980,11 +1048,14 @@ struct MapViewRepresentable: UIViewRepresentable {
         
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let circle = overlay as? MKCircle {
+                print("Rendering circle overlay")
                 let renderer = MKCircleRenderer(circle: circle)
                 if overlay === parent.viewModel.pickupGeofenceOverlay {
+                    print("Rendering pickup geofence circle")
                     renderer.fillColor = UIColor.orange.withAlphaComponent(0.5)
                     renderer.strokeColor = UIColor.orange.withAlphaComponent(0.8)
                 } else if overlay === parent.viewModel.destinationGeofenceOverlay {
+                    print("Rendering destination geofence circle")
                     renderer.fillColor = UIColor.green.withAlphaComponent(0.5)
                     renderer.strokeColor = UIColor.green.withAlphaComponent(0.8)
                 }

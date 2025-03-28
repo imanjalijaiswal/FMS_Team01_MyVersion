@@ -8,10 +8,23 @@ struct DashboardView: View {
     @State private var showingProfile = false
     @State private var selectedFilter: TaskFilter = .assigned
     @Binding var selectedTab: Int
-    //@State private var viewModel.tripsForDriver: [Trip] = []
+    @State private var preInspectionCompletedTrips: Set<UUID> = []
+    @State private var tripsRequiringMaintenance: Set<UUID> = []
     
     var filteredTrips: [Trip] {
         viewModel.tripsForDriver.filter { task in
+            // First check if this trip is the active trip
+            let isActiveTrip = task.status == .inProgress || 
+                             (preInspectionCompletedTrips.contains(task.id) && 
+                              task.status == .scheduled && 
+                              !tripsRequiringMaintenance.contains(task.id))
+            
+            // If it's the active trip, don't show it in filtered list
+            if isActiveTrip {
+                return false
+            }
+            
+            // Otherwise, apply normal filtering
             switch selectedFilter {
             case .assigned:
                 return task.status == .scheduled
@@ -22,7 +35,14 @@ struct DashboardView: View {
     }
     
     var activeTrip: Trip? {
-        viewModel.tripsForDriver.first { $0.status == .inProgress }
+        viewModel.tripsForDriver.first { trip in
+            // Include trips that are either in progress or have completed pre-inspection
+            // but exclude trips that require maintenance
+            trip.status == .inProgress || 
+            (preInspectionCompletedTrips.contains(trip.id) && 
+             trip.status == .scheduled && 
+             !tripsRequiringMaintenance.contains(trip.id))
+        }
     }
     
     var body: some View {
@@ -86,17 +106,8 @@ struct DashboardView: View {
                 .padding()
             }
             .background(Color(red: 242/255, green: 242/255, blue: 247/255))
-            .navigationTitle("Driver")// Empty title to prevent double title
+            .navigationTitle("Driver")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    //                    Button(action: {
-                    //                        // Action for the bell button
-                    //                    }) {
-                    //                        Image(systemName: "bell.fill")
-                    //                            .font(.title2)
-                    //                            .foregroundColor(.primaryGradientStart)
-                    //                    }
-                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         showingProfile = true
@@ -109,6 +120,25 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingProfile) {
                 ProfileView(user: $user, role: $role)
+            }
+            .task {
+                await checkPreInspections()
+            }
+        }
+    }
+    
+    private func checkPreInspections() async {
+        for trip in viewModel.tripsForDriver {
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+                let hasAnyFailure = inspection.preInspection.values.contains(false)
+                let hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                
+                if hasCompletedPreInspection {
+                    preInspectionCompletedTrips.insert(trip.id)
+                    if hasAnyFailure {
+                        tripsRequiringMaintenance.insert(trip.id)
+                    }
+                }
             }
         }
     }
@@ -237,7 +267,7 @@ struct TaskCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingTripOverview) {
-            TripOverviewView(task: task, selectedTab: $selectedTab)
+            TripOverviewView(task: task, selectedTab: $selectedTab, isInDestinationGeofence: false)
         }
         .task {
             await fetchVehicle() // Fetch vehicle data when TaskCard appears
