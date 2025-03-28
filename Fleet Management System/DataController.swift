@@ -176,6 +176,7 @@ class IFEDataController: ObservableObject {
         }
     }
     
+
     func addVehicle(_ vehicle: Vehicle) {
         Task {
             do {
@@ -689,4 +690,9 @@ func getCoordinates(from address: String) async -> String? {
         print("Geocoding failed: \(error.localizedDescription)")
     }
     return nil
+}
+
+func estimatedDate(from startDate: Date, hours: Float) -> Date {
+    let secondsToAdd = Int(hours * 3600)// Convert hours to seconds
+    return Calendar.current.date(byAdding: .second, value: secondsToAdd, to: startDate) ?? startDate
 }

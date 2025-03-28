@@ -53,7 +53,7 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-                DashboardView(user: $user, role: $role)
+            DashboardView(user: $user, role: $role,selectedTab: $selectedTab)
                     .tabItem {
                         Image(systemName: "square.grid.2x2")
                         Text("Dashboard")

@@ -78,11 +78,13 @@ class RemoteController: DatabaseAPIIntegrable {
         let preInspection = Dictionary(uniqueKeysWithValues: inspection.preInspection.compactMap { key, value in
             TripInspectionItem(rawValue: key).map { ($0, value) }
         })
+
         
         let postInspection = Dictionary(uniqueKeysWithValues: inspection.postInspection.compactMap { key, value in
             TripInspectionItem(rawValue: key).map { ($0, value) }
         })
         
+
         return TripInspection(
             id: inspection.id,
             preInspection: preInspection,
@@ -100,12 +102,14 @@ class RemoteController: DatabaseAPIIntegrable {
         }
         
         let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+
         
         let params = PreInspectionParams(p_id: id.uuidString, p_pre_trip_inspection: inspectionDictionary, p_note: note)
         
+
         try await client
             .rpc("add_pre_trip_inspection_for_trip_id", params: params)
-            .execute().value
+            .execute()
     }
     
     func addPostTripInspectionForTrip(by id: UUID, inspection: [TripInspectionItem : Bool], note: String) async throws {
@@ -116,12 +120,14 @@ class RemoteController: DatabaseAPIIntegrable {
         }
         
         let inspectionDictionary = Dictionary(uniqueKeysWithValues: inspection.map { ($0.rawValue, $1) })
+
         
         let params = PostInspectionParams(p_id: id.uuidString, p_post_trip_inspection: inspectionDictionary, p_note: note)
         
+
         try await client
             .rpc("add_post_trip_inspection_for_trip_id", params: params)
-            .execute().value
+            .execute()
     }
     
     func updateTripStatus(by id: UUID, to newStatus: TripStatus) async throws {

@@ -2,15 +2,22 @@
 //  TripDataModel.swift
 //  Fleet Management System
 //
-//  Created by Rohit Raj on 19/03/25.
+//  Created by Kavyansh Pratap Singh on 19/03/25.
 //
 
 
 import Foundation
 
+/*
+ TripInspection table
+ (id: UUID PK, tripUID: UUID FK, preInspection: JSONB, postInspection: JSONB, notes: TEXT)
+ */
+
 struct Trip: Identifiable, Codable {
     var id: UUID
     var tripID: Int
+//    var tripInspectionUID: UUID
+    
     var assignedByFleetManagerID: UUID      //initialize automatidally when fleet manager assignns the trip
     var assignedDriverIDs: [UUID]
     //var assigneVehicleID: Int
@@ -27,6 +34,8 @@ struct Trip: Identifiable, Codable {
     var status: TripStatus
 }
 
+
+
 enum TripStatus: String, Codable {
     case scheduled = "Scheduled"
     case inProgress = "In Progress"
@@ -41,7 +50,7 @@ struct TripInspection: Codable, Equatable, Identifiable {
     var postInspectionNote: String
 }
 
-enum TripInspectionItem: String, Codable, CaseIterable {
+enum TripInspectionItem: String, Codable, CaseIterable{
     case tireCondition = "Tire Condition"
     case brakeSystem = "Brake System"
     case lights = "Lights"

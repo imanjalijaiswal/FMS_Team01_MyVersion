@@ -2,7 +2,7 @@
 //  DriverDataModel.swift
 //  Fleet Management System
 //
-//  Created by Rohit Raj on 19/03/25.
+//  Created by Kavyansh Pratap Singh on 19/03/25.
 //
 
 import Foundation
@@ -48,3 +48,4 @@ struct Vehicle: Identifiable, Codable, Equatable{
     var status: VehicleStatus
     var activeStatus: Bool
 }
+

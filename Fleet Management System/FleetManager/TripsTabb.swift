@@ -173,41 +173,13 @@ struct TripCard: View {
         .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .actionSheet(isPresented: $showingStatusSheet) {
-            let buttons: [ActionSheet.Button] = {
-                switch trip.status {
-                case .scheduled:
-                    return [
-                        .default(Text("Mark as In Progress")) {
-                            viewModel.updateTripStatus(trip, to: .inProgress)
-                        },
-                        .cancel()
-                    ]
-                case .inProgress:
-                    return [
-                        .default(Text("Mark as Completed")) {
-                            viewModel.updateTripStatus(trip, to: .completed)
-                        },
-                        .cancel()
-                    ]
-                case .completed:
-                    return [.cancel()]
-                }
-            }()
-            
-            return ActionSheet(
-                title: Text("Update Trip Status"),
-                message: nil,
-                buttons: buttons
-            )
-        }
     }
 }
 
 struct AssignTripView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: IFEDataController
-    
+
     @State private var pickupLocation = ""
     @State private var destination = ""
     @State private var selectedVehicle: Vehicle? = nil
@@ -233,7 +205,7 @@ struct AssignTripView: View {
         selectedVehicle != nil &&
         selectedDriver1 != nil
     }
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -243,13 +215,13 @@ struct AssignTripView: View {
                         placeholder: "Pickup Location",
                         selectedLocation: $selectedStartLocation
                     )
-                    
+
                     LocationSearchBar(
                         text: $destination,
                         placeholder: "Drop-off Location",
                         selectedLocation: $selectedEndLocation
                     )
-                    
+
                     // Scheduled Date Time
                     VStack {
                         Button(action: { showScheduledDatePicker.toggle() }) {
@@ -264,7 +236,7 @@ struct AssignTripView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        
+
                         if showScheduledDatePicker {
                             DatePicker(
                                 "Scheduled Date & Time",
@@ -298,7 +270,7 @@ struct AssignTripView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        
+
                         if showEstimatedDatePicker {
                             DatePicker(
                                 "Estimated Arrival",
@@ -411,12 +383,12 @@ struct AssignTripView: View {
                                             destination: selectedEndLocation ?? "0,0",
                                             estimatedArrivalDateTime: estimatedArrivalDateTime,
                                             totalDistance: Int(distance/1000),
-                                            totalTripDuration: estimatedArrivalDateTime,
+                                            totalTripDuration: estimatedDate(from: scheduledDateTime, hours: Float((distance/1000)/50)),
                                             description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
                                             scheduledDateTime: scheduledDateTime, createdAt: .now,
                                             status: .scheduled
                                         )
-                                        
+
                                         viewModel.addTrip(newTrip)
                                         showingAlert = true
                                     }
@@ -427,7 +399,7 @@ struct AssignTripView: View {
                     .foregroundColor(Color.primaryGradientEnd)
                     .disabled(!isFormValid)
                 }
-                
+
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
@@ -446,6 +418,7 @@ struct AssignTripView: View {
         }
     }
 }
+
 
 
 func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
@@ -1032,6 +1005,8 @@ struct VehicleSelectionView: View {
 }
 
 
+
 #Preview{
     TripsView()
 }
+
