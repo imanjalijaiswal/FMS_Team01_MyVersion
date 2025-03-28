@@ -474,6 +474,7 @@ struct MaintenancePersonnelDetailView: View {
             Section {
                 if personnel.activeStatus {
                     Button(action: {
+                        viewModel.removeMaintenancePersonnel(personnel)
                         showingDisableAlert = true
                     }) {
                         Text("Make Inactive")
@@ -484,6 +485,7 @@ struct MaintenancePersonnelDetailView: View {
                 } else {
                     Button(action: {
                         // Add enable maintenance personnel functionality in DataController
+                        viewModel.enableMaintenancePersonnel(personnel)
                         dismiss()
                     }) {
                         Text("Make Active")
