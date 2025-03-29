@@ -64,6 +64,10 @@ struct ProfileView: View {
                             Text("Driver")
                                 .font(.subheadline)
                                 .foregroundColor(.textSecondary)
+                        } else if let user = user, user.role == .maintenancePersonnel {
+                                                   Text("Maintenance Personnel")
+                                                       .font(.subheadline)
+                                                       .foregroundColor(.textSecondary)
                         } else {
                             Text("Fleet Manager")
                                 .font(.subheadline)
