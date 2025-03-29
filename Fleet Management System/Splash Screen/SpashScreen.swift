@@ -10,7 +10,9 @@ import SwiftUI
 struct SpashScreen: View {
     @State private var isActive = false
     @State private var textLocation : CGFloat = 40
-    
+    @State private var textopacity = 0.0
+    @State private var textScale = 0.8
+    @State private var pandaScale = 0.8
     var body: some View {
         if isActive {
             ContentView()
@@ -28,6 +30,11 @@ struct SpashScreen: View {
                 .ignoresSafeArea()
                 
                 VStack(spacing: 20) {
+                    Image("panda-open")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 200,height: 200)
+                        .scaleEffect(pandaScale)
                     HStack(spacing: 0) {
                         Text("InFleet")
                             .foregroundStyle(.white)
@@ -35,13 +42,15 @@ struct SpashScreen: View {
                         Text(" Express")
                             .foregroundStyle(Color.primaryGradientStart1)
                             .fontWeight(.semibold)
-                    }
-                    .font(.system(size: 40))
+                    }.opacity(textopacity)
+                    
+                        }.font(.system(size: 40))
                     .offset(y: textLocation)
                     .onAppear {
-                        withAnimation(.easeInOut(duration: 0.5)) {
+                        withAnimation(.easeInOut(duration: 0.8)) {
                             self.textLocation = -50
-                        }
+                            self.textopacity = 1
+                            self.pandaScale = 1
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                             withAnimation(.easeInOut(duration: 0.5)) {
