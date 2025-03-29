@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import MapKit
 
 import PDFKit  // For PDF generation
 
@@ -27,6 +28,7 @@ struct MaintenanceView: View {
     @State private var showingProfile = false
     @State private var vehicleLicenseMap: [Int: String] = [:]
     @State private var userPhoneMap: [UUID: String] = [:]
+    @State private var userNameMap: [UUID: String] = [:]
     @State private var showingStartWorkConfirmation = false
     @State private var taskToStart: MaintenanceTask?
     @State private var laborCost: String = "0.0"
@@ -35,6 +37,7 @@ struct MaintenanceView: View {
     @State private var repairNote: String = ""
     @State private var showingInvoicePreview = false
     @State private var generatedInvoice: Invoice?
+    @State private var showLocationTracking = false
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -86,7 +89,12 @@ struct MaintenanceView: View {
                 filteredSOSTasks: filteredSOSTasks,
                 vehicleLicenseMap: vehicleLicenseMap,
                 userPhoneMap: userPhoneMap,
-                onShowProfile: { showingProfile = true }
+                userNameMap: userNameMap,
+                onShowProfile: { showingProfile = true },
+                onTrackTask: { task in
+                    selectedTask = task
+                    showLocationTracking = true
+                }
             )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
@@ -200,6 +208,25 @@ struct MaintenanceView: View {
         .sheet(isPresented: $showingProfile) {
             ProfileView(user: $user, role: $role)
         }
+        .sheet(isPresented: $showLocationTracking) {
+            Group {
+                if let task = selectedTask {
+                    let vehicleLicense = vehicleLicenseMap[task.vehicleID] ?? "Unknown Vehicle"
+
+                    NavigationView {
+                        LocationTrackingView(
+                            task: task,
+                            vehicleLicense: vehicleLicense,
+                            userPhoneMap: userPhoneMap
+                        )
+                    }
+                } else {
+                    Text("Could not load tracking information")
+                }
+            }
+        }
+
+
         .accentColor(.blue)
     }
     
@@ -323,6 +350,7 @@ struct MaintenanceView: View {
                         DispatchQueue.main.async {
                             let phoneNumber = userData.phone  // Access 'phone' directly as a property
                             self.userPhoneMap[task.assignedBy] = phoneNumber
+                            self.userNameMap[task.assignedBy] = userData.fullName
                         }
                     }
                 }
@@ -705,6 +733,8 @@ struct SOSTaskCard: View {
     let task: MaintenanceTask
     let vehicleLicense: String?
     let assignerPhone: String?
+    let assignerName: String?
+    let onTrack: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -741,6 +771,15 @@ struct SOSTaskCard: View {
             Text("Task ID: \(task.taskID)")
                 .foregroundColor(.secondary)
             
+            if let name = assignerName {
+                HStack(spacing: 5) {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.blue)
+                    Text("Driver: \(name)")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
             if let phone = assignerPhone {
                 HStack(spacing: 5) {
                     Image(systemName: "phone.fill")
@@ -773,9 +812,7 @@ struct SOSTaskCard: View {
                         .cornerRadius(8)
                 }
                 
-                Button(action: {
-                    // Track functionality would go here
-                }) {
+                Button(action: onTrack) {
                     Text("Track")
                         .fontWeight(.medium)
                         .foregroundColor(.white)
@@ -1041,7 +1078,9 @@ struct SOSTabView: View {
     let filteredSOSTasks: [MaintenanceTask]
     let vehicleLicenseMap: [Int: String]
     let userPhoneMap: [UUID: String]
+    let userNameMap: [UUID: String]
     let onShowProfile: () -> Void
+    let onTrackTask: (MaintenanceTask) -> Void
     
     var body: some View {
         VStack(spacing: 0) {
@@ -1105,7 +1144,11 @@ struct SOSTabView: View {
                                 SOSTaskCard(
                                     task: task,
                                     vehicleLicense: vehicleLicenseMap[task.vehicleID],
-                                    assignerPhone: userPhoneMap[task.assignedBy]
+                                    assignerPhone: userPhoneMap[task.assignedBy],
+                                    assignerName: userNameMap[task.assignedBy],
+                                    onTrack: {
+                                        onTrackTask(task)
+                                    }
                                 )
                             }
                         }
@@ -1141,4 +1184,256 @@ struct SegmentButton: View {
                 )
         }
     }
+}
+
+struct LocationTrackingView: View {
+    let task: MaintenanceTask
+    let vehicleLicense: String?
+    let userPhoneMap: [UUID: String]
+    @Environment(\.dismiss) var dismiss
+    @State private var vehicleLocation: CLLocationCoordinate2D?
+    @State private var userLocation: CLLocationCoordinate2D?
+    @State private var vehicleAddress: String = "Fetching address..."
+    @State private var region = MKCoordinateRegion()
+    @State private var isLoadingLocation = true
+    @State private var driverName: String = "Loading..."
+    
+    // DataController reference
+    private let dataController = IFEDataController.shared
+    
+    var body: some View {
+        ZStack {
+            // Map View
+            if let vehicleLocation = vehicleLocation {
+                Map(coordinateRegion: $region, showsUserLocation: true, annotationItems: [AnnotationItem(coordinate: vehicleLocation, title: vehicleLicense ?? "Vehicle")]) { item in
+                    MapAnnotation(coordinate: item.coordinate) {
+                        VStack {
+                            Text(item.title)
+                                .font(.caption)
+                                .padding(4)
+                                .background(Color.white)
+                                .cornerRadius(4)
+                            
+                            Image(systemName: "car.fill")
+                                .foregroundColor(.red)
+                                .padding(8)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                        }
+                    }
+                }
+                .edgesIgnoringSafeArea(.all)
+            } else {
+                Color(.systemGroupedBackground)
+                    .edgesIgnoringSafeArea(.all)
+                    .overlay {
+                        if isLoadingLocation {
+                            ProgressView("Loading location...")
+                        } else {
+                            Text("Could not load vehicle location")
+                        }
+                    }
+            }
+            
+            // Bottom Panel
+            VStack {
+                Spacer()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "car.fill")
+                            .foregroundColor(.blue)
+                        
+                        Text(vehicleLicense ?? "Vehicle \(task.vehicleID)")
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(alertTypeColor)
+                                .frame(width: 10, height: 10)
+                            
+                            Text(task.type.rawValue)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(alertTypeColor.opacity(0.1))
+                        .cornerRadius(12)
+                    }
+                    
+                    Divider()
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "person.fill")
+                                    .foregroundColor(.gray)
+                                Text("Driver: \(driverName)")
+                                    .font(.subheadline)
+                            }
+                            
+                            HStack {
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.gray)
+                                Text(vehicleAddress)
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                            }
+                            
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text(task.issueNote)
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                    
+                    HStack(spacing: 20) {
+                        Button(action: getDirections) {
+                            Label("Get Directions", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                        }
+                        
+                        Button(action: centerMap) {
+                            Label("Center", systemImage: "scope")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.gray.opacity(0.2))
+                                .foregroundColor(.primary)
+                                .cornerRadius(10)
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(16)
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: -4)
+                .padding()
+            }
+        }
+        .navigationTitle("Location Tracking")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarItems(trailing: Button("Close") {
+            dismiss()
+        })
+        .onAppear {
+            fetchVehicleLocation()
+            getUserLocation()
+            fetchDriverName()
+        }
+    }
+    
+    private var alertTypeColor: Color {
+        switch task.type {
+        case .preInspectionMaintenance:
+            return .blue
+        case .postInspectionMaintenance:
+            return .orange
+        case .emergencyMaintenance:
+            return .red
+        default:
+            return .gray
+        }
+    }
+    
+    private func fetchVehicleLocation() {
+        isLoadingLocation = true
+        
+        Task {
+            if let vehicle = await dataController.getRegisteredVehicle(by: task.vehicleID) {
+                let coordinateStrings = vehicle.currentCoordinate.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                
+                if coordinateStrings.count == 2, 
+                   let latitude = Double(coordinateStrings[0]), 
+                   let longitude = Double(coordinateStrings[1]) {
+                    
+                    DispatchQueue.main.async {
+                        self.vehicleLocation = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+                        self.centerMap()
+                        self.isLoadingLocation = false
+                        self.fetchAddress(from: vehicle.currentCoordinate)
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingLocation = false
+                }
+            }
+        }
+    }
+    
+    private func getUserLocation() {
+        // This would use CoreLocation's CLLocationManager in a real implementation
+        // For this example, we'll set a default location
+        self.userLocation = CLLocationCoordinate2D(latitude: 28.6139, longitude: 77.2090) // Default Delhi location
+    }
+    
+    private func fetchAddress(from coordinate: String) {
+        getAddress(from: coordinate) { address in
+            if let address = address {
+                DispatchQueue.main.async {
+                    self.vehicleAddress = address
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.vehicleAddress = "Address not available"
+                }
+            }
+        }
+    }
+    
+    private func fetchDriverName() {
+        Task {
+            // First try to get user metadata for the person who assigned this task
+            if let userData = await dataController.getUserMetaData(by: task.assignedBy) {
+                DispatchQueue.main.async {
+                    self.driverName = userData.fullName
+                }
+            } else {
+                // If no user metadata is found, check if we have a phone number
+                if let phone = userPhoneMap[task.assignedBy] {
+                    DispatchQueue.main.async {
+                        self.driverName = "Driver (Contact: \(phone))"
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.driverName = "Unknown Driver"
+                    }
+                }
+            }
+        }
+    }
+    
+    private func centerMap() {
+        if let location = vehicleLocation {
+            self.region = MKCoordinateRegion(
+                center: location,
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            )
+        }
+    }
+    
+    private func getDirections() {
+        if let location = vehicleLocation {
+            let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: location))
+            mapItem.name = vehicleLicense ?? "Vehicle Location"
+            mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+        }
+    }
+}
+
+// Helper struct for the map annotation
+struct AnnotationItem: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let title: String
 }
