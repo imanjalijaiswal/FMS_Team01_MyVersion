@@ -15,14 +15,18 @@ struct MaintenanceView: View {
     @Binding var role: Role?
     @State private var selectedTab = 0 // 0 for Maintenance, 1 for SOS
     @State private var selectedSegment = 0 // 0 for Scheduled, 1 for In Progress, 2 for Completed
+    @State private var sosSelectedSegment = 0 // 0 for Pre-inspection, 1 for Post-inspection, 2 for Emergency
     @State private var tasks: [MaintenanceTask] = []
+    @State private var sosTasks: [MaintenanceTask] = []
     @State private var isLoading = false
+    @State private var isSosLoading = false
     @State private var showingCompletionDaysSheet = false
     @State private var showingInvoiceSheet = false
     @State private var selectedTask: MaintenanceTask?
     @State private var completionDays = 1
     @State private var showingProfile = false
     @State private var vehicleLicenseMap: [Int: String] = [:]
+    @State private var userPhoneMap: [UUID: String] = [:]
     @State private var showingStartWorkConfirmation = false
     @State private var taskToStart: MaintenanceTask?
     @State private var laborCost: String = "0.0"
@@ -46,140 +50,28 @@ struct MaintenanceView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // MAINTENANCE TAB
-            VStack(spacing: 0) {
-                // Navigation Title
-                HStack {
-                    Text("Maintenance")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .padding(.leading)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        showingProfile = true
-                    }) {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .frame(width: 35, height: 35)
-                            .foregroundColor(.blue)
-                            .padding(.trailing)
-                    }
+            MaintenanceTabView(
+                selectedSegment: $selectedSegment,
+                isLoading: isLoading,
+                filteredTasks: filteredTasks,
+                vehicleLicenseMap: vehicleLicenseMap,
+                onShowProfile: { showingProfile = true },
+                onSelectTask: { task in
+                    selectedTask = task
+                },
+                onStartWork: { task in
+                    taskToStart = task
+                    showingStartWorkConfirmation = true
+                },
+                onUpdateCompletionDays: { task, days in
+                    selectedTask = task
+                    updateCompletionDays(days: days)
+                },
+                onCreateInvoice: { task in
+                    selectedTask = task
+                    showingInvoiceSheet = true
                 }
-                .padding(.bottom, 10)
-                .padding(.top, 70)
-                
-                // Segment Controller
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(UIColor.systemGray5))
-                        .frame(height: 45)
-                    
-                    HStack(spacing: 0) {
-                        Button(action: { selectedSegment = 0 }) {
-                            Text("Assigned")
-                                .font(.headline)
-                                .fontWeight(selectedSegment == 0 ? .semibold : .regular)
-                                .foregroundColor(selectedSegment == 0 ? .black : .gray)
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    Group {
-                                        if selectedSegment == 0 {
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .fill(Color.white)
-                                                .padding(4)
-                                        }
-                                    }
-                                )
-                        }
-                        
-                        Button(action: { selectedSegment = 1 }) {
-                            Text("In Progress")
-                                .font(.headline)
-                                .fontWeight(selectedSegment == 1 ? .semibold : .regular)
-                                .foregroundColor(selectedSegment == 1 ? .black : .gray)
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    Group {
-                                        if selectedSegment == 1 {
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .fill(Color.white)
-                                                .padding(4)
-                                        }
-                                    }
-                                )
-                        }
-                        
-                        Button(action: { selectedSegment = 2 }) {
-                            Text("Completed")
-                                .font(.headline)
-                                .fontWeight(selectedSegment == 2 ? .semibold : .regular)
-                                .foregroundColor(selectedSegment == 2 ? .black : .gray)
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    Group {
-                                        if selectedSegment == 2 {
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .fill(Color.white)
-                                                .padding(4)
-                                        }
-                                    }
-                                )
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 10)
-                
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .padding()
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            // Debug text to show number of filtered tasks
-                            let filteredCount = filteredTasks.count
-                            let categoryName = selectedSegment == 0 ? "Assigned" : selectedSegment == 1 ? "In Progress" : "Completed"
-//                            Text("DEBUG: \(filteredCount) tasks in \(categoryName) category")
-//                                .font(.caption)
-//                                .foregroundColor(.gray)
-//                                .padding(.bottom, 4)
-                            
-                            if filteredTasks.isEmpty {
-                                Text("No tasks available")
-                                    .font(.title2)
-                                    .foregroundColor(.gray)
-                                    .padding(.top, 40)
-                            } else {
-                                ForEach(filteredTasks) { task in
-                                    MaintenanceTaskCard(
-                                        task: task,
-                                        vehicleLicense: vehicleLicenseMap[task.vehicleID],
-                                        onStartWork: {
-                                            taskToStart = task
-                                            showingStartWorkConfirmation = true
-                                        },
-                                        onDaysSelected: { days in
-                                            selectedTask = task
-                                            updateCompletionDays(days: days)
-                                        },
-                                        onCreateInvoice: {
-                                            selectedTask = task
-                                            showingInvoiceSheet = true
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        .padding()
-                    }
-                }
-                    
-            }
+            )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
                 Image(systemName: "wrench.and.screwdriver.fill")
@@ -188,19 +80,14 @@ struct MaintenanceView: View {
             .tag(0)
             
             // SOS TAB
-            VStack {
-                Text("SOS Feature")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                Spacer()
-                
-                Text("Coming Soon")
-                    .font(.title)
-                    .foregroundColor(.gray)
-                
-                Spacer()
-            }
+            SOSTabView(
+                sosSelectedSegment: $sosSelectedSegment,
+                isSosLoading: isSosLoading,
+                filteredSOSTasks: filteredSOSTasks,
+                vehicleLicenseMap: vehicleLicenseMap,
+                userPhoneMap: userPhoneMap,
+                onShowProfile: { showingProfile = true }
+            )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -217,6 +104,7 @@ struct MaintenanceView: View {
             print("DEBUG: User ID: \(user?.id.uuidString ?? "nil"), Role: \(user?.role.rawValue ?? "nil")")
             
             loadTasks()
+            loadSOSTasks()
         }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -336,6 +224,27 @@ struct MaintenanceView: View {
         }
     }
     
+    var filteredSOSTasks: [MaintenanceTask] {
+        let filtered: [MaintenanceTask]
+        switch sosSelectedSegment {
+        case 0: // Pre-inspection
+            filtered = sosTasks.filter { $0.type == .preInspectionMaintenance }
+            print("DEBUG: Found \(filtered.count) pre-inspection tasks out of \(sosTasks.count) total SOS tasks")
+            return filtered
+        case 1: // Post-inspection
+            filtered = sosTasks.filter { $0.type == .postInspectionMaintenance }
+            print("DEBUG: Found \(filtered.count) post-inspection tasks out of \(sosTasks.count) total SOS tasks")
+            return filtered
+        case 2: // Emergency
+            filtered = sosTasks.filter { $0.type == .emergencyMaintenance }
+            print("DEBUG: Found \(filtered.count) emergency tasks out of \(sosTasks.count) total SOS tasks")
+            return filtered
+        default:
+            print("DEBUG: Invalid SOS segment selection: \(sosSelectedSegment)")
+            return []
+        }
+    }
+    
     func loadTasks() {
         guard let user = user else {
             print("DEBUG: Cannot load tasks - user is nil")
@@ -351,8 +260,14 @@ struct MaintenanceView: View {
                 let directTasks = try await RemoteController.shared.getMaintenancePersonnelTasks(by: user.id)
                 print("DEBUG: Direct API call returned \(directTasks.count) tasks")
                 
+                // Only include Regular Maintenance tasks
+                let regularTasks = directTasks.filter { task in
+                    task.type == .regularMaintenance
+                }
+                print("DEBUG: Filtered regular maintenance tasks: \(regularTasks.count) out of \(directTasks.count) total tasks")
+                
                 // Load all vehicle license numbers
-                for task in directTasks {
+                for task in regularTasks {
                     if let vehicle = await dataController.getRegisteredVehicle(by: task.vehicleID) {
                         DispatchQueue.main.async {
                             self.vehicleLicenseMap[task.vehicleID] = vehicle.licenseNumber
@@ -361,14 +276,80 @@ struct MaintenanceView: View {
                 }
                 
                 DispatchQueue.main.async {
-                    self.tasks = directTasks
+                    self.tasks = regularTasks
                     self.isLoading = false
                 }
             } catch {
                 print("DEBUG ERROR: Failed to load tasks directly: \(error.localizedDescription)")
+                
+                // Try to get regular tasks from data controller
+                let controllerTasks = dataController.personnelTasks
+                let regularTasks = controllerTasks.filter { task in
+                    task.type == .regularMaintenance
+                }
+                
                 DispatchQueue.main.async {
-                    self.tasks = dataController.personnelTasks
+                    self.tasks = regularTasks
                     self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    func loadSOSTasks() {
+        guard let user = user else {
+            print("DEBUG: Cannot load SOS tasks - user is nil")
+            return
+        }
+        
+        print("DEBUG: Loading SOS tasks for user \(user.id.uuidString) with role \(user.role.rawValue)")
+        isSosLoading = true
+        
+        Task {
+            do {
+                print("DEBUG: Making direct API call to get SOS tasks")
+                let directTasks = try await RemoteController.shared.getMaintenancePersonnelTasks(by: user.id)
+                print("DEBUG: Direct API call returned \(directTasks.count) tasks")
+                
+                // Load all vehicle license numbers and user phone numbers
+                for task in directTasks {
+                    if let vehicle = await dataController.getRegisteredVehicle(by: task.vehicleID) {
+                        DispatchQueue.main.async {
+                            self.vehicleLicenseMap[task.vehicleID] = vehicle.licenseNumber
+                        }
+                    }
+                    
+                    if let userData = await dataController.getUserMetaData(by: task.assignedBy) {
+                        DispatchQueue.main.async {
+                            let phoneNumber = userData.phone  // Access 'phone' directly as a property
+                            self.userPhoneMap[task.assignedBy] = phoneNumber
+                        }
+                    }
+                }
+
+                // Filter for SOS related tasks (pre-inspection, post-inspection, emergency)
+                // Break the complex predicate into simpler logic
+                let sosTaskTypes: [MaintenanceTaskType] = [.preInspectionMaintenance, .postInspectionMaintenance, .emergencyMaintenance]
+                let sosTasks = directTasks.filter { task in
+                    sosTaskTypes.contains(task.type)
+                }
+
+                
+                DispatchQueue.main.async {
+                    self.sosTasks = sosTasks
+                    self.isSosLoading = false
+                }
+            } catch {
+                print("DEBUG ERROR: Failed to load SOS tasks directly: \(error.localizedDescription)")
+                
+                // Try to get SOS tasks from data controller
+                let controllerTasks = dataController.personnelTasks.filter {
+                    $0.type == .preInspectionMaintenance || $0.type == .postInspectionMaintenance || $0.type == .emergencyMaintenance
+                }
+                
+                DispatchQueue.main.async {
+                    self.sosTasks = controllerTasks
+                    self.isSosLoading = false
                 }
             }
         }
@@ -699,20 +680,6 @@ struct MaintenanceTaskCard: View {
                 }
                 .padding(.top, 5)
             }
-            
-//            Button(action: onCreateInvoice) {
-//                HStack {
-//                    Image(systemName: "doc.text")
-//                    Text("View Invoice")
-//                }
-//                .fontWeight(.medium)
-//                .foregroundColor(.white)
-//                .frame(maxWidth: .infinity)
-//                .padding(.vertical, 10)
-//                .background(Color.green)
-//                .cornerRadius(8)
-//            }
-           // .padding(.top, 5)
         }
     }
     
@@ -731,6 +698,116 @@ struct MaintenanceTaskCard: View {
     private var totalExpense: Double {
         guard let expenses = task.expenses else { return 0 }
         return expenses.values.reduce(0, +)
+    }
+}
+
+struct SOSTaskCard: View {
+    let task: MaintenanceTask
+    let vehicleLicense: String?
+    let assignerPhone: String?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Common header for all card types
+            HStack {
+                if let license = vehicleLicense {
+                    Text("Vehicle: \(license)")
+                        .font(.headline)
+                } else {
+                    Text("Vehicle ID: \(task.vehicleID)")
+                        .font(.headline)
+                }
+                
+                Spacer()
+                
+                // Status indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(typeColor)
+                        .frame(width: 10, height: 10)
+                    
+                    Text(task.type.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(typeColor)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(typeColor.opacity(0.1))
+                .cornerRadius(12)
+            }
+            .padding(.top, 5)
+            
+            Text("Task ID: \(task.taskID)")
+                .foregroundColor(.secondary)
+            
+            if let phone = assignerPhone {
+                HStack(spacing: 5) {
+                    Image(systemName: "phone.fill")
+                        .foregroundColor(.green)
+                    Text("Contact: \(phone)")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if let date = task.estimatedCompletionDate {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock")
+                        .foregroundColor(.blue)
+                    Text("Due: \(date.formatted(.dateTime.day().month(.abbreviated).year()))")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // Action buttons
+            HStack(spacing: 10) {
+                Button(action: {
+                    // Connect functionality would go here
+                }) {
+                    Text("Connect")
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.green)
+                        .cornerRadius(8)
+                }
+                
+                Button(action: {
+                    // Track functionality would go here
+                }) {
+                    Text("Track")
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.top, 5)
+        }
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(typeColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private var typeColor: Color {
+        switch task.type {
+        case .preInspectionMaintenance:
+            return .blue
+        case .postInspectionMaintenance:
+            return .orange
+        case .emergencyMaintenance:
+            return .red
+        default:
+            return .gray
+        }
     }
 }
 
@@ -799,12 +876,6 @@ struct InvoicePreviewView: View {
                                 Text("₹\(invoice.totalExpense, specifier: "%.2f")")
                             }
                             
-//                            HStack {
-//                                Text("Tax (18%)")
-//                                Spacer()
-//                                Text("₹\(invoice.totalExpense * 0.18, specifier: "%.2f")")
-//                            }
-                            
                             Divider()
                             
                             HStack {
@@ -853,28 +924,6 @@ struct InvoicePreviewView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top)
-                    
-                    // Buttons
-//                    HStack {
-//                        Button("Download PDF") {
-//                            generatePDF()
-//                        }
-//                        .frame(maxWidth: .infinity)
-//                        .padding()
-//                        .background(Color.blue)
-//                        .foregroundColor(.white)
-//                        .cornerRadius(8)
-//                        
-//                        Button("Email Invoice") {
-//                            emailInvoice()
-//                        }
-//                        .frame(maxWidth: .infinity)
-//                        .padding()
-//                        .background(Color.green)
-//                        .foregroundColor(.white)
-//                        .cornerRadius(8)
-//                    }
-                    .padding(.top)
                 }
                 .padding()
             }
@@ -884,16 +933,212 @@ struct InvoicePreviewView: View {
             })
         }
     }
+}
+
+struct MaintenanceTabView: View {
+    @Binding var selectedSegment: Int
+    let isLoading: Bool
+    let filteredTasks: [MaintenanceTask]
+    let vehicleLicenseMap: [Int: String]
+    let onShowProfile: () -> Void
+    let onSelectTask: (MaintenanceTask) -> Void
+    let onStartWork: (MaintenanceTask) -> Void
+    let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
+    let onCreateInvoice: (MaintenanceTask) -> Void
+
+    //  Computed property for categoryName
+    var categoryName: String {
+        switch selectedSegment {
+        case 0: return "Assigned"
+        case 1: return "In Progress"
+        default: return "Completed"
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Maintenance")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.leading)
+                
+                Spacer()
+                
+                Button(action: onShowProfile) {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 35, height: 35)
+                        .foregroundColor(.blue)
+                        .padding(.trailing)
+                }
+            }
+            .padding(.bottom, 10)
+            .padding(.top, 70)
+            
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(UIColor.systemGray5))
+                    .frame(height: 45)
+                
+                HStack(spacing: 0) {
+                    SegmentButton(text: "Assigned", isSelected: selectedSegment == 0) {
+                        selectedSegment = 0
+                    }
+                    
+                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
+                        selectedSegment = 1
+                    }
+                    
+                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
+                        selectedSegment = 2
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 10)
+            
+            if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        if filteredTasks.isEmpty {
+                            Text("No tasks available")
+                                .font(.title2)
+                                .foregroundColor(.gray)
+                                .padding(.top, 40)
+                        } else {
+                            ForEach(filteredTasks) { task in
+                                MaintenanceTaskCard(
+                                    task: task,
+                                    vehicleLicense: vehicleLicenseMap[task.vehicleID],
+                                    onStartWork: {
+                                        onStartWork(task)
+                                    },
+                                    onDaysSelected: { days in
+                                        onUpdateCompletionDays(task, days)
+                                    },
+                                    onCreateInvoice: {
+                                        onCreateInvoice(task)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+    }
+}
+
+struct SOSTabView: View {
+    @Binding var sosSelectedSegment: Int
+    let isSosLoading: Bool
+    let filteredSOSTasks: [MaintenanceTask]
+    let vehicleLicenseMap: [Int: String]
+    let userPhoneMap: [UUID: String]
+    let onShowProfile: () -> Void
     
-//    func generatePDF() {
-//        // In a real app, this would generate a PDF using PDFKit
-//        print("Generating PDF for invoice #\(invoice.taskID)")
-//        presentationMode.wrappedValue.dismiss()
-//    }
-//    
-//    func emailInvoice() {
-//        // In a real app, this would open an email composer
-//        print("Emailing invoice #\(invoice.taskID)")
-//        presentationMode.wrappedValue.dismiss()
-//    }
+    var body: some View {
+        VStack(spacing: 0) {
+            // Navigation Title
+            HStack {
+                Text("SOS")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.leading)
+                
+                Spacer()
+                
+                Button(action: onShowProfile) {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 35, height: 35)
+                        .foregroundColor(.blue)
+                        .padding(.trailing)
+                }
+            }
+            .padding(.bottom, 10)
+            .padding(.top, 70)
+            
+            // Segment Controller for SOS
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(UIColor.systemGray5))
+                    .frame(height: 45)
+                
+                HStack(spacing: 0) {
+                    SegmentButton(text: "Pre-inspect", isSelected: sosSelectedSegment == 0) {
+                        sosSelectedSegment = 0
+                    }
+                    
+                    SegmentButton(text: "Post-inspect", isSelected: sosSelectedSegment == 1) {
+                        sosSelectedSegment = 1
+                    }
+                    
+                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
+                        sosSelectedSegment = 2
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 10)
+            
+            if isSosLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        if filteredSOSTasks.isEmpty {
+                            Text("No tasks available")
+                                .font(.title2)
+                                .foregroundColor(.gray)
+                                .padding(.top, 40)
+                        } else {
+                            ForEach(filteredSOSTasks) { task in
+                                SOSTaskCard(
+                                    task: task,
+                                    vehicleLicense: vehicleLicenseMap[task.vehicleID],
+                                    assignerPhone: userPhoneMap[task.assignedBy]
+                                )
+                            }
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+    }
+}
+
+struct SegmentButton: View {
+    let text: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(.headline)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .foregroundColor(isSelected ? .black : .gray)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white)
+                                .padding(4)
+                        }
+                    }
+                )
+        }
+    }
 }
