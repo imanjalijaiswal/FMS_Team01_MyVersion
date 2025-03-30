@@ -52,7 +52,7 @@ struct VehicleRowView: View {
                                     .frame(width: 4, height: 4)
                                 Text(vehicle.status.rawValue)
                                     .font(.caption)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(Color.setForegroundColor(vehicle: vehicle))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)

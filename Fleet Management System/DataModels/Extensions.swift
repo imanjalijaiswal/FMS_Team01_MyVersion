@@ -53,13 +53,13 @@ extension Color {
         static func setVechicleColor(status : VehicleStatus) -> Color{
             switch status{
             case .assigned :
-                .statusOrange
+                return Color.statusOrange
             case .available :
-                    .primaryGradientStart
+                return Color.primaryGradientStart
             case .inactive :
-                    .red
+                return Color.red
             default:
-                    .blue
+                return Color.blue
             }
         }
         static func setForegroundColor(vehicle : Vehicle) -> Color{
@@ -81,11 +81,13 @@ extension Color {
             return Color.blue
         }
     }
-    static func setMaintaienceColor(maintaiencePersonal : MaintenancePersonnel) -> Color{
-        if maintaiencePersonal.activeStatus{
-            return setMaintaiencePersonalColor(status: .scheduled)
-        }else{
-            return Color.gray
+    static func setMaintaienceColor(maintaiencePersonal: MaintenancePersonnel) -> Color {
+        if !maintaiencePersonal.activeStatus {
+            return .red
+        } else if maintaiencePersonal.meta_data.firstTimeLogin {
+            return .gray
+        } else {
+            return Color.primaryGradientStart
         }
     }
 }

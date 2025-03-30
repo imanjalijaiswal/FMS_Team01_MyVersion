@@ -91,14 +91,24 @@ struct MaintenancePersonnelRowView: View {
     let personnel: MaintenancePersonnel
     @ObservedObject var viewModel: IFEDataController
     
+    var statusText: String {
+//        if !personnel.activeStatus {
+//            return "Inactive"
+         if personnel.meta_data.firstTimeLogin {
+            return "Offline"
+        } else {
+            return "Available"
+        }
+    }
+    
     var body: some View {
         NavigationLink(destination: MaintenancePersonnelDetailView(personnel: personnel, viewModel: viewModel)) {
             HStack(spacing: 12) {
                 Image(systemName: "wrench.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.setMaintaienceColor(maintaiencePersonal: personnel))
                     .padding(6)
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color.setMaintaienceColor(maintaiencePersonal: personnel).opacity(0.1))
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -115,6 +125,21 @@ struct MaintenancePersonnelRowView: View {
                             Text(personnel.meta_data.phone)
                                 .font(.caption)
                                 .foregroundColor(.gray)
+                        }
+                        Spacer()
+                        if personnel.activeStatus {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.setMaintaienceColor(maintaiencePersonal: personnel))
+                                    .frame(width: 4, height: 4)
+                                Text(statusText)
+                                    .font(.caption)
+                                    .foregroundColor(Color.setMaintaienceColor(maintaiencePersonal: personnel))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.setMaintaienceColor(maintaiencePersonal: personnel).opacity(0.1))
+                            .cornerRadius(8)
                         }
                     }
                 }
@@ -437,9 +462,9 @@ struct MaintenancePersonnelDetailView: View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    Image(systemName: "wrench.circle.fill")
+                    Image(systemName: "wrench.fill")
                         .font(.system(size: 80))
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color.setMaintaienceColor(maintaiencePersonal: personnel))
                     
                     Text(personnel.meta_data.fullName)
                         .font(.title2)
@@ -945,6 +970,11 @@ struct MaintenancePersonnelListView: View {
         }
     }
 }
+
+
+    
+    
+
 
 /*
 #Preview{
