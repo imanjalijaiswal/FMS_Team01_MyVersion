@@ -234,15 +234,16 @@ struct MaintenanceView: View {
         let filtered: [MaintenanceTask]
         switch selectedSegment {
         case 0:
-            filtered = tasks.filter { $0.status == .scheduled }
-            print("DEBUG: Found \(filtered.count) scheduled tasks out of \(tasks.count) total tasks")
+            filtered = tasks.filter { $0.status == .scheduled && $0.type == .regularMaintenance }
+            print("DEBUG: Found \(filtered.count) scheduled regular maintenance tasks out of \(tasks.count) total tasks")
             return filtered
+
         case 1:
-            filtered = tasks.filter { $0.status == .inProgress }
+            filtered = tasks.filter { $0.status == .inProgress && $0.type == .regularMaintenance }
             print("DEBUG: Found \(filtered.count) in-progress tasks out of \(tasks.count) total tasks")
             return filtered
         case 2:
-            filtered = tasks.filter { $0.status == .completed }
+            filtered = tasks.filter { $0.status == .completed && $0.type == .regularMaintenance }
             print("DEBUG: Found \(filtered.count) completed tasks out of \(tasks.count) total tasks")
             return filtered
         default:
