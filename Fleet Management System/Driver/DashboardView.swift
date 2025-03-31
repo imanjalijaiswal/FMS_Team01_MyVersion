@@ -98,9 +98,34 @@ struct DashboardView: View {
                 
                 // Task list
                 VStack(spacing: 16) {
-                    ForEach(filteredTrips, id: \.id) { trip in
-                        TaskCard(task: trip, selectedTab: $selectedTab)
-                            .shadow(radius: 2, x: 2, y: 2)
+                    if filteredTrips.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: selectedFilter == .assigned ? "calendar.badge.plus" : "clock.arrow.circlepath")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 60, height: 60)
+                                .foregroundColor(.primaryGradientStart.opacity(0.6))
+                            
+                            Text(selectedFilter == .assigned ? "No Assigned Trips" : "No Trip History")
+                                .font(.headline)
+                                .foregroundColor(.primaryGradientStart)
+                            
+                            Text(selectedFilter == .assigned ? "You don't have any assigned trips at the moment" : "You haven't completed any trips yet")
+                                .font(.subheadline)
+                                .foregroundColor(.primaryGradientStart.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                        .background(Color.white.opacity(0.7))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                    } else {
+                        ForEach(filteredTrips, id: \.id) { trip in
+                            TaskCard(task: trip, selectedTab: $selectedTab)
+                                .shadow(radius: 2, x: 2, y: 2)
+                        }
                     }
                 }
                 .padding()

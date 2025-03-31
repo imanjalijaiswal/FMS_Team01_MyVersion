@@ -71,6 +71,7 @@ struct TripOverviewView: View {
     private var contentView: some View {
         VStack(spacing: 10) {
             TripStatusCard(task: task)
+            TripPartnerView(task: task)
             VehicleDetailsCard(task: task)
             LocationsCard(task: task)
             StartTripButton(task: task, isInspectionCompleted: hasCompletedPreInspection, requiresMaintenance: requiresMaintenance, showInspection: $showingPreTripInspection, selectedTab: $selectedTab, onStartTrip: {
@@ -124,7 +125,16 @@ struct TripOverviewView: View {
 // Sub-view for Trip Status
 struct TripStatusCard: View {
     let task: Trip
-    
+    var statusColor: Color {
+        switch task.status {
+        case .inProgress:
+            return .blue
+        case .completed:
+            return .green
+        case .scheduled:
+            return .orange
+        }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -134,10 +144,11 @@ struct TripStatusCard: View {
                 // Note: task.type doesn't exist, using task.status instead
                 Text(task.status.rawValue)
                     .font(.caption)
-                    .fontWeight(.medium)
+                    .foregroundColor(statusColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .cornerRadius(4)
+                    .background(statusColor.opacity(0.1))
+                    .cornerRadius(8)
             }
             
             HStack {
@@ -168,10 +179,132 @@ struct TripStatusCard: View {
     }
 }
 
+struct TripPartnerView: View {
+    let task: Trip
+    @State private var partner: UserMetaData?
+    let dataController = IFEDataController.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Partner Details")
+                .font(.title3)
+                .fontWeight(.semibold)
+            
+            Group {
+                if let partner = partner {
+                    // Partner info section
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .frame(width: 44, height: 44)
+                            .foregroundColor(.primaryGradientStart)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(partner.fullName)
+                                .font(.headline)
+                            Text("Amazon Logistics")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    // Contact info section
+                    VStack(spacing: 12) {
+                        Button(action: { 
+                            if let url = URL(string: "tel://\(partner.phone)") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "phone.fill")
+                                    .foregroundColor(.primaryGradientStart)
+                                Text(partner.phone)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                        }
+                        
+                        Button(action: { 
+                            if let url = URL(string: "mailto:\(partner.email)") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "envelope.fill")
+                                    .foregroundColor(.primaryGradientStart)
+                                Text(partner.email)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                } else {
+                    // Loading state
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.circle.fill")
+                            .resizable()
+                            .frame(width: 44, height: 44)
+                            .foregroundColor(.gray.opacity(0.3))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 120, height: 16)
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 80, height: 14)
+                        }
+                    }
+                    
+                    VStack(spacing: 12) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "phone.fill")
+                                .foregroundColor(.gray.opacity(0.3))
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 100, height: 16)
+                            Spacer()
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "envelope.fill")
+                                .foregroundColor(.gray.opacity(0.3))
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 150, height: 16)
+                            Spacer()
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(12)
+        .task {
+            // Get the current user's ID
+            if let currentUserId = dataController.user?.id {
+                // Find the partner's ID (the one that's not the current user)
+                if let partnerId = task.assignedDriverIDs.first(where: { $0 != currentUserId }) {
+                    // Fetch partner's metadata
+                    if let partnerMetaData = await dataController.getUserMetaData(by: partnerId) {
+                        partner = partnerMetaData
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Sub-view for Vehicle Details
 struct VehicleDetailsCard: View {
     let task: Trip
-    
+    @State private var vehicle: Vehicle?
+    var remoteController = RemoteController()
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vehicle Details")
@@ -179,20 +312,50 @@ struct VehicleDetailsCard: View {
             
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Vehicle ID")
-                        .font(.caption)
-                        .foregroundColor(.textSecondary)
-                    Text("\(task.assignedVehicleID)")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                    if let vehicle = vehicle {
+                        HStack{
+                            VStack(alignment: .leading, spacing: 4){
+                                Text("Name")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                                Text("\(vehicle.make) \(vehicle.model)") // Show vehicle name instead of ID
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 4){
+                                Text("License Number")
+                                    .font(.caption)
+                                    .foregroundColor(.textSecondary)
+                                Text("\(vehicle.licenseNumber)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.statusOrange)
+                            }
+                        }
+                    } else {
+                        Text("Loading...")
+                            .foregroundColor(.gray)
+                    }
                 }
                 Spacer()
             }
+        }
+        .task {
+            await fetchVehicle() // Fetch vehicle data when TaskCard appears
         }
         .padding()
         .background(Color.white)
         .cornerRadius(12)
     }
+    private func fetchVehicle() async {
+        do {
+            vehicle = try await remoteController.getRegisteredVehicle(by: task.assignedVehicleID)
+        } catch {
+            print("Error fetching vehicle: \(error)")
+        }
+    }
+            
 }
 
 // Sub-view for Locations
@@ -221,7 +384,7 @@ struct LocationsCard: View {
                     Text("Estimated Time")
                         .font(.caption)
                         .foregroundColor(.textSecondary)
-                    Text("\(Int(task.totalTripDuration.timeIntervalSince(task.scheduledDateTime)/3600)) hours")
+                    Text("\(Int(task.totalDistance)/50) hours")
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }

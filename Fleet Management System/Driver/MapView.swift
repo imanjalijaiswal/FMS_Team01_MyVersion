@@ -767,18 +767,6 @@ struct MapView: View {
                             }
                             
                             Spacer()
-                            
-                            Button(action: {
-                                selectedTrip = trip
-                                showingTripOverview = true
-                            }) {
-                                Image(systemName: "info.circle")
-                                    .font(.title3)
-                                    .foregroundColor(.primaryGradientStart)
-                                    .padding(8)
-                                    .background(Color.white)
-                                    .clipShape(Circle())
-                            }
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
