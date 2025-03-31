@@ -218,6 +218,10 @@ struct FleetManagerDashboardView: View {
         viewModel.drivers.filter { !$0.activeStatus }.count
     }
     
+    var offlineDrivers: Int {
+        viewModel.drivers.filter{$0.activeStatus && $0.meta_data.firstTimeLogin}.count
+    }
+    
     var availableVehicles: Int {
         viewModel.vehicles.filter { $0.status == .available && $0.activeStatus }.count
     }
@@ -240,6 +244,9 @@ struct FleetManagerDashboardView: View {
     
     var inactiveMaintenancePersonnel: Int {
         viewModel.maintenancePersonnels.filter { !$0.activeStatus }.count
+    }
+    var offlineMaintenancePersonnel: Int {
+        viewModel.maintenancePersonnels.filter{ $0.activeStatus && $0.meta_data.firstTimeLogin}.count
     }
     var scheduledTrips: Int {
         viewModel.trips.filter { $0.status == .scheduled }.count
@@ -270,7 +277,8 @@ struct FleetManagerDashboardView: View {
                              Color.mint),
                             
                             (DriverStatus.onTrip.rawValue, onTripDrivers, Color.primaryGradientEnd),
-                            ("Inactive", inactiveDrivers, Color.orange)
+                            ("Inactive", inactiveDrivers, Color.orange),
+                            ("Offline", offlineDrivers, Color.gray)
                         ]
                     )
                     
@@ -279,7 +287,8 @@ struct FleetManagerDashboardView: View {
                         total: viewModel.maintenancePersonnels.count,
                         items: [
                             ("Available", availableMaintenancePersonnel, Color.mint),
-                            ("Inactive", inactiveMaintenancePersonnel, Color.orange)
+                            ("Inactive", inactiveMaintenancePersonnel, Color.orange),
+                            ("Offline", offlineMaintenancePersonnel, Color.gray)
                         ]
                     )
                     

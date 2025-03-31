@@ -184,6 +184,8 @@ struct AssignTripView: View {
     @State private var selectedVehicle: Vehicle? = nil
     @State private var selectedStartLocation: String? = nil
     @State private var selectedEndLocation: String? = nil
+    @State private var selectedStartCoordinates: String? = nil
+    @State private var selectedEndCoordinates: String? = nil
     @State private var showingAlert = false
     @State private var scheduledDateTime = Date()
     @State private var estimatedArrivalDateTime = Date()
@@ -202,7 +204,9 @@ struct AssignTripView: View {
         !pickupLocation.isEmpty &&
         !destination.isEmpty &&
         selectedVehicle != nil &&
-        selectedDriver1 != nil
+        selectedDriver1 != nil &&
+        selectedStartCoordinates != nil &&
+        selectedEndCoordinates != nil
     }
 
     var body: some View {
@@ -212,13 +216,15 @@ struct AssignTripView: View {
                     LocationSearchBar(
                         text: $pickupLocation,
                         placeholder: "Pickup Location",
-                        selectedLocation: $selectedStartLocation
+                        selectedLocation: $selectedStartLocation,
+                        selectedCoordinates: $selectedStartCoordinates
                     )
 
                     LocationSearchBar(
                         text: $destination,
                         placeholder: "Drop-off Location",
-                        selectedLocation: $selectedEndLocation
+                        selectedLocation: $selectedEndLocation,
+                        selectedCoordinates: $selectedEndCoordinates
                     )
 
                     // Scheduled Date Time
@@ -365,32 +371,30 @@ struct AssignTripView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        Task{
-                            if let pickupCoordinate = await getCoordinates(from: selectedStartLocation ?? ""){
-                                selectedStartLocation = pickupCoordinate
-                                if let destinationCoordinate = await getCoordinates(from: selectedEndLocation ?? ""){
-                                    selectedEndLocation = destinationCoordinate
-                                    if let distance = calculateDistance(from: selectedStartLocation ?? "", to: selectedEndLocation ?? "") {
-                                        print("Distance: \(distance / 1000) km") // Convert meters to kilometers
-                                        let newTrip = Trip(
-                                            id: UUID(),
-                                            tripID: Int.random(in: 1000...9999),
-                                            assignedByFleetManagerID: UUID(),
-                                            assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
-                                            assignedVehicleID: selectedVehicle?.id ?? 0,
-                                            pickupLocation: selectedStartLocation ?? "0,0",
-                                            destination: selectedEndLocation ?? "0,0",
-                                            estimatedArrivalDateTime: estimatedArrivalDateTime,
-                                            totalDistance: Int(distance/1000),
-                                            totalTripDuration: estimatedDate(from: scheduledDateTime, hours: Float((distance/1000)/50)),
-                                            description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
-                                            scheduledDateTime: scheduledDateTime, createdAt: .now,
-                                            status: .scheduled
-                                        )
+                        Task {
+                            if let startCoordinates = selectedStartCoordinates,
+                               let endCoordinates = selectedEndCoordinates {
+                                if let distance = calculateDistance(from: startCoordinates, to: endCoordinates) {
+                                    print("Distance: \(distance / 1000) km")
+                                    let newTrip = Trip(
+                                        id: UUID(),
+                                        tripID: Int.random(in: 1000...9999),
+                                        assignedByFleetManagerID: UUID(),
+                                        assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
+                                        assignedVehicleID: selectedVehicle?.id ?? 0,
+                                        pickupLocation: startCoordinates,
+                                        destination: endCoordinates,
+                                        estimatedArrivalDateTime: estimatedArrivalDateTime,
+                                        totalDistance: Int(distance/1000),
+                                        totalTripDuration: estimatedDate(from: scheduledDateTime, hours: Float((distance/1000)/50)),
+                                        description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
+                                        scheduledDateTime: scheduledDateTime,
+                                        createdAt: .now,
+                                        status: .scheduled
+                                    )
 
-                                        viewModel.addTrip(newTrip)
-                                        showingAlert = true
-                                    }
+                                    viewModel.addTrip(newTrip)
+                                    showingAlert = true
                                 }
                             }
                         }
@@ -417,8 +421,6 @@ struct AssignTripView: View {
         }
     }
 }
-
-
 
 func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
     let startComponents = startCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -588,11 +590,11 @@ struct DriverSelectionView: View {
     }
 }
 
-
 struct LocationSearchBar: View {
     @Binding var text: String
     let placeholder: String
     @Binding var selectedLocation: String?
+    @Binding var selectedCoordinates: String?
     @State private var showingMap = false
     @StateObject private var searchCompleter = SearchCompleter()
     @State private var showResults = false
@@ -622,8 +624,14 @@ struct LocationSearchBar: View {
                     VStack(alignment: .leading) {
                         ForEach(searchCompleter.results, id: \.self) { result in
                             Button(action: {
-                                text = result.title
-                                selectedLocation = result.title
+                                let searchRequest = MKLocalSearch.Request(completion: result)
+                                let search = MKLocalSearch(request: searchRequest)
+                                search.start { response, error in
+                                    guard let coordinate = response?.mapItems.first?.placemark.coordinate else { return }
+                                    text = result.title
+                                    selectedLocation = result.title
+                                    selectedCoordinates = "\(coordinate.latitude), \(coordinate.longitude)"
+                                }
                                 showResults = false
                             }) {
                                 VStack(alignment: .leading) {
@@ -646,7 +654,7 @@ struct LocationSearchBar: View {
             }
         }
         .sheet(isPresented: $showingMap) {
-            MapLocationPicker(selectedLocation: $selectedLocation, searchText: $text)
+            MapLocationPicker(selectedLocation: $selectedLocation, selectedCoordinates: $selectedCoordinates, searchText: $text)
         }
     }
 }
@@ -654,6 +662,7 @@ struct LocationSearchBar: View {
 struct MapLocationPicker: View {
     @Environment(\.dismiss) var dismiss
     @Binding var selectedLocation: String?
+    @Binding var selectedCoordinates: String?
     @Binding var searchText: String
     @State private var position = MapCameraPosition.region(MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 20.5937, longitude: 78.9629),
@@ -662,19 +671,28 @@ struct MapLocationPicker: View {
     @State private var searchTextMap = ""
     @StateObject private var searchCompleter = SearchCompleter()
     @State private var showResults = false
+    @State private var currentSearchResult: MKLocalSearchCompletion?
     
     func getLocationName(center: CLLocationCoordinate2D) {
         let location = CLLocation(latitude: center.latitude, longitude: center.longitude)
         CLGeocoder().reverseGeocodeLocation(location) { placemarks, error in
             if let placemark = placemarks?.first {
-                let address = [
-                    placemark.name,
-                    placemark.locality,
-                    placemark.administrativeArea,
-                    placemark.country
-                ].compactMap { $0 }.joined(separator: ", ")
-                selectedLocation = address
-                searchText = address
+                if let currentResult = currentSearchResult {
+                    // If we have a search result, use its title instead of reverse geocoding
+                    selectedLocation = currentResult.title
+                    searchText = currentResult.title
+                } else {
+                    // Fallback to reverse geocoded address
+                    let address = [
+                        placemark.name,
+                        placemark.locality,
+                        placemark.administrativeArea,
+                        placemark.country
+                    ].compactMap { $0 }.joined(separator: ", ")
+                    selectedLocation = address
+                    searchText = address
+                }
+                selectedCoordinates = "\(center.latitude), \(center.longitude)"
             }
         }
     }
@@ -712,6 +730,7 @@ struct MapLocationPicker: View {
                                 ForEach(searchCompleter.results, id: \.self) { result in
                                     Button(action: {
                                         searchTextMap = result.title
+                                        currentSearchResult = result
                                         let searchRequest = MKLocalSearch.Request(completion: result)
                                         let search = MKLocalSearch(request: searchRequest)
                                         search.start { response, error in
@@ -720,6 +739,9 @@ struct MapLocationPicker: View {
                                                 center: coordinate,
                                                 span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                                             ))
+                                            selectedLocation = result.title
+                                            selectedCoordinates = "\(coordinate.latitude), \(coordinate.longitude)"
+                                            searchText = result.title
                                         }
                                         showResults = false
                                     }) {

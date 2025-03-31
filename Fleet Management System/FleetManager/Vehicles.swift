@@ -596,7 +596,8 @@ struct VehicleDetailsView: View {
                     LocationSearchBar(
                         text: $currentCoordinate,
                         placeholder: "Current Location",
-                        selectedLocation: $selectedLocation
+                        selectedLocation: $selectedLocation,
+                        selectedCoordinates: $selectedAdress
                     )
                     
                 }

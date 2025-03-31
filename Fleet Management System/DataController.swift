@@ -8,6 +8,7 @@ import SwiftUI
 import CoreLocation
 import SwiftSMTP
 import Auth
+import MapKit
 
 
 class IFEDataController: ObservableObject {
@@ -641,7 +642,7 @@ class IFEDataController: ObservableObject {
     ///
     /// - Discussion:
     ///   - This function follows these steps:
-    ///     1. Saves the current fleet manager’s ID before performing any operations.
+    ///     1. Saves the current fleet manager's ID before performing any operations.
     ///     2. Creates a new maintenance personnel account with the given email and password.
     ///     3. Retrieves the highest existing employee ID and increments it for the new personnel.
     ///     4. Saves the personnel metadata (phone number, full name, and employee ID).
@@ -851,25 +852,72 @@ func getAddress(from coordinate: String, completion: @escaping (String?) -> Void
         return
     }
 
-    let location = CLLocation(latitude: latitude, longitude: longitude)
-    let geocoder = CLGeocoder()
+    let location = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    let searchRequest = MKLocalSearch.Request()
+    searchRequest.naturalLanguageQuery = "\(latitude), \(longitude)"
+    searchRequest.resultTypes = [.pointOfInterest, .address]
+    searchRequest.region = MKCoordinateRegion(
+        center: location,
+        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+    )
     
-    geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+    let search = MKLocalSearch(request: searchRequest)
+    search.start { response, error in
         if let error = error {
-            print("Reverse geocoding failed: \(error.localizedDescription)")
+            print("Search failed: \(error.localizedDescription)")
             completion(nil)
             return
         }
+        
+        if let items = response?.mapItems {
+            // Try to find the most relevant result
+            if let poi = items.first(where: { $0.pointOfInterestCategory != nil }) {
+                // If we found a point of interest, use its full address
+                let address = [
+                    poi.name,
+                    poi.placemark.thoroughfare,
+                    poi.placemark.locality,
+                    poi.placemark.administrativeArea,
+                    poi.placemark.country
+                ].compactMap { $0 }.joined(separator: ", ")
+                completion(address)
+            } else if let firstItem = items.first {
+                // If no POI, use the first result's full address
+                let address = [
+                    firstItem.name,
+                    firstItem.placemark.thoroughfare,
+                    firstItem.placemark.locality,
+                    firstItem.placemark.administrativeArea,
+                    firstItem.placemark.country
+                ].compactMap { $0 }.joined(separator: ", ")
+                completion(address)
+            } else {
+                // Fallback to reverse geocoding
+                let geocoder = CLGeocoder()
+                let location = CLLocation(latitude: latitude, longitude: longitude)
+                
+                geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
+                    if let error = error {
+                        print("Reverse geocoding failed: \(error.localizedDescription)")
+                        completion(nil)
+                        return
+                    }
 
-        if let placemark = placemarks?.first {
-            let address = [
-                placemark.name,
-                placemark.locality,
-                placemark.administrativeArea,
-                placemark.country
-            ].compactMap { $0 }.joined(separator: ", ")
-
-            completion(address)
+                    if let placemark = placemarks?.first {
+                        let address = [
+                            placemark.name,
+                            placemark.thoroughfare,
+                            placemark.locality,
+                            placemark.administrativeArea,
+                            placemark.country
+                        ].compactMap { $0 }.joined(separator: ", ")
+                        
+                        completion(address.isEmpty ? nil : address)
+                    } else {
+                        completion(nil)
+                    }
+                }
+            }
         } else {
             completion(nil)
         }
