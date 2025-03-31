@@ -116,11 +116,11 @@ struct MaintenanceView: View {
         }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Start Work") {
-                if let task = taskToStart {
-                    startWork(task: task)
-                }
-            }
+//            Button("Start Work") {
+//                if let task = taskToStart {
+//                    startWork(task: task)
+//                }
+//            }
         } message: {
             Text("Are you sure you want to start work on this task?")
         }
@@ -496,7 +496,7 @@ struct MaintenanceView: View {
     }
 }
 
-struct MaintenanceTaskCard: View {
+struct MaintenanceTaskCardV: View {
     let task: MaintenanceTask
     let vehicleLicense: String?
     let onStartWork: () -> Void
@@ -576,61 +576,62 @@ struct MaintenanceTaskCard: View {
             }
             
             HStack {
-                Text("Complete in:")
-                    .foregroundColor(.secondary)
+//                Text("Complete in:")
+//                    .foregroundColor(.secondary)
+//                
+//                Spacer()
                 
-                Spacer()
-                
-                Menu {
-                    ForEach(1...7, id: \.self) { day in
-                        Button(action: {
-                            completionDays = day
-                            onDaysSelected(day)
-                        }) {
-                            HStack {
-                                Text("\(day) day\(day > 1 ? "s" : "")")
-                                
-                                Spacer()
-                                
-                                if day == completionDays {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
-                            .foregroundColor(.primary)
-                        
-                        Spacer(minLength: 8)
-                        
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color(UIColor.systemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
+//                Menu {
+//                    ForEach(1...7, id: \.self) { day in
+//                        Button(action: {
+//                            completionDays = day
+//                            onDaysSelected(day)
+//                        }) {
+//                            HStack {
+//                                Text("\(day) day\(day > 1 ? "s" : "")")
+//                                
+//                                Spacer()
+//                                
+//                                if day == completionDays {
+//                                    Image(systemName: "checkmark")
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+//                label: {
+//                    HStack {
+//                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
+//                            .foregroundColor(.primary)
+//                        
+//                        Spacer(minLength: 8)
+//                        
+//                        Image(systemName: "chevron.up.chevron.down")
+//                            .font(.caption)
+//                            .foregroundColor(.gray)
+//                    }
+//                    .padding(.horizontal, 20)
+//                    .padding(.vertical, 8)
+//                    .background(Color(UIColor.systemBackground))
+//                    .overlay(
+//                        RoundedRectangle(cornerRadius: 8)
+//                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+//                    )
+//                }
+//                .buttonStyle(PlainButtonStyle())
             }
             .padding(.vertical, 5)
             
-            Button(action: onStartWork) {
-                Text("Start Work")
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .cornerRadius(8)
-            }
-            .padding(.top, 5)
+//            Button(action: onStartWork) {
+//                Text("Start Work")
+//                    .fontWeight(.medium)
+//                    .foregroundColor(.white)
+//                    .frame(maxWidth: .infinity)
+//                    .padding(.vertical, 12)
+//                    .background(Color.blue)
+//                    .cornerRadius(8)
+//            }
+//            .padding(.top, 5)
         }
     }
     
@@ -1050,7 +1051,7 @@ struct MaintenanceTabView: View {
                                 .padding(.top, 40)
                         } else {
                             ForEach(filteredTasks) { task in
-                                MaintenanceTaskCard(
+                                MaintenanceTaskCardV(
                                     task: task,
                                     vehicleLicense: vehicleLicenseMap[task.vehicleID],
                                     onStartWork: {
