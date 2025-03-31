@@ -121,7 +121,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     // Profile Header
-                    profileHeader
+
                     
                     // Information Cards
                     VStack(spacing: 16) {
