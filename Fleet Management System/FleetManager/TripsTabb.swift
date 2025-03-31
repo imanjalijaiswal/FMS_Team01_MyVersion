@@ -448,7 +448,7 @@ struct DriversRowView: View {
         HStack(spacing: 12) {
             Image(systemName: "person.circle.fill")
                 .font(.system(size: 40))
-                .foregroundColor(.blue)
+                .foregroundColor(Color.primaryGradientStart)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(driver.meta_data.fullName)
@@ -824,9 +824,9 @@ struct VehicleCardContent: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "car.fill")
+            Image(systemName: "truck.box.fill")
                 .font(.system(size: 40))
-                .foregroundColor(.green)
+                .foregroundColor(Color.setForegroundColor(vehicle: vehicle))
             
             VStack(alignment: .leading, spacing: 4) {
                     VStack(alignment: .leading, spacing: 4){

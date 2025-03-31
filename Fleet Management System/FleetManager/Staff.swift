@@ -510,7 +510,6 @@ struct MaintenancePersonnelDetailView: View {
                     }
                 } else {
                     Button(action: {
-                        // Add enable maintenance personnel functionality in DataController
                         viewModel.enableMaintenancePersonnel(personnel)
                         dismiss()
                     }) {
@@ -529,19 +528,18 @@ struct MaintenancePersonnelDetailView: View {
                 Button(isEditing ? "Save" : "Edit") {
                     withAnimation {
                         if isEditing {
-                            // Add update maintenance personnel phone functionality in DataController
                             isEditing.toggle()
                         } else {
                             isEditing.toggle()
                         }
                     }
                 }
+                .foregroundColor(.primaryGradientEnd)
             }
         }
         .alert("Make Personnel Inactive", isPresented: $showingDisableAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Inactive", role: .destructive) {
-                // Add remove maintenance personnel functionality in DataController
                 dismiss()
             }
         } message: {
