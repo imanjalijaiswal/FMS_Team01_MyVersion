@@ -3,53 +3,52 @@ import SwiftUI
 struct MaintenanceSchedulingView: View {
     @State private var showScheduleForm = false
     @State private var searchText = ""
-    @State private var selectedFilter = "All"
+    @State private var selectedFilter = ""
     @StateObject private var viewModel = IFEDataController.shared
-    @State private var maintenanceSchedules: [MaintenanceSchedule] = [
-        MaintenanceSchedule(
-            ticketNumber: 1001,
-            maintenancePersonnel: "John Smith",
-            vehiclePlate: "ABC-123",
-            vehicleModel: "Toyota Camry",
-            scheduledDateTime: Date().addingTimeInterval(86400),
-            status: "Scheduled"
-        ),
-        MaintenanceSchedule(
-            ticketNumber: 1002,
-            maintenancePersonnel: "Mike Johnson",
-            vehiclePlate: "XYZ-789",
-            vehicleModel: "Honda Civic",
-            scheduledDateTime: Date().addingTimeInterval(172800),
-            status: "In Progress"
-        ),
-        MaintenanceSchedule(
-            ticketNumber: 1003,
-            maintenancePersonnel: "Sarah Wilson",
-            vehiclePlate: "DEF-456",
-            vehicleModel: "Ford F-150",
-            scheduledDateTime: Date().addingTimeInterval(259200),
-            status: "Scheduled"
-        )
-    ]
     
-    let filters = ["All", "Scheduled", "In Progress"]
+    private var scheduledCount: Int {
+            viewModel.managerAssignedMaintenanceTasks.filter { $0.status == .scheduled }.count
+        }
+        
+    private var inProgressCount: Int {
+            viewModel.managerAssignedMaintenanceTasks.filter { $0.status == .inProgress }.count
+        }
+        
+    private var completedCount: Int {
+            viewModel.managerAssignedMaintenanceTasks.filter { $0.status == .completed }.count
+        }
+        
+    private var totalCount: Int {
+            viewModel.managerAssignedMaintenanceTasks.count
+        }
+        
+        private var filters: [String] {
+            [
+                "All (\(totalCount))",
+                "Scheduled (\(scheduledCount))",
+                "In Progress (\(inProgressCount))",
+                "Completed (\(completedCount))"
+            ]
+        }
+
     
-    var filteredSchedules: [MaintenanceSchedule] {
-        let searchResults = maintenanceSchedules.filter { schedule in
+    var filteredTasks: [MaintenanceTask] {
+        let searchResults = viewModel.managerAssignedMaintenanceTasks.filter { task in
             if searchText.isEmpty { return true }
             
-            return schedule.maintenancePersonnel.localizedCaseInsensitiveContains(searchText) ||
-                   schedule.vehiclePlate.localizedCaseInsensitiveContains(searchText) ||
-                   schedule.vehicleModel.localizedCaseInsensitiveContains(searchText)
+            return task.assignedTo.uuidString.localizedCaseInsensitiveContains(searchText) ||
+                   String(task.vehicleID).localizedCaseInsensitiveContains(searchText)
         }
         
         switch selectedFilter {
         case "In Progress":
-            return searchResults.filter { $0.status == "In Progress" }
+            return searchResults.filter { $0.status == .inProgress }
         case "Scheduled":
-            return searchResults.filter { $0.status == "Scheduled" }
+            return searchResults.filter { $0.status == .scheduled }
+        case "Completed":
+            return searchResults.filter { $0.status == .completed }
         default:
-            return searchResults
+            return searchResults.filter { _ in true }
         }
     }
 
@@ -67,13 +66,13 @@ struct MaintenanceSchedulingView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
-                        if filteredSchedules.isEmpty {
-                            Text("No maintenance schedules available")
-                                .foregroundColor(.gray)
-                                .padding()
+                        if filteredTasks.isEmpty {
+                            Text("No maintenance tasks available")
+                            .foregroundColor(.gray)
+                            .padding()
                         } else {
-                            ForEach(filteredSchedules) { schedule in
-                                MaintenanceScheduleCard(schedule: schedule)
+                            ForEach(filteredTasks) { task in
+                                MaintenanceTaskCard(task: task)
                             }
                         }
                     }
@@ -93,54 +92,80 @@ struct MaintenanceSchedulingView: View {
             }
             .background(Color.white)
             .sheet(isPresented: $showScheduleForm) {
-                MaintenanceScheduleFormView(viewModel: viewModel) { newSchedule in
-                    maintenanceSchedules.append(newSchedule)
+                MaintenanceScheduleFormView(viewModel: viewModel) { _ in
                 }
+                .background(Color(.systemGray6))
+            }
+        }
+        .onAppear {
+            if selectedFilter.isEmpty {
+                selectedFilter = filters[0]
             }
         }
     }
 }
 
-struct MaintenanceScheduleCard: View {
-    let schedule: MaintenanceSchedule
+struct MaintenanceTaskCard: View {
+    let task: MaintenanceTask
+    @StateObject private var viewModel = IFEDataController.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading) {
-                    Text(String(format:"#%d", schedule.ticketNumber))
-                        .font(.subheadline)
-                    
-                    Text(schedule.maintenancePersonnel)
-                        .font(.headline)
-                    
+                    HStack{
+                        Text("Task ID:")
+                            .font(.subheadline)
+                        
+                        Text("#\(task.taskID)")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    if let personnel = viewModel.maintenancePersonnels.first(where: { $0.id == task.assignedTo }) {
+                        Text(personnel.meta_data.fullName)
+                            .font(.headline)
+                    } else {
+                        Text("Unknown Personnel")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                    }
                 }
                 Spacer()
-                Text(schedule.status)
+                Text(task.status.rawValue)
                     .font(.subheadline)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.orange.opacity(0.2))
-                    .foregroundColor(.orange)
+                    .background(Color.setMaintaiencePersonalColor(status: MaintenanceStatus(rawValue: task.status.rawValue) ?? .scheduled).opacity(0.2))
+                    .foregroundColor(Color.setMaintaiencePersonalColor(status: MaintenanceStatus(rawValue: task.status.rawValue) ?? .scheduled))
                     .cornerRadius(15)
             }
 
-            HStack {
-                Text("Vehicle Details: ")
+            // Vehicle Details section
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Vehicle Details:")
                     .font(.subheadline)
                     .foregroundColor(.gray)
                 
-                Text("\(schedule.vehicleModel) \n \(schedule.vehiclePlate)")
-                    .font(.subheadline)
-                    .foregroundColor(.black)
-                
+                if let vehicle = viewModel.vehicles.first(where: { $0.id == task.vehicleID }) {
+                    Text("\(vehicle.make) \(vehicle.model)")
+                        .font(.subheadline)
+                        .foregroundColor(.black)
+                    
+                    Text(vehicle.licenseNumber)
+                        .font(.subheadline)
+                        .foregroundColor(.black)
+                } else {
+                    Text("Vehicle not found")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
             }
 
-            HStack {
+            // Add created date section
+            HStack(spacing: 8) {
                 Image(systemName: "calendar")
                     .foregroundColor(.gray)
-                
-                Text(schedule.scheduledDateTime.formatted(date: .long, time: .shortened))
+                Text(task.createdAt.formatted(date: .long, time: .shortened))
                     .font(.subheadline)
                     .foregroundColor(.gray)
             }
@@ -154,16 +179,14 @@ struct MaintenanceScheduleCard: View {
 
 struct MaintenanceScheduleFormView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var scheduledDateTime = Date()
-    @State private var selectedPersonnel = ""
+    @State private var selectedPersonnel = UUID() // Changed to UUID
     @State private var selectedVehicle: Vehicle? = nil
     @State private var notes = ""
-    @State private var showDatePicker = false
-    @State private var showScheduledDatePicker = false
     @State private var showVehicleSelectionSheet = false
-    @State private var isDoneEnabled = false
+    @State private var showPersonnelSelectionSheet = false
     @State private var showSuccessAlert = false
-
+    @State private var isDoneEnabled = false
+    @State private var text:String = ""
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "d/M/yyyy, h:mm a"
@@ -171,7 +194,7 @@ struct MaintenanceScheduleFormView: View {
     }()
     
     @ObservedObject var viewModel: IFEDataController
-    var onScheduleComplete: ((MaintenanceSchedule) -> Void)? = nil
+    var onScheduleComplete: ((MaintenanceTask) -> Void)? = nil
 
     var vehicleDisplayText: String {
         if let vehicle = selectedVehicle {
@@ -180,56 +203,35 @@ struct MaintenanceScheduleFormView: View {
         return "Select Vehicle"
     }
 
+    var isFormValid: Bool {
+        selectedVehicle != nil && selectedPersonnel != UUID()
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     
-                    VStack {
-                        Button(action: { showScheduledDatePicker.toggle() }) {
-                            HStack {
-                                Text("Scheduled Date & Time")
-                                    .foregroundColor(.primary)
-                                    .frame(width: 120, alignment: .leading)
-                                Spacer()
-                                Text(scheduledDateTime.formatted())
-                                    .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showScheduledDatePicker ? 90 : 0))
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        
-                        if showScheduledDatePicker {
-                            DatePicker(
-                                "Scheduled Date & Time",
-                                selection: $scheduledDateTime,
-                                in: Calendar.current.date(byAdding: .day, value: 1, to: Date())!...,
-                                displayedComponents: [.date, .hourAndMinute]
-                            )
-                            .datePickerStyle(.graphical)
-                            .onAppear {
-                                scheduledDateTime = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                    
                     // Personnel Selection Card
-                    HStack {
-                        Text("Maintenance\n Personnel")
-                        Spacer()
-                        Text(selectedPersonnel.isEmpty ? "Select Personnel" : selectedPersonnel)
-                            .foregroundColor(.gray)
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
+                    Button(action: { showPersonnelSelectionSheet = true }) {
+                        HStack {
+                            Text("Maintenance Personnel")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if let personnel = viewModel.maintenancePersonnels.first(where: { $0.id == selectedPersonnel }) {
+                                Text(personnel.meta_data.fullName)
+                                    .foregroundColor(.gray)
+                            } else {
+                                Text("Select Personnel")
+                                    .foregroundColor(.gray)
+                            }
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(10)
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                   
                     
                     // Vehicle Selection Card
                     Button(action: { showVehicleSelectionSheet = true }) {
@@ -243,26 +245,54 @@ struct MaintenanceScheduleFormView: View {
                                 .foregroundColor(.gray)
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.white)
                         .cornerRadius(10)
                     }
-
                     
                     // Notes Card
-                    TextField("Maintenance Description", text: $notes)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
+//<<<<<<< HEAD
+//                    TextField("Maintenance Description", text: $notes)
+//                        .textFieldStyle(RoundedBorderTextFieldStyle())
+//                        .padding()
+//                        .background(Color.white)
+//                        .cornerRadius(10)
+//                
+//=======
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Maintenance Description")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        TextEditor(text: $notes)
+                            .frame(minHeight: 100)
+                            .overlay(
+                                Group {
+                                    if notes.isEmpty {
+                                        Text("Enter maintenance details, issues, or special instructions")
+                                            .foregroundColor(.gray)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 8)
+                                    }
+                                },
+                                alignment: .topLeading
+                            )
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
                         
                         
+//>>>>>>> Arnav_Screen
                 }
                 .padding()
+            }
+            .background(Color(.systemGray6))
+            .sheet(isPresented: $showPersonnelSelectionSheet) {
+                MaintenancePersonnelSelectionView(selectedPersonnel: $selectedPersonnel, viewModel: viewModel)
             }
             .sheet(isPresented: $showVehicleSelectionSheet) {
                 VehicleSelectionView(viewModel: viewModel, selectedVehicle: $selectedVehicle)
             }
-            .background(Color.white)
             .navigationTitle("Schedule Maintenance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -277,8 +307,8 @@ struct MaintenanceScheduleFormView: View {
                     Button("Done") {
                         handleDoneButton()
                     }
-                    .disabled(selectedVehicle == nil)
-                    .foregroundColor(selectedVehicle == nil ? Color.gray : Color.primaryGradientStart)
+                    .disabled(!isFormValid)
+                    .foregroundColor(!isFormValid ? Color.gray : Color.primaryGradientStart)
                     .fontWeight(.regular)
                 }
             }
@@ -293,42 +323,159 @@ struct MaintenanceScheduleFormView: View {
     }
     
     private func handleDoneButton() {
-        
-        // Update vehicle status to under maintenance
         if let vehicle = selectedVehicle {
-            // Update the local state immediately after calling the update method
             if let index = viewModel.vehicles.firstIndex(where: { $0.id == vehicle.id }) {
                 viewModel.vehicles[index].status = .underMaintenance
             }
-            viewModel.updateVehicleStatus(vehicle, with: .underMaintenance)
-        }
-        
-        
-        // add new schedule to the maintenance schedules list
-        let newSchedule = MaintenanceSchedule(
-
             
-            maintenancePersonnel: "John Smith",
-            vehiclePlate: selectedVehicle?.licenseNumber ?? "",
-            vehicleModel: selectedVehicle?.model ?? "",
-            scheduledDateTime: scheduledDateTime,
-            status: "Scheduled"
-        )
-        
-        onScheduleComplete?(newSchedule)
-
-        
-        showSuccessAlert = true
+            let maintenanceNotes = notes.isEmpty ? "" : notes
+            
+            Task {
+                if let newTask = await viewModel.assignNewMaintenanceTask(
+                    by: viewModel.user?.id ?? UUID(),
+                    to: selectedPersonnel,
+                    for: vehicle.id,
+                    ofType: .regularMaintenance,
+                    maintenanceNotes
+                ) {
+                    onScheduleComplete?(newTask)
+                    await viewModel.loadManagerAssignedMaintenanceTasks()
+                    showSuccessAlert = true
+                }
+            }
+        }
     }
 }
 
-struct MaintenanceSchedule: Identifiable {
-    let id = UUID()
 
-    var ticketNumber: Int = 0
-    let maintenancePersonnel: String
-    let vehiclePlate: String
-    let vehicleModel: String
-    let scheduledDateTime: Date
-    let status: String
+//to select maintenancePersonnel in SchedulingForm
+struct MaintenancePersonnelSelectionView: View {
+    @Environment(\.dismiss) var dismiss
+    @Binding var selectedPersonnel: UUID
+    @ObservedObject var viewModel: IFEDataController
+    @State private var searchText = ""
+    @State private var temporarySelectedPersonnel: UUID? // Holds selection until confirmed
+    
+    var availablePersonnel: [MaintenancePersonnel] {
+        let personnel = viewModel.maintenancePersonnels
+        
+        if searchText.isEmpty {
+            return personnel
+        }
+        
+        return personnel.filter { personnel in
+            personnel.meta_data.fullName.lowercased().contains(searchText.lowercased()) ||
+            String(personnel.meta_data.employeeID).contains(searchText) ||
+            personnel.meta_data.phone.contains(searchText)
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                SearchBar(text: $searchText)
+                    .padding(.vertical, 8)
+                
+                if availablePersonnel.isEmpty {
+                    VStack(spacing: 20) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text(searchText.isEmpty ? "No available personnel" : "No matching personnel")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(availablePersonnel) { personnel in
+                                Button(action: {
+                                    if temporarySelectedPersonnel == personnel.id {
+                    
+                                        temporarySelectedPersonnel = nil
+                                    } else {
+                                        // Select new personnel
+                                        temporarySelectedPersonnel = personnel.id
+                                    }
+                                }) {
+                                    PersonnelRowView(
+                                        personnel: personnel,
+                                        isSelected: temporarySelectedPersonnel == personnel.id
+                                    )
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(10)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .background(Color.white)
+                }
+            }
+            .navigationTitle("Select Personnel")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.primaryGradientEnd)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        if let personnel = temporarySelectedPersonnel {
+                            selectedPersonnel = personnel
+                        }
+                        dismiss()
+                    }
+                    .disabled(temporarySelectedPersonnel == nil)
+                    .foregroundColor(temporarySelectedPersonnel == nil ? .gray : .primaryGradientStart)
+                }
+            }
+            .toolbarBackground(Color(.white), for: .navigationBar)
+            .background(Color.white)
+        }
+    }
+}
+
+struct PersonnelRowView: View {
+    let personnel: MaintenancePersonnel
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.green)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(personnel.meta_data.fullName)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+
+                Text("ID: \(personnel.meta_data.employeeID)")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+
+                HStack {
+                    Label(personnel.meta_data.phone, systemImage: "phone.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.title2)
+            }
+        }
+        .padding(.vertical, 4)
+    }
 }

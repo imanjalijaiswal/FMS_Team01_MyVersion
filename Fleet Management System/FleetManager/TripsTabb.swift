@@ -119,11 +119,7 @@ struct TripCard: View {
                         .foregroundColor(.gray)
                 }
                 Spacer()
-                Button(action: {
-                    showingStatusSheet = true
-                }) {
-                    StatusBadge(status: trip.status)
-                }
+                StatusBadge(status: trip.status)
             }
             
             Divider()

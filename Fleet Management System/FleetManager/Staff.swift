@@ -34,9 +34,10 @@ struct DriverRowView: View {
             HStack(spacing: 12) {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.blue)
+                    .foregroundColor(driver.activeStatus ?
+                                     Color.foregroundColorForDriver(driver: driver) : .red)
                     .padding(6)
-                    .background(Color.blue.opacity(0.1))
+                    .background(driver.activeStatus ? Color.foregroundColorForDriver(driver: driver).opacity(0.1) : .red.opacity(0.1))
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -58,15 +59,15 @@ struct DriverRowView: View {
                         if driver.activeStatus {
                             HStack(spacing: 4) {
                                 Circle()
-                                    .fill(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? Color.green : Color.gray) : Color.red)
+                                    .fill(Color.foregroundColorForDriver(driver: driver))
                                     .frame(width: 4, height: 4)
                                 Text(!driver.meta_data.firstTimeLogin ? driver.status.rawValue : "Offline")
                                     .font(.caption)
-                                    .foregroundColor(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? .green : .gray) : .red)
+                                    .foregroundColor(Color.foregroundColorForDriver(driver: driver))
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(!driver.meta_data.firstTimeLogin ? ((driver.status == .available) ? Color.green.opacity(0.1) : Color.gray.opacity(0.1)) : Color.red.opacity(0.1))
+                            .background(Color.foregroundColorForDriver(driver: driver).opacity(0.1))
                             .cornerRadius(8)
                         }
                     }
@@ -90,14 +91,24 @@ struct MaintenancePersonnelRowView: View {
     let personnel: MaintenancePersonnel
     @ObservedObject var viewModel: IFEDataController
     
+    var statusText: String {
+//        if !personnel.activeStatus {
+//            return "Inactive"
+         if personnel.meta_data.firstTimeLogin {
+            return "Offline"
+        } else {
+            return "Available"
+        }
+    }
+    
     var body: some View {
         NavigationLink(destination: MaintenancePersonnelDetailView(personnel: personnel, viewModel: viewModel)) {
             HStack(spacing: 12) {
                 Image(systemName: "wrench.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.setMaintaienceColor(maintaiencePersonal: personnel))
                     .padding(6)
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color.setMaintaienceColor(maintaiencePersonal: personnel).opacity(0.1))
                     .clipShape(Circle())
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -114,6 +125,21 @@ struct MaintenancePersonnelRowView: View {
                             Text(personnel.meta_data.phone)
                                 .font(.caption)
                                 .foregroundColor(.gray)
+                        }
+                        Spacer()
+                        if personnel.activeStatus {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.setMaintaienceColor(maintaiencePersonal: personnel))
+                                    .frame(width: 4, height: 4)
+                                Text(statusText)
+                                    .font(.caption)
+                                    .foregroundColor(Color.setMaintaienceColor(maintaiencePersonal: personnel))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.setMaintaienceColor(maintaiencePersonal: personnel).opacity(0.1))
+                            .cornerRadius(8)
                         }
                     }
                 }
@@ -329,7 +355,7 @@ struct DriverDetailView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 80))
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color.foregroundColorForDriver(driver: driver))
                     
                     Text(driver.meta_data.fullName)
                         .font(.title2)
@@ -436,9 +462,9 @@ struct MaintenancePersonnelDetailView: View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    Image(systemName: "wrench.circle.fill")
+                    Image(systemName: "wrench.fill")
                         .font(.system(size: 80))
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color.setMaintaienceColor(maintaiencePersonal: personnel))
                     
                     Text(personnel.meta_data.fullName)
                         .font(.title2)
@@ -474,6 +500,7 @@ struct MaintenancePersonnelDetailView: View {
             Section {
                 if personnel.activeStatus {
                     Button(action: {
+                        viewModel.removeMaintenancePersonnel(personnel)
                         showingDisableAlert = true
                     }) {
                         Text("Make Inactive")
@@ -484,6 +511,7 @@ struct MaintenancePersonnelDetailView: View {
                 } else {
                     Button(action: {
                         // Add enable maintenance personnel functionality in DataController
+                        viewModel.enableMaintenancePersonnel(personnel)
                         dismiss()
                     }) {
                         Text("Make Active")
@@ -943,6 +971,96 @@ struct MaintenancePersonnelListView: View {
     }
 }
 
+
+    
+    
+
+
+/*
 #Preview{
     StaffView()
+=======
+#Preview {
+    // Create a preview with sample data
+    let mockController = IFEDataController.shared
+    mockController.drivers = [
+        // Available driver
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Arnav Chauhan",
+                email: "arnav@example.com",
+                phone: "+917043788123",
+                role: .driver,
+                employeeID: 1001,
+                firstTimeLogin: false,
+                createdAt: Date(),
+                activeStatus: true
+            ),
+            licenseNumber: "DL0120230000001",
+            totalTrips: 24,
+            status: .available
+        ),
+        
+        // On Trip driver
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Raj Kumar",
+                email: "raj@example.com",
+                phone: "+919876543210",
+                role: .driver,
+                employeeID: 1002,
+                firstTimeLogin: false,
+                createdAt: Date(),
+                activeStatus: true
+            ),
+            licenseNumber: "DL0120230000002",
+            totalTrips: 15,
+            status: .onTrip
+        ),
+        
+        // Inactive driver
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Meera Singh",
+                email: "meera@example.com",
+                phone: "+919876543211",
+                role: .driver,
+                employeeID: 1003,
+                firstTimeLogin: false,
+                createdAt: Date(),
+                activeStatus: false
+            ),
+            licenseNumber: "DL0120230000003",
+            totalTrips: 32,
+            status: .available
+        ),
+        
+        // Offline driver (first time login)
+        Driver(
+            meta_data: UserMetaData(
+                id: UUID(),
+                fullName: "Anil Patel",
+                email: "anil@example.com",
+                phone: "+919876543212",
+                role: .driver,
+                employeeID: 1004,
+                firstTimeLogin: true,
+                createdAt: Date(),
+                activeStatus: true
+            ),
+            licenseNumber: "DL0120230000004",
+            totalTrips: 0,
+            status: .Offline
+        )
+    ]
+    
+    return NavigationView {
+        StaffView()
+            .environmentObject(mockController)
+    }
+>>>>>>> Arnav_Screen:Fleet Management System/FleetManager/Driver.swift
 }
+*/

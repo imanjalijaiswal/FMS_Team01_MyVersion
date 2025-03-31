@@ -16,7 +16,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             if isLoading {
-                ProgressView("Loading...")
+                SkeltonView()
             } else if let user = user, isFirstTimeLogin {
                 // Show password reset screen for first-time login - only when we have a user AND firstTimeLogin is true
                 // AND the user is NOT a driver that was just created
@@ -36,36 +36,11 @@ struct ContentView: View {
         }
         .task {
             do {
-                // Set isFirstTimeLogin to false by default - assume no first time login until proven otherwise
-                isFirstTimeLogin = false
-                
-                // Try to get the current session
-                user = try await AuthManager.shared.getCurrentSession()
-                
-                // If no user was found but we have a stored fleet manager ID, try to restore that session
-                if user == nil {
-                    if let fleetManagerId = AuthManager.shared.getActiveFleetManagerID() {
-                        user = try await AuthManager.shared.restoreFleetManagerSession()
-                    }
+                // Fetch user session
+                if let session = try await AuthManager.shared.getCurrentSession() {
+                    user = session
+                    role = session.role
                 }
-                
-                // Check if it's first-time login only if we have a valid user
-                if let currentUser = user {
-                    // Only allow first-time login flow for fleet managers
-                    // Newly created drivers will be redirected to login screen
-                    if currentUser.role == .fleetManager || currentUser.role == .maintenancePersonnel {
-                        isFirstTimeLogin = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id.uuidString)
-                    } else if currentUser.role == .driver {
-                        // If it's a driver and first-time login is true, we need to sign them out
-                        // so they don't auto-login - they should log in explicitly
-                        let isFirstTime = try await AuthManager.shared.checkFirstTimeLogin(userId: currentUser.id.uuidString)
-                        if isFirstTime {
-                            try await AuthManager.shared.signOut()
-                            user = nil // Force them to go to login screen
-                        }
-                    }
-                }
-                
                 isLoading = false
             } catch {
                 print("Error fetching session: \(error)")
@@ -105,6 +80,9 @@ struct ContentView: View {
         }
     }
 }
+
+
+// Shimmer effect modifier for iOS 17+
 
 #Preview {
     ContentView()
