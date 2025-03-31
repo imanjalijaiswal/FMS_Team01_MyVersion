@@ -190,23 +190,40 @@ struct AssignTripView: View {
     @State private var scheduledDateTime = Date()
     @State private var estimatedArrivalDateTime = Date()
     @State private var showScheduledDatePicker = false
-    @State private var showEstimatedDatePicker = false
     @State private var showVehiclePicker = false
     @State private var selectedDriver1: Driver? = nil
     @State private var selectedDriver2: Driver? = nil
     @State private var showDriver1Selection = false
     @State private var showDriver2Selection = false
     @State private var tripDescription = ""
-    @State private var totalDistance = ""
     @State private var pickupAddress: String = "Fetching address..."
     @State private var destinationAddress: String = "Fetching address..."
+    @State private var isCalculatingDistance = false
+    @State private var calculatedDistance: Double? = nil
+
     var isFormValid: Bool {
         !pickupLocation.isEmpty &&
         !destination.isEmpty &&
         selectedVehicle != nil &&
         selectedDriver1 != nil &&
         selectedStartCoordinates != nil &&
-        selectedEndCoordinates != nil
+        selectedEndCoordinates != nil &&
+        calculatedDistance != nil
+    }
+
+    var totalDrivingHours: Double {
+        guard let distance = calculatedDistance else { return 0 }
+        // Assuming average speed of 50 km/h
+        return distance / 50000 // Convert meters to hours
+    }
+
+    var maxDailyDrivingHours: Double {
+        // One driver can drive up to 10 hours, two drivers can drive up to 20 hours
+        return selectedDriver2 != nil ? 20.0 : 10.0
+    }
+
+    var requiredDays: Int {
+        Int(ceil(totalDrivingHours / maxDailyDrivingHours))
     }
 
     var body: some View {
@@ -251,9 +268,10 @@ struct AssignTripView: View {
                             )
                             .datePickerStyle(.graphical)
                             .onAppear {
-                                // Ensure the default selected date is also tomorrow
                                 scheduledDateTime = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
-
+                            }
+                            .onChange(of: scheduledDateTime) { oldValue, newValue in
+                                updateEstimatedArrivalTime()
                             }
                         }
                     }
@@ -261,35 +279,19 @@ struct AssignTripView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
 
-                    // Estimated Arrival
-                    VStack {
-                        Button(action: { showEstimatedDatePicker.toggle() }) {
-                            HStack {
-                                Text("Estimated Arrival")
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                Text(estimatedArrivalDateTime.formatted())
-                                    .foregroundColor(.gray)
-                                Image(systemName: "chevron.right")
-                                    .rotationEffect(.degrees(showEstimatedDatePicker ? 90 : 0))
+                    // Estimated Arrival (Read-only)
+                    VStack(alignment: .leading) {
+                        Text("Estimated Arrival")
+                            .foregroundColor(.primary)
+                        HStack {
+                            Text(estimatedArrivalDateTime.formatted())
+                                .foregroundColor(.gray)
+                            Spacer()
+                            if let distance = calculatedDistance {
+                                Text("\(Int(distance/1000)) km")
                                     .foregroundColor(.gray)
                             }
                         }
-
-                        if showEstimatedDatePicker {
-                            DatePicker(
-                                "Estimated Arrival",
-                                selection: $estimatedArrivalDateTime,
-                                in: Calendar.current.date(byAdding: .hour, value: 1, to: scheduledDateTime)!...,
-                                displayedComponents: [.date, .hourAndMinute]
-                            )
-                            .datePickerStyle(.graphical)
-                            .onAppear {
-                                // Ensure the default selected date is also tomorrow
-                                estimatedArrivalDateTime = Calendar.current.date(byAdding: .hour, value: 1, to: scheduledDateTime) ?? Date()
-                            }
-                        }
-
                     }
                     .padding()
                     .background(Color(.systemGray6))
@@ -320,7 +322,7 @@ struct AssignTripView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
                     .sheet(isPresented: $showVehiclePicker) {
-                    VehicleSelectionView(viewModel: viewModel, selectedVehicle: $selectedVehicle)
+                        VehicleSelectionView(viewModel: viewModel, selectedVehicle: $selectedVehicle)
                     }
 
                     // Driver Selection
@@ -363,6 +365,38 @@ struct AssignTripView: View {
                     .sheet(isPresented: $showDriver2Selection) {
                         DriverSelectionView(viewModel: viewModel, selectedDriver: $selectedDriver2, excludeDriver: selectedDriver1)
                     }
+
+                    if isCalculatingDistance {
+                        HStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                            Text("Calculating route distance...")
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                    } else if let distance = calculatedDistance {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Route Details")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            
+                            HStack {
+                                Label("\(Int(distance/1000)) km", systemImage: "arrow.left.and.right")
+                                Spacer()
+                                Label("\(Int(totalDrivingHours))h \(Int((totalDrivingHours.truncatingRemainder(dividingBy: 1)) * 60))m", systemImage: "clock")
+                            }
+                            .foregroundColor(.gray)
+                            
+                            if requiredDays > 1 {
+                                Text("Note: This trip will require \(requiredDays) days to complete")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                    }
                 }
                 .padding()
             }
@@ -373,29 +407,27 @@ struct AssignTripView: View {
                     Button("Done") {
                         Task {
                             if let startCoordinates = selectedStartCoordinates,
-                               let endCoordinates = selectedEndCoordinates {
-                                if let distance = calculateDistance(from: startCoordinates, to: endCoordinates) {
-                                    print("Distance: \(distance / 1000) km")
-                                    let newTrip = Trip(
-                                        id: UUID(),
-                                        tripID: Int.random(in: 1000...9999),
-                                        assignedByFleetManagerID: UUID(),
-                                        assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
-                                        assignedVehicleID: selectedVehicle?.id ?? 0,
-                                        pickupLocation: startCoordinates,
-                                        destination: endCoordinates,
-                                        estimatedArrivalDateTime: estimatedArrivalDateTime,
-                                        totalDistance: Int(distance/1000),
-                                        totalTripDuration: estimatedDate(from: scheduledDateTime, hours: Float((distance/1000)/50)),
-                                        description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
-                                        scheduledDateTime: scheduledDateTime,
-                                        createdAt: .now,
-                                        status: .scheduled
-                                    )
+                               let endCoordinates = selectedEndCoordinates,
+                               let distance = calculatedDistance {
+                                let newTrip = Trip(
+                                    id: UUID(),
+                                    tripID: Int.random(in: 1000...9999),
+                                    assignedByFleetManagerID: UUID(),
+                                    assignedDriverIDs: [selectedDriver1, selectedDriver2].compactMap { $0?.id },
+                                    assignedVehicleID: selectedVehicle?.id ?? 0,
+                                    pickupLocation: startCoordinates,
+                                    destination: endCoordinates,
+                                    estimatedArrivalDateTime: estimatedArrivalDateTime,
+                                    totalDistance: Int(distance/1000),
+                                    totalTripDuration: estimatedDate(from: scheduledDateTime, hours: Float(totalDrivingHours)),
+                                    description: tripDescription.isEmpty ? "InFleet Express Trip" : tripDescription,
+                                    scheduledDateTime: scheduledDateTime,
+                                    createdAt: .now,
+                                    status: .scheduled
+                                )
 
-                                    viewModel.addTrip(newTrip)
-                                    showingAlert = true
-                                }
+                                viewModel.addTrip(newTrip)
+                                showingAlert = true
                             }
                         }
                     }
@@ -418,11 +450,58 @@ struct AssignTripView: View {
             } message: {
                 Text("Trip assigned successfully")
             }
+            .onChange(of: selectedEndCoordinates) { oldValue, newValue in
+                if let start = selectedStartCoordinates,
+                   let end = newValue {
+                    isCalculatingDistance = true
+                    calculateDistance(from: start, to: end) { distance in
+                        DispatchQueue.main.async {
+                            calculatedDistance = distance
+                            isCalculatingDistance = false
+                            updateEstimatedArrivalTime()
+                        }
+                    }
+                }
+            }
+            .onChange(of: selectedDriver2) { oldValue, newValue in
+                updateEstimatedArrivalTime()
+            }
+        }
+    }
+    
+    private func updateEstimatedArrivalTime() {
+        if let distance = calculatedDistance {
+            let totalHours = distance / 50000 // Convert meters to hours
+            let totalMinutes = Int((totalHours.truncatingRemainder(dividingBy: 1)) * 60)
+            let totalWholeHours = Int(totalHours)
+            
+            // Calculate how many full days are needed
+            let maxDailyHours = maxDailyDrivingHours
+            let fullDays = totalWholeHours / Int(maxDailyHours)
+            let remainingHours = totalWholeHours % Int(maxDailyHours)
+            
+            // Create a new date starting from scheduled date
+            var arrivalDate = scheduledDateTime
+            
+            // Add full days if needed
+            if fullDays > 0 {
+                arrivalDate = Calendar.current.date(byAdding: .day, value: fullDays, to: arrivalDate) ?? arrivalDate
+            }
+            
+            // Add remaining hours and minutes
+            if remainingHours > 0 {
+                arrivalDate = Calendar.current.date(byAdding: .hour, value: remainingHours, to: arrivalDate) ?? arrivalDate
+            }
+            if totalMinutes > 0 {
+                arrivalDate = Calendar.current.date(byAdding: .minute, value: totalMinutes, to: arrivalDate) ?? arrivalDate
+            }
+            
+            estimatedArrivalDateTime = arrivalDate
         }
     }
 }
 
-func calculateDistance(from startCoordinate: String, to endCoordinate: String) -> Double? {
+func calculateDistance(from startCoordinate: String, to endCoordinate: String, completion: @escaping (Double?) -> Void) {
     let startComponents = startCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
     let endComponents = endCoordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
 
@@ -432,14 +511,40 @@ func calculateDistance(from startCoordinate: String, to endCoordinate: String) -
           let endLatitude = Double(endComponents[0]),
           let endLongitude = Double(endComponents[1]) else {
         print("Invalid coordinate format")
-        return nil
+        completion(nil)
+        return
     }
 
-    let startLocation = CLLocation(latitude: startLatitude, longitude: startLongitude)
-    let endLocation = CLLocation(latitude: endLatitude, longitude: endLongitude)
+    let startLocation = CLLocationCoordinate2D(latitude: startLatitude, longitude: startLongitude)
+    let endLocation = CLLocationCoordinate2D(latitude: endLatitude, longitude: endLongitude)
 
-    let distanceInMeters = startLocation.distance(from: endLocation) // Distance in meters
-    return distanceInMeters
+    // Create a route request
+    let request = MKDirections.Request()
+    request.source = MKMapItem(placemark: MKPlacemark(coordinate: startLocation))
+    request.destination = MKMapItem(placemark: MKPlacemark(coordinate: endLocation))
+    request.transportType = .automobile
+
+    // Calculate the route
+    let directions = MKDirections(request: request)
+    directions.calculate { response, error in
+        if let error = error {
+            print("Error calculating route: \(error)")
+            // Fallback to straight-line distance if route calculation fails
+            let startLoc = CLLocation(latitude: startLatitude, longitude: startLongitude)
+            let endLoc = CLLocation(latitude: endLatitude, longitude: endLongitude)
+            completion(startLoc.distance(from: endLoc))
+            return
+        }
+        
+        if let route = response?.routes.first {
+            completion(route.distance)
+        } else {
+            // Fallback to straight-line distance if no route found
+            let startLoc = CLLocation(latitude: startLatitude, longitude: startLongitude)
+            let endLoc = CLLocation(latitude: endLatitude, longitude: endLongitude)
+            completion(startLoc.distance(from: endLoc))
+        }
+    }
 }
 
 struct DriversRowView: View {
@@ -537,6 +642,38 @@ struct DriverSelectionView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 12) {
+                            // Add a "No Driver" option at the top
+                            Button(action: {
+                                temporarySelectedDriver = nil
+                            }) {
+                                HStack {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.gray)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("No Driver")
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                        Text("Remove driver selection")
+                                            .font(.subheadline)
+                                            .foregroundColor(.gray)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if temporarySelectedDriver == nil {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                            .font(.title2)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(10)
+                            }
+                            
                             ForEach(availableDrivers) { driver in
                                 Button(action: {
                                     if temporarySelectedDriver?.id == driver.id {
@@ -578,8 +715,7 @@ struct DriverSelectionView: View {
                         selectedDriver = temporarySelectedDriver
                         dismiss()
                     }
-                    .disabled(temporarySelectedDriver == nil)
-                    .foregroundColor(temporarySelectedDriver == nil ? Color.gray : Color.primaryGradientStart)// Disable if no selection
+                    .foregroundColor(Color.primaryGradientStart)
                 }
             }
             .toolbarBackground(Color(.white), for: .navigationBar)

@@ -292,7 +292,7 @@ struct TaskCard: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingTripOverview) {
-            TripOverviewView(task: task, selectedTab: $selectedTab, isInDestinationGeofence: false)
+            TripOverviewView(task: task, selectedTab: $selectedTab, isInDestinationGeofence: MapViewModel().hasReachedDestination)
         }
         .task {
             await fetchVehicle() // Fetch vehicle data when TaskCard appears

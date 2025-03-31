@@ -71,7 +71,9 @@ struct TripOverviewView: View {
     private var contentView: some View {
         VStack(spacing: 10) {
             TripStatusCard(task: task)
-            TripPartnerView(task: task)
+            if task.assignedDriverIDs.count > 1 {
+                TripPartnerView(task: task)
+            }
             VehicleDetailsCard(task: task)
             LocationsCard(task: task)
             StartTripButton(task: task, isInspectionCompleted: hasCompletedPreInspection, requiresMaintenance: requiresMaintenance, showInspection: $showingPreTripInspection, selectedTab: $selectedTab, onStartTrip: {
