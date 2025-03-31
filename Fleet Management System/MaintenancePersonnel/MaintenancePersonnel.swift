@@ -102,7 +102,7 @@ struct MaintenanceView: View {
                 Text("SOS")
             }
             .tag(1)
-            .badge(5)
+//            .badge(5)
         }
         .onAppear {
             // Set the TabView appearance to match iOS design
@@ -1024,13 +1024,13 @@ struct MaintenanceTabView: View {
                         selectedSegment = 0
                     }
                     
-                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
-                        selectedSegment = 1
-                    }
-                    
-                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
-                        selectedSegment = 2
-                    }
+//                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
+//                        selectedSegment = 1
+//                    }
+//                    
+//                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
+//                        selectedSegment = 2
+//                    }
                 }
             }
             .padding(.horizontal)
@@ -1120,9 +1120,9 @@ struct SOSTabView: View {
                         sosSelectedSegment = 1
                     }
                     
-                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
-                        sosSelectedSegment = 2
-                    }
+//                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
+//                        sosSelectedSegment = 2
+//                    }
                 }
             }
             .padding(.horizontal)
