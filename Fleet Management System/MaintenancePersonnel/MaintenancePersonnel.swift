@@ -910,7 +910,7 @@ struct InvoicePreviewView: View {
                                 Text("Total")
                                     .fontWeight(.bold)
                                 Spacer()
-                                let finalAmount = invoice.totalExpense * 1.18
+                                let finalAmount = invoice.totalExpense
                                 Text("₹\(finalAmount, specifier: "%.2f")")
                                     .fontWeight(.bold)
                             }
