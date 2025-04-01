@@ -48,6 +48,43 @@ struct TripInspection: Codable, Equatable, Identifiable {
     var postInspection: [TripInspectionItem: Bool]
     var preInspectionNote: String
     var postInspectionNote: String
+    
+    static var issueDescription: [TripInspectionItem: String] {
+        let description: [TripInspectionItem: String] = [
+            .tireCondition: "Tires are worn out or damaged.",
+            .brakeSystem: "Brakes are not functioning properly or have reduced efficiency.",
+            .lights: "Lights are dim, flickering, or not functioning.",
+            .fluidLevels: "Fluid levels are insufficient or inconsistent.",
+            .tirePressure: "Pressure is not optimal or uneven among tires.",
+            .coolingSystem: "Cooling system is not maintaining optimal temperature.",
+            .mirrors: "Mirrors are damaged or not adjustable.",
+            .batteryHealth: "Battery is weak or not holding charge.",
+            .seatBelts: "Seat belts are faulty or not locking properly.",
+            .airbags: "Airbags are not deploying correctly or show malfunction.",
+            .emergencyKit: "Emergency kit is incomplete or missing essential items."
+        ]
+        
+        return description
+    }
+    
+    func getPreInspectionFailureDetails() -> String {
+        let failedItems = preInspection.filter { !$0.value }
+            .map { $0.key }
+        
+        let formatedItems = failedItems.enumerated()
+            .map { "\($0.offset + 1). \($0.element.rawValue) - \(TripInspection.issueDescription[$0.element] ?? "Issue detected.")" }
+            .joined(separator: "\n")
+        
+        let details = """
+        Issues detected during pre-inspection:
+        \(formatedItems)
+        
+        Note:
+        \(preInspectionNote)
+        """
+        
+        return details
+    }
 }
 
 enum TripInspectionItem: String, Codable, CaseIterable{

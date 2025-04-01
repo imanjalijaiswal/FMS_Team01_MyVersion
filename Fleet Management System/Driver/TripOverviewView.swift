@@ -421,6 +421,17 @@ struct StartTripButton: View {
                         .padding()
                         .background(Color.white)
                         .cornerRadius(12)
+                    /// This is to check the functionality of getPreInspectionFailureDetails() method which converts the inspection checklist into a descriptive string.
+                    /*
+                        .onAppear() {
+                            Task {
+                                do {
+                                    let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id)
+                                    print(inspection?.getPreInspectionFailureDetails() ?? "No inspection found yet.")
+                                }
+                            }
+                        }
+                    */
                 } else {
                     Button(action: {
                         if !isInspectionCompleted {
