@@ -14,7 +14,7 @@ import PDFKit  // For PDF generation
 struct MaintenanceView: View {
     @Binding var user: AppUser?
     @Binding var role: Role?
-    @State private var selectedTab = 0 // 0 for Maintenance, 1 for SOS
+    @State private var selectedTab = 0 // 0 for Maintenance, 1 for sos
     @State private var selectedSegment = 0 // 0 for Scheduled, 1 for In Progress, 2 for Completed
     @State private var sosSelectedSegment = 0 // 0 for Pre-inspection, 1 for Post-inspection, 2 for Emergency
     @State private var tasks: [MaintenanceTask] = []
@@ -503,6 +503,8 @@ struct MaintenanceTaskCardV: View {
     let onDaysSelected: (Int) -> Void
     let onCreateInvoice: () -> Void
     @State private var completionDays = 1
+    @State private var showingInvoicePreview = false
+    @State private var generatedInvoice: Invoice?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -584,6 +586,7 @@ struct MaintenanceTaskCardV: View {
             HStack {
                 Text("Complete in:")
                     .foregroundColor(.secondary)
+
                     .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 
                 Spacer()
@@ -611,12 +614,14 @@ struct MaintenanceTaskCardV: View {
                         Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
                             .foregroundColor(.primary)
                             .dynamicTypeSize(...DynamicTypeSize.accessibility5)
+
                         
                         Spacer(minLength: 8)
                         
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption)
                             .foregroundColor(.gray)
+
                             .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                     }
                     .padding(.horizontal, 20)
@@ -683,48 +688,31 @@ struct MaintenanceTaskCardV: View {
                 }
             }
             
-            // Show expenses if available
-            if let expenses = task.expenses, !expenses.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Cost Breakdown:")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
-                    
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(Array(expenses.keys), id: \.self) { key in
-                            if let value = expenses[key], value > 0 {
-                                HStack {
-                                    Text(key.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
-                                    Spacer()
-                                    Text("₹\(value, specifier: "%.2f")")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
-                                }
-                            }
-                        }
+            Button(action: {
+                Task {
+                    if let invoice = await task.generateInvoice() {
+                        generatedInvoice = invoice
+                        showingInvoicePreview = true
                     }
-                    .padding(10)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
-                    
-                    HStack {
-                        Text("Total")
-                            .fontWeight(.medium)
-                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
-                        Spacer()
-                        Text("₹\(totalExpense, specifier: "%.2f")")
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
-                    }
-                    .padding(.top, 5)
+
                 }
-                .padding(.top, 5)
+            }) {
+                HStack {
+                    Image(systemName: "doc.text.fill")
+                    Text("View Invoice")
+                }
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(8)
+            }
+            .padding(.top, 5)
+            .sheet(isPresented: $showingInvoicePreview) {
+                if let invoice = generatedInvoice {
+                    InvoicePreviewView(invoice: invoice)
+                }
             }
         }
     }
@@ -957,7 +945,7 @@ struct InvoicePreviewView: View {
                                     .fontWeight(.bold)
                                     .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                 Spacer()
-                                let finalAmount = invoice.totalExpense * 1.18
+                                let finalAmount = invoice.totalExpense
                                 Text("₹\(finalAmount, specifier: "%.2f")")
                                     .fontWeight(.bold)
                                     .dynamicTypeSize(...DynamicTypeSize.accessibility5)
@@ -1091,6 +1079,15 @@ struct MaintenanceTabView: View {
                                 .minimumScaleFactor(0.7)
                         }
                     }
+                    
+                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
+                        selectedSegment = 1
+                    }
+                    
+                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
+                        selectedSegment = 2
+                    }
+
                 }
                 .padding(4)
             }
@@ -1198,6 +1195,11 @@ struct SOSTabView: View {
                                 .minimumScaleFactor(0.7)
                         }
                     }
+                    
+                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
+                        sosSelectedSegment = 2
+                    }
+
                 }
                 .padding(4)
             }
