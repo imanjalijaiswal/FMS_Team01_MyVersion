@@ -116,11 +116,11 @@ struct MaintenanceView: View {
         }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }
-//            Button("Start Work") {
-//                if let task = taskToStart {
-//                    startWork(task: task)
-//                }
-//            }
+            Button("Start Work") {
+                if let task = taskToStart {
+                    startWork(task: task)
+                }
+            }
         } message: {
             Text("Are you sure you want to start work on this task?")
         }
@@ -511,9 +511,11 @@ struct MaintenanceTaskCardV: View {
                 if let license = vehicleLicense {
                     Text("Vehicle: \(license)")
                         .font(.headline)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 } else {
                     Text("Vehicle ID: \(task.vehicleID)")
                         .font(.headline)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
                 
                 Spacer()
@@ -528,6 +530,7 @@ struct MaintenanceTaskCardV: View {
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(statusColor)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -538,12 +541,14 @@ struct MaintenanceTaskCardV: View {
             
             Text("Task ID: \(task.taskID)")
                 .foregroundColor(.secondary)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             
             HStack(spacing: 5) {
                 Image(systemName: "wrench.fill")
                     .foregroundColor(.blue)
                 Text(task.type.rawValue)
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             }
             
             // Content specific to status
@@ -573,65 +578,69 @@ struct MaintenanceTaskCardV: View {
                     .foregroundColor(.blue)
                 Text("Estimated Date: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             }
             
             HStack {
-//                Text("Complete in:")
-//                    .foregroundColor(.secondary)
-//                
-//                Spacer()
+                Text("Complete in:")
+                    .foregroundColor(.secondary)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 
-//                Menu {
-//                    ForEach(1...7, id: \.self) { day in
-//                        Button(action: {
-//                            completionDays = day
-//                            onDaysSelected(day)
-//                        }) {
-//                            HStack {
-//                                Text("\(day) day\(day > 1 ? "s" : "")")
-//                                
-//                                Spacer()
-//                                
-//                                if day == completionDays {
-//                                    Image(systemName: "checkmark")
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//                label: {
-//                    HStack {
-//                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
-//                            .foregroundColor(.primary)
-//                        
-//                        Spacer(minLength: 8)
-//                        
-//                        Image(systemName: "chevron.up.chevron.down")
-//                            .font(.caption)
-//                            .foregroundColor(.gray)
-//                    }
-//                    .padding(.horizontal, 20)
-//                    .padding(.vertical, 8)
-//                    .background(Color(UIColor.systemBackground))
-//                    .overlay(
-//                        RoundedRectangle(cornerRadius: 8)
-//                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-//                    )
-//                }
-//                .buttonStyle(PlainButtonStyle())
+                Spacer()
+                
+                Menu {
+                    ForEach(1...7, id: \.self) { day in
+                        Button(action: {
+                            completionDays = day
+                            onDaysSelected(day)
+                        }) {
+                            HStack {
+                                Text("\(day) day\(day > 1 ? "s" : "")")
+                                
+                                Spacer()
+                                
+                                if day == completionDays {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+                label: {
+                    HStack {
+                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
+                            .foregroundColor(.primary)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
+                        
+                        Spacer(minLength: 8)
+                        
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Color(UIColor.systemBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(.vertical, 5)
             
-//            Button(action: onStartWork) {
-//                Text("Start Work")
-//                    .fontWeight(.medium)
-//                    .foregroundColor(.white)
-//                    .frame(maxWidth: .infinity)
-//                    .padding(.vertical, 12)
-//                    .background(Color.blue)
-//                    .cornerRadius(8)
-//            }
-//            .padding(.top, 5)
+            Button(action: onStartWork) {
+                Text("Start Work")
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+            }
+            .padding(.top, 5)
         }
     }
     
@@ -643,6 +652,7 @@ struct MaintenanceTaskCardV: View {
                     .foregroundColor(.blue)
                 Text("Due: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             }
             
             HStack {
@@ -669,6 +679,7 @@ struct MaintenanceTaskCardV: View {
                         .foregroundColor(.green)
                     Text("Completed: \(completionDate.formatted(.dateTime.day().month(.abbreviated).year()))")
                         .foregroundColor(.secondary)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
             }
             
@@ -678,6 +689,7 @@ struct MaintenanceTaskCardV: View {
                     Text("Cost Breakdown:")
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                     
                     VStack(alignment: .leading, spacing: 5) {
                         ForEach(Array(expenses.keys), id: \.self) { key in
@@ -686,10 +698,12 @@ struct MaintenanceTaskCardV: View {
                                     Text(key.rawValue)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
+                                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                     Spacer()
                                     Text("₹\(value, specifier: "%.2f")")
                                         .font(.caption)
                                         .fontWeight(.medium)
+                                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                 }
                             }
                         }
@@ -701,10 +715,12 @@ struct MaintenanceTaskCardV: View {
                     HStack {
                         Text("Total")
                             .fontWeight(.medium)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         Spacer()
                         Text("₹\(totalExpense, specifier: "%.2f")")
                             .fontWeight(.bold)
                             .foregroundColor(.green)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                     }
                     .padding(.top, 5)
                 }
@@ -745,9 +761,11 @@ struct SOSTaskCard: View {
                 if let license = vehicleLicense {
                     Text("Vehicle: \(license)")
                         .font(.headline)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 } else {
                     Text("Vehicle ID: \(task.vehicleID)")
                         .font(.headline)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
                 
                 Spacer()
@@ -762,6 +780,7 @@ struct SOSTaskCard: View {
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(typeColor)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -772,6 +791,7 @@ struct SOSTaskCard: View {
             
             Text("Task ID: \(task.taskID)")
                 .foregroundColor(.secondary)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             
             if let name = assignerName {
                 HStack(spacing: 5) {
@@ -779,6 +799,7 @@ struct SOSTaskCard: View {
                         .foregroundColor(.blue)
                     Text("Driver: \(name)")
                         .foregroundColor(.secondary)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
             }
             
@@ -788,6 +809,7 @@ struct SOSTaskCard: View {
                         .foregroundColor(.green)
                     Text("Contact: \(phone)")
                         .foregroundColor(.secondary)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
             }
             
@@ -797,6 +819,7 @@ struct SOSTaskCard: View {
                         .foregroundColor(.blue)
                     Text("Due: \(date.formatted(.dateTime.day().month(.abbreviated).year()))")
                         .foregroundColor(.secondary)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                 }
             }
             
@@ -863,12 +886,15 @@ struct InvoicePreviewView: View {
                         Text("INVOICE")
                             .font(.largeTitle)
                             .fontWeight(.bold)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         Spacer()
                         
                         VStack(alignment: .trailing) {
                             Text("Date: \(invoice.createdAt.formatted(.dateTime.day().month().year()))")
+                                .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             Text("Invoice #: INV-\(invoice.taskID)")
+                                .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         }
                     }
                     .padding(.bottom)
@@ -877,12 +903,16 @@ struct InvoicePreviewView: View {
                     Group {
                         Text("Vehicle Details")
                             .font(.headline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text("Vehicle lN: \(invoice.vehicleLicenseNumber)")
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                 Text("Service Type: \(invoice.type.rawValue)")
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                 Text("Task ID: \(invoice.taskID)")
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -895,14 +925,17 @@ struct InvoicePreviewView: View {
                     Group {
                         Text("Cost Breakdown")
                             .font(.headline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         VStack(spacing: 15) {
                             ForEach(Array(invoice.expenses.keys), id: \.self) { key in
                                 if let value = invoice.expenses[key] {
                                     HStack {
                                         Text(key.rawValue)
+                                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                         Spacer()
                                         Text("₹\(value, specifier: "%.2f")")
+                                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                     }
                                 }
                             }
@@ -911,8 +944,10 @@ struct InvoicePreviewView: View {
                             
                             HStack {
                                 Text("Subtotal")
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                 Spacer()
                                 Text("₹\(invoice.totalExpense, specifier: "%.2f")")
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             }
                             
                             Divider()
@@ -920,10 +955,12 @@ struct InvoicePreviewView: View {
                             HStack {
                                 Text("Total")
                                     .fontWeight(.bold)
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                                 Spacer()
                                 let finalAmount = invoice.totalExpense * 1.18
                                 Text("₹\(finalAmount, specifier: "%.2f")")
                                     .fontWeight(.bold)
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             }
                         }
                         .padding()
@@ -935,31 +972,38 @@ struct InvoicePreviewView: View {
                     Group {
                         Text("Issue Description")
                             .font(.headline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         Text(invoice.issueNote.isEmpty ? "No issue description provided" : invoice.issueNote)
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(8)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         Text("Repair Notes")
                             .font(.headline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         Text(invoice.repairNote.isEmpty ? "No repair notes provided" : invoice.repairNote)
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(8)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                     }
                     
                     // Footer
                     VStack(alignment: .center, spacing: 5) {
                         Text("Thank you for your business")
                             .font(.headline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         Text("Fleet Management System")
                             .font(.subheadline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         Text("Contact: vk092731@gmail.com")
                             .font(.caption)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top)
@@ -985,7 +1029,6 @@ struct MaintenanceTabView: View {
     let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
     let onCreateInvoice: (MaintenanceTask) -> Void
 
-    //  Computed property for categoryName
     var categoryName: String {
         switch selectedSegment {
         case 0: return "Assigned"
@@ -996,10 +1039,13 @@ struct MaintenanceTabView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header
             HStack {
                 Text("Maintenance")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 34, weight: .bold))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading)
                 
                 Spacer()
@@ -1015,24 +1061,38 @@ struct MaintenanceTabView: View {
             .padding(.bottom, 10)
             .padding(.top, 70)
             
+            // Segment Control
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(UIColor.systemGray5))
                     .frame(height: 45)
                 
                 HStack(spacing: 0) {
-                    SegmentButton(text: "Assigned", isSelected: selectedSegment == 0) {
-                        selectedSegment = 0
+                    ForEach(["Assigned", "In Progress", "Completed"], id: \.self) { title in
+                        Button(action: {
+                            withAnimation {
+                                selectedSegment = title == "Assigned" ? 0 : title == "In Progress" ? 1 : 2
+                            }
+                        }) {
+                            Text(title)
+                                .font(.system(size: 16, weight: selectedSegment == (title == "Assigned" ? 0 : title == "In Progress" ? 1 : 2) ? .semibold : .regular))
+                                .foregroundColor(selectedSegment == (title == "Assigned" ? 0 : title == "In Progress" ? 1 : 2) ? .black : .gray)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 37)
+                                .background(
+                                    Group {
+                                        if selectedSegment == (title == "Assigned" ? 0 : title == "In Progress" ? 1 : 2) {
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color.white)
+                                        }
+                                    }
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
                     }
-                    
-//                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
-//                        selectedSegment = 1
-//                    }
-//                    
-//                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
-//                        selectedSegment = 2
-//                    }
                 }
+                .padding(4)
             }
             .padding(.horizontal)
             .padding(.bottom, 10)
@@ -1089,8 +1149,10 @@ struct SOSTabView: View {
             // Navigation Title
             HStack {
                 Text("SOS")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 34, weight: .bold))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading)
                 
                 Spacer()
@@ -1106,25 +1168,38 @@ struct SOSTabView: View {
             .padding(.bottom, 10)
             .padding(.top, 70)
             
-            // Segment Controller for SOS
+            // Segment Control
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(UIColor.systemGray5))
                     .frame(height: 45)
                 
                 HStack(spacing: 0) {
-                    SegmentButton(text: "Pre-inspect", isSelected: sosSelectedSegment == 0) {
-                        sosSelectedSegment = 0
+                    ForEach(["Pre-inspect", "Post-inspect", "Emergency"], id: \.self) { title in
+                        Button(action: {
+                            withAnimation {
+                                sosSelectedSegment = title == "Pre-inspect" ? 0 : title == "Post-inspect" ? 1 : 2
+                            }
+                        }) {
+                            Text(title)
+                                .font(.system(size: 16, weight: sosSelectedSegment == (title == "Pre-inspect" ? 0 : title == "Post-inspect" ? 1 : 2) ? .semibold : .regular))
+                                .foregroundColor(sosSelectedSegment == (title == "Pre-inspect" ? 0 : title == "Post-inspect" ? 1 : 2) ? .black : .gray)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 37)
+                                .background(
+                                    Group {
+                                        if sosSelectedSegment == (title == "Pre-inspect" ? 0 : title == "Post-inspect" ? 1 : 2) {
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color.white)
+                                        }
+                                    }
+                                )
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
                     }
-                    
-                    SegmentButton(text: "Post-inspect", isSelected: sosSelectedSegment == 1) {
-                        sosSelectedSegment = 1
-                    }
-                    
-//                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
-//                        sosSelectedSegment = 2
-//                    }
                 }
+                .padding(4)
             }
             .padding(.horizontal)
             .padding(.bottom, 10)
@@ -1158,32 +1233,6 @@ struct SOSTabView: View {
                     .padding()
                 }
             }
-        }
-    }
-}
-
-struct SegmentButton: View {
-    let text: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(.headline)
-                .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundColor(isSelected ? .black : .gray)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(
-                    Group {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white)
-                                .padding(4)
-                        }
-                    }
-                )
         }
     }
 }
@@ -1248,6 +1297,7 @@ struct LocationTrackingView: View {
                         
                         Text(vehicleLicense ?? "Vehicle \(task.vehicleID)")
                             .font(.headline)
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         
                         Spacer()
                         
@@ -1259,6 +1309,7 @@ struct LocationTrackingView: View {
                             Text(task.type.rawValue)
                                 .font(.caption)
                                 .fontWeight(.medium)
+                                .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -1275,6 +1326,7 @@ struct LocationTrackingView: View {
                                     .foregroundColor(.gray)
                                 Text("Driver: \(driverName)")
                                     .font(.subheadline)
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             }
                             
                             HStack {
@@ -1283,6 +1335,7 @@ struct LocationTrackingView: View {
                                 Text(vehicleAddress)
                                     .font(.subheadline)
                                     .lineLimit(2)
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             }
                             
                             HStack {
@@ -1291,6 +1344,7 @@ struct LocationTrackingView: View {
                                 Text(task.issueNote)
                                     .font(.subheadline)
                                     .lineLimit(2)
+                                    .dynamicTypeSize(...DynamicTypeSize.accessibility5)
                             }
                         }
                     }
