@@ -511,6 +511,8 @@ struct MaintenanceTaskCardV: View {
     @State private var showingInvoicePreview = false
     @State private var generatedInvoice: Invoice?
     @State private var isLoadingInvoice = false  // Add loading state
+    @State private var refreshID = UUID() // Add for immediate UI refresh
+    @State private var temporaryEstimatedDate: Date? = nil // For immediate UI update
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -571,6 +573,24 @@ struct MaintenanceTaskCardV: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(statusColor.opacity(0.3), lineWidth: 1)
         )
+        .id(refreshID) // Force refresh when refreshID changes
+        .onAppear {
+            // Calculate completionDays from task.estimatedCompletionDate when the view appears
+            if let estimatedDate = task.estimatedCompletionDate {
+                let calendar = Calendar.current
+                let today = calendar.startOfDay(for: Date())
+                let estimatedDay = calendar.startOfDay(for: estimatedDate)
+                
+                if let days = calendar.dateComponents([.day], from: today, to: estimatedDay).day {
+                    // Clamp between 1-7 days
+                    let clampedDays = max(1, min(7, days))
+                    if clampedDays != completionDays {
+                        self.completionDays = clampedDays
+                        print("DEBUG: Set completionDays to \(clampedDays) based on estimated date \(estimatedDate)")
+                    }
+                }
+            }
+        }
     }
     
     // UI for scheduled tasks
@@ -579,8 +599,12 @@ struct MaintenanceTaskCardV: View {
             HStack(spacing: 5) {
                 Image(systemName: "clock")
                     .foregroundColor(.blue)
-                Text("Estimated Date: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
+                
+                // Use either the temporary estimated date or the task's date
+                let displayDate = temporaryEstimatedDate ?? task.estimatedCompletionDate
+                Text("Estimated Date: \(displayDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
                     .foregroundColor(.secondary)
+                    .id("est-date-\(displayDate?.timeIntervalSince1970 ?? 0)") // Force refresh when date changes
             }
             
             HStack {
@@ -593,6 +617,14 @@ struct MaintenanceTaskCardV: View {
                     ForEach(1...7, id: \.self) { day in
                         Button(action: {
                             completionDays = day
+                            
+                            // Set temporary date for immediate UI update
+                            temporaryEstimatedDate = Calendar.current.date(byAdding: .day, value: day, to: Date())
+                            
+                            // Force refresh
+                            refreshID = UUID()
+                            
+                            // Call the actual update function
                             onDaysSelected(day)
                         }) {
                             HStack {
@@ -1132,6 +1164,7 @@ struct MaintenanceTabView: View {
                                         onCreateInvoice(task)
                                     }
                                 )
+                                .id("\(task.id)-\(task.estimatedCompletionDate?.timeIntervalSince1970 ?? 0)")
                             }
                         }
                     }
