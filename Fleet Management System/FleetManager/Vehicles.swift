@@ -389,6 +389,7 @@ struct VehicleDetailsView: View {
     @State private var duplicateVINError: String? = nil
     @State private var duplicateInsuranceError: String? = nil
     
+    
     func isValidLicensePlate(_ license: String) -> Bool {
         let pattern = "^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$"
         let licensePredicate = NSPredicate(format: "SELF MATCHES %@", pattern)
