@@ -1012,66 +1012,103 @@ struct MaintenanceTabView: View {
     let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
     let onCreateInvoice: (MaintenanceTask) -> Void
 
-    //  Computed property for categoryName
-    var categoryName: String {
-        switch selectedSegment {
-        case 0: return "Assigned"
-        case 1: return "In Progress"
-        default: return "Completed"
-        }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            // Fixed header layout to prevent text wrapping
-            HStack(alignment: .center) {
+            // Header with fixed size and constrained font size
+            VStack(alignment: .leading) {
                 Text("Maintenance")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 38, weight: .bold))
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading)
-                
-                Spacer()
-                
-                Button(action: onShowProfile) {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 35, height: 35)
-                        .foregroundColor(.blue)
+                    .padding(.top, 50)
+                    .padding(.bottom, 15)
+                    .overlay(
+                        Button(action: onShowProfile) {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .frame(width: 35, height: 35)
+                                .foregroundColor(.blue)
+                        }
                         .padding(.trailing)
-                }
+                        .padding(.top, 50)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    )
             }
-            .padding(.bottom, 10)
-            .padding(.top, 70)
             
-            // Improved segment control with fixed height and better spacing
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(UIColor.systemGray5))
-                    .frame(height: 50)
+            // Segment control styled to match the reference image
+            ZStack(alignment: .top) {
+                // Background pill
+                RoundedRectangle(cornerRadius: 30)
+                    .fill(Color(.systemGray6))
+                    .frame(height: 56)
+                    .padding(.horizontal)
                 
-                HStack(spacing: 2) {
-                    SegmentButton(text: "Assigned", isSelected: selectedSegment == 0) {
-                        selectedSegment = 0
+                HStack(spacing: 0) {
+                    // Assigned Tab
+                    Button(action: { selectedSegment = 0 }) {
+                        VStack {
+                            Text("Assigned")
+                                .font(.system(size: 16, weight: selectedSegment == 0 ? .semibold : .regular))
+                                .foregroundColor(selectedSegment == 0 ? .black : .gray)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selectedSegment == 0 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        : nil
+                                )
+                        }
                     }
                     
-                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
-                        selectedSegment = 1
+                    // In Progress Tab
+                    Button(action: { selectedSegment = 1 }) {
+                        VStack {
+                            Text("In Progress")
+                                .font(.system(size: 16, weight: selectedSegment == 1 ? .semibold : .regular))
+                                .foregroundColor(selectedSegment == 1 ? .black : .gray)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selectedSegment == 1 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        : nil
+                                )
+                        }
                     }
                     
-                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
-                        selectedSegment = 2
+                    // Completed Tab
+                    Button(action: { selectedSegment = 2 }) {
+                        VStack {
+                            Text("Completed")
+                                .font(.system(size: 16, weight: selectedSegment == 2 ? .semibold : .regular))
+                                .foregroundColor(selectedSegment == 2 ? .black : .gray)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selectedSegment == 2 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        : nil
+                                )
+                        }
                     }
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
             .padding(.bottom, 10)
             
             if isLoading {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .padding()
+                Spacer()
             } else {
                 ScrollView {
                     LazyVStack(spacing: 16) {
@@ -1117,55 +1154,101 @@ struct SOSTabView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Updated Navigation Title with same layout improvements
-            HStack(alignment: .center) {
+            // Header with fixed size and constrained font size
+            VStack(alignment: .leading) {
                 Text("SOS")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 32, weight: .bold))
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading)
-                
-                Spacer()
-                
-                Button(action: onShowProfile) {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 35, height: 35)
-                        .foregroundColor(.blue)
+                    .padding(.top, 50)
+                    .padding(.bottom, 15)
+                    .overlay(
+                        Button(action: onShowProfile) {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .frame(width: 35, height: 35)
+                                .foregroundColor(.blue)
+                        }
                         .padding(.trailing)
-                }
+                        .padding(.top, 50)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    )
             }
-            .padding(.bottom, 10)
-            .padding(.top, 70)
             
-            // Updated Segment Controller for SOS with consistent height and spacing
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(UIColor.systemGray5))
-                    .frame(height: 50)
+            // Segment control styled to match the reference image
+            ZStack(alignment: .top) {
+                // Background pill
+                RoundedRectangle(cornerRadius: 30)
+                    .fill(Color(.systemGray6))
+                    .frame(height: 56)
+                    .padding(.horizontal)
                 
-                HStack(spacing: 2) {
-                    SegmentButton(text: "Pre-inspect", isSelected: sosSelectedSegment == 0) {
-                        sosSelectedSegment = 0
+                HStack(spacing: 0) {
+                    // Pre-inspect Tab
+                    Button(action: { sosSelectedSegment = 0 }) {
+                        VStack {
+                            Text("Pre-inspect")
+                                .font(.system(size: 16, weight: sosSelectedSegment == 0 ? .semibold : .regular))
+                                .foregroundColor(sosSelectedSegment == 0 ? .black : .gray)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    sosSelectedSegment == 0 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        : nil
+                                )
+                        }
                     }
                     
-                    SegmentButton(text: "Post-inspect", isSelected: sosSelectedSegment == 1) {
-                        sosSelectedSegment = 1
+                    // Post-inspect Tab
+                    Button(action: { sosSelectedSegment = 1 }) {
+                        VStack {
+                            Text("Post-inspect")
+                                .font(.system(size: 16, weight: sosSelectedSegment == 1 ? .semibold : .regular))
+                                .foregroundColor(sosSelectedSegment == 1 ? .black : .gray)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    sosSelectedSegment == 1 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        : nil
+                                )
+                        }
                     }
                     
-                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
-                        sosSelectedSegment = 2
+                    // Emergency Tab
+                    Button(action: { sosSelectedSegment = 2 }) {
+                        VStack {
+                            Text("Emergency")
+                                .font(.system(size: 16, weight: sosSelectedSegment == 2 ? .semibold : .regular))
+                                .foregroundColor(sosSelectedSegment == 2 ? .black : .gray)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    sosSelectedSegment == 2 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.white)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                        : nil
+                                )
+                        }
                     }
                 }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
             .padding(.bottom, 10)
             
             if isSosLoading {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .padding()
+                Spacer()
             } else {
                 ScrollView {
                     LazyVStack(spacing: 16) {
@@ -1192,32 +1275,6 @@ struct SOSTabView: View {
                 }
             }
         }
-    }
-}
-
-struct SegmentButton: View {
-    let text: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? .black : .gray)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background(
-                    Group {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white)
-                                .padding(4)
-                        }
-                    }
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 }
 
