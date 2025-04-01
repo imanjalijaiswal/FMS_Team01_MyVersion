@@ -484,8 +484,14 @@ struct EndTripButton: View {
                     if !isInspectionCompleted {
                         showInspection = true
                     } else {
-                        // End trip action will be implemented later
+                        // End trip action
                         dataController.updateTripStatus(task, to: .completed)
+                        // Dismiss the view after completing the trip
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let window = windowScene.windows.first,
+                           let rootViewController = window.rootViewController {
+                            rootViewController.dismiss(animated: true)
+                        }
                     }
                 }) {
                     Text(isInspectionCompleted ? "End Trip" : "Post-Trip Inspection")
