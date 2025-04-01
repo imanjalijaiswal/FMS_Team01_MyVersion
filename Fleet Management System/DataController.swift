@@ -887,6 +887,31 @@ class IFEDataController: ObservableObject {
             return nil
         }
     }
+    
+    /// Retrieves the service center associated with a specific maintenance personnel asynchronously.
+    ///
+    /// This function fetches the `ServiceCenter` object linked to a given maintenance personnel (identified by its `serviceCenterID`).
+    /// If the operation fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameter id: The unique identifier of the service center which is being retrieved.
+    /// - Returns: An optional `ServiceCenter` object representing the service center associated with the maintenance personnel. Returns `nil` if the fetch operation fails.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// if let serviceCenter = await getVehicleServiceCenter(by: maintenancePersonnel.serviceCenterID) {
+    ///     print("Service Center is found")
+    /// } else {
+    ///     print("Failed to fetch the service center for the given id.")
+    /// }
+    /// ```
+    func getVehicleServiceCenter(by id: Int) async -> ServiceCenter? {
+        do {
+            return try await remoteController.getVehicleServiceCenter(by: id)
+        } catch {
+            print("Error while fetching the service center: \(error.localizedDescription)")
+            return nil
+        }
+    }
 }
 
 func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {

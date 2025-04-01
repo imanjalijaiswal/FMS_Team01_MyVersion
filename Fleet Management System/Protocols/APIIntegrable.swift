@@ -69,6 +69,7 @@ protocol DatabaseAPIIntegrable {
     
     func getVehicleServiceCenterAssignedStatus(by id: Int) async throws -> Bool
     
+    func getVehicleServiceCenter(by id: Int) async throws -> ServiceCenter
     
     //MARK: Trip APIs
     func assignNewTrip(assignedBy: UUID,

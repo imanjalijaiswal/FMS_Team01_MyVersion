@@ -21,6 +21,12 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func getVehicleServiceCenter(by id: Int) async throws -> ServiceCenter {
+        return try await client
+            .rpc("get_service_center_by_id", params: ["p_id": id])
+            .execute().value
+    }
+    
     func getVehicleServiceCenterAssignedStatus(by id: Int) async throws -> Bool {
         return try await client
             .rpc("get_service_center_assigned_status_by_id", params: ["p_id": id])
