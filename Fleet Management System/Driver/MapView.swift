@@ -67,6 +67,17 @@ class MapViewModel: NSObject, ObservableObject {
     
     private let tripViewModel = IFEDataController.shared
     
+    private let notificationCenter = UNUserNotificationCenter.current()
+    
+    override init() {
+        super.init()
+        setupNotificationHandler()
+    }
+    
+    private func setupNotificationHandler() {
+        notificationCenter.delegate = self
+    }
+    
     private func convertCoordinateToAddress(_ coordinate: CLLocationCoordinate2D, completion: @escaping (String) -> Void) {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         geocoder.reverseGeocodeLocation(location) { placemarks, error in
@@ -121,7 +132,7 @@ class MapViewModel: NSObject, ObservableObject {
         locationManager = CLLocationManager()
         locationManager?.delegate = self
         locationManager?.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager?.distanceFilter = 10 // Update location every 10 meters
+        locationManager?.distanceFilter = 5 // Update location more frequently (every 5 meters)
         locationManager?.headingFilter = 5 // Update heading every 5 degrees
         locationManager?.requestWhenInUseAuthorization()
         locationManager?.startUpdatingLocation()
@@ -130,6 +141,17 @@ class MapViewModel: NSObject, ObservableObject {
         // Request region monitoring authorization
         if CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) {
             locationManager?.requestAlwaysAuthorization()
+            
+            // Check if we have a current trip and setup geofencing
+            if let trip = currentTrip {
+                setupGeofencing(for: trip)
+            }
+        } else {
+            print("Region monitoring is not available on this device")
+            scheduleNotification(
+                title: "Geofencing Unavailable",
+                body: "Your device doesn't support geofencing. Some features may be limited."
+            )
         }
         
         // Request notification permission
@@ -138,6 +160,65 @@ class MapViewModel: NSObject, ObservableObject {
         // Start route update timer
         routeUpdateTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.updateRoutes()
+        }
+    }
+    
+    private func checkCurrentGeofenceStatus() {
+        guard let locationManager = locationManager,
+              let userLocation = userLocation else { return }
+        
+        print("Checking geofence status at location: \(userLocation)")
+        
+        // Check pickup region
+        if let pickupRegion = pickupRegion {
+            let isInPickup = pickupRegion.contains(userLocation)
+            print("Is in pickup region: \(isInPickup)")
+            if isInPickup != hasReachedPickup {
+                DispatchQueue.main.async {
+                    self.hasReachedPickup = isInPickup
+                    if isInPickup {
+                        self.scheduleNotification(
+                            title: "Arrived at Pickup",
+                            body: "You have reached the pickup location. You can start navigation.",
+                            sound: true
+                        )
+                        print("User entered pickup region")
+                    } else {
+                        self.scheduleNotification(
+                            title: "Left Pickup Location",
+                            body: "You have left the pickup location. Please return to start navigation.",
+                            sound: true
+                        )
+                        print("User left pickup region")
+                    }
+                }
+            }
+        }
+        
+        // Check destination region
+        if let destinationRegion = destinationRegion {
+            let isInDestination = destinationRegion.contains(userLocation)
+            print("Is in destination region: \(isInDestination)")
+            if isInDestination != hasReachedDestination {
+                DispatchQueue.main.async {
+                    self.hasReachedDestination = isInDestination
+                    if isInDestination {
+                        self.scheduleNotification(
+                            title: "Arrived at Destination",
+                            body: "You have reached the destination. You can end navigation.",
+                            sound: true
+                        )
+                        print("User entered destination region")
+                    } else {
+                        self.scheduleNotification(
+                            title: "Left Destination",
+                            body: "You have left the destination area. Please return to complete the trip.",
+                            sound: true
+                        )
+                        print("User left destination region")
+                    }
+                }
+            }
         }
     }
     
@@ -527,20 +608,55 @@ class MapViewModel: NSObject, ObservableObject {
     }
     
     func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        let center = UNUserNotificationCenter.current()
+        
+        // First, remove any existing notification categories
+        center.removeAllPendingNotificationRequests()
+        center.removeAllDeliveredNotifications()
+        
+        // Create notification category with actions
+        let startNavigationAction = UNNotificationAction(
+            identifier: "START_NAVIGATION",
+            title: "Start Navigation",
+            options: .foreground
+        )
+        
+        let endNavigationAction = UNNotificationAction(
+            identifier: "END_NAVIGATION",
+            title: "End Navigation",
+            options: .foreground
+        )
+        
+        let category = UNNotificationCategory(
+            identifier: "GEOFENCE_NOTIFICATION",
+            actions: [startNavigationAction, endNavigationAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        
+        center.setNotificationCategories([category])
+        
+        // Request authorization
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if granted {
                 print("Notification permission granted")
             } else if let error = error {
                 print("Error requesting notification permission: \(error.localizedDescription)")
+            } else {
+                print("Notification permission denied")
             }
         }
     }
     
-    func scheduleNotification(title: String, body: String) {
+    func scheduleNotification(title: String, body: String, sound: Bool = true) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        content.sound = sound ? .default : nil
+        content.badge = 1
+        
+        // Add category identifier for handling notification actions
+        content.categoryIdentifier = "GEOFENCE_NOTIFICATION"
         
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
@@ -548,6 +664,8 @@ class MapViewModel: NSObject, ObservableObject {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("Error scheduling notification: \(error.localizedDescription)")
+            } else {
+                print("Notification scheduled successfully")
             }
         }
     }
@@ -558,8 +676,13 @@ extension MapViewModel: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         
+        print("Location updated: \(location.coordinate)")
+        
         DispatchQueue.main.async {
             self.userLocation = location.coordinate
+            
+            // Always check geofence status on location update
+            self.checkCurrentGeofenceStatus()
             
             // Update current location address using reverse geocoding
             let geocoder = CLGeocoder()
@@ -620,14 +743,16 @@ extension MapViewModel: CLLocationManagerDelegate {
                 self.hasReachedPickup = true
                 self.scheduleNotification(
                     title: "Arrived at Pickup",
-                    body: "You have reached the pickup location"
+                    body: "You have reached the pickup location. You can now start navigation.",
+                    sound: true
                 )
                 print("Driver has reached pickup location")
             } else if circularRegion.identifier.starts(with: "destination") {
                 self.hasReachedDestination = true
                 self.scheduleNotification(
                     title: "Arrived at Destination",
-                    body: "You have reached the destination"
+                    body: "You have reached the destination. You can now end navigation.",
+                    sound: true
                 )
                 print("Driver has reached destination")
             }
@@ -642,14 +767,16 @@ extension MapViewModel: CLLocationManagerDelegate {
                 self.hasReachedPickup = false
                 self.scheduleNotification(
                     title: "Left Pickup Location",
-                    body: "You have left the pickup location"
+                    body: "You have left the pickup location. Please return to start navigation.",
+                    sound: true
                 )
                 print("Driver has left pickup location")
             } else if circularRegion.identifier.starts(with: "destination") {
                 self.hasReachedDestination = false
                 self.scheduleNotification(
                     title: "Left Destination",
-                    body: "You have left the destination"
+                    body: "You have left the destination area. Please return to complete the trip.",
+                    sound: true
                 )
                 print("Driver has left destination")
             }
@@ -660,7 +787,8 @@ extension MapViewModel: CLLocationManagerDelegate {
         print("Region monitoring failed: \(error.localizedDescription)")
         self.scheduleNotification(
             title: "Geofencing Error",
-            body: "Failed to monitor location: \(error.localizedDescription)"
+            body: "Failed to monitor location: \(error.localizedDescription). Please check your location settings.",
+            sound: true
         )
     }
 }
@@ -1356,4 +1484,38 @@ class NextDirectionAnnotation: NSObject, MKAnnotation {
 
 #Preview {
     MapView(selectedTab: .constant(0))
+}
+
+extension MapViewModel: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show notification even when app is in foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let actionIdentifier = response.actionIdentifier
+        
+        switch actionIdentifier {
+        case "START_NAVIGATION":
+            if hasReachedPickup {
+                startNavigation()
+            }
+        case "END_NAVIGATION":
+            if hasReachedDestination {
+                stopNavigation()
+            }
+        default:
+            break
+        }
+        
+        completionHandler()
+    }
 } 
