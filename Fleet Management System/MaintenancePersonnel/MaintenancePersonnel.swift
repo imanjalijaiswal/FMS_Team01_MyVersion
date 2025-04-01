@@ -14,7 +14,7 @@ import PDFKit  // For PDF generation
 struct MaintenanceView: View {
     @Binding var user: AppUser?
     @Binding var role: Role?
-    @State private var selectedTab = 0 // 0 for Maintenance, 1 for SOS
+    @State private var selectedTab = 0 // 0 for Maintenance, 1 for sos
     @State private var selectedSegment = 0 // 0 for Scheduled, 1 for In Progress, 2 for Completed
     @State private var sosSelectedSegment = 0 // 0 for Pre-inspection, 1 for Post-inspection, 2 for Emergency
     @State private var tasks: [MaintenanceTask] = []
@@ -116,11 +116,11 @@ struct MaintenanceView: View {
         }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }
-//            Button("Start Work") {
-//                if let task = taskToStart {
-//                    startWork(task: task)
-//                }
-//            }
+            Button("Start Work") {
+                if let task = taskToStart {
+                    startWork(task: task)
+                }
+            }
         } message: {
             Text("Are you sure you want to start work on this task?")
         }
@@ -503,6 +503,8 @@ struct MaintenanceTaskCardV: View {
     let onDaysSelected: (Int) -> Void
     let onCreateInvoice: () -> Void
     @State private var completionDays = 1
+    @State private var showingInvoicePreview = false
+    @State private var generatedInvoice: Invoice?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -576,62 +578,62 @@ struct MaintenanceTaskCardV: View {
             }
             
             HStack {
-//                Text("Complete in:")
-//                    .foregroundColor(.secondary)
-//                
-//                Spacer()
+                Text("Complete in:")
+                    .foregroundColor(.secondary)
                 
-//                Menu {
-//                    ForEach(1...7, id: \.self) { day in
-//                        Button(action: {
-//                            completionDays = day
-//                            onDaysSelected(day)
-//                        }) {
-//                            HStack {
-//                                Text("\(day) day\(day > 1 ? "s" : "")")
-//                                
-//                                Spacer()
-//                                
-//                                if day == completionDays {
-//                                    Image(systemName: "checkmark")
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//                label: {
-//                    HStack {
-//                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
-//                            .foregroundColor(.primary)
-//                        
-//                        Spacer(minLength: 8)
-//                        
-//                        Image(systemName: "chevron.up.chevron.down")
-//                            .font(.caption)
-//                            .foregroundColor(.gray)
-//                    }
-//                    .padding(.horizontal, 20)
-//                    .padding(.vertical, 8)
-//                    .background(Color(UIColor.systemBackground))
-//                    .overlay(
-//                        RoundedRectangle(cornerRadius: 8)
-//                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-//                    )
-//                }
-//                .buttonStyle(PlainButtonStyle())
+                Spacer()
+                
+                Menu {
+                    ForEach(1...7, id: \.self) { day in
+                        Button(action: {
+                            completionDays = day
+                            onDaysSelected(day)
+                        }) {
+                            HStack {
+                                Text("\(day) day\(day > 1 ? "s" : "")")
+                                
+                                Spacer()
+                                
+                                if day == completionDays {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+                label: {
+                    HStack {
+                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
+                            .foregroundColor(.primary)
+                        
+                        Spacer(minLength: 8)
+                        
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Color(UIColor.systemBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(.vertical, 5)
             
-//            Button(action: onStartWork) {
-//                Text("Start Work")
-//                    .fontWeight(.medium)
-//                    .foregroundColor(.white)
-//                    .frame(maxWidth: .infinity)
-//                    .padding(.vertical, 12)
-//                    .background(Color.blue)
-//                    .cornerRadius(8)
-//            }
-//            .padding(.top, 5)
+            Button(action: onStartWork) {
+                Text("Start Work")
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .cornerRadius(8)
+            }
+            .padding(.top, 5)
         }
     }
     
@@ -672,43 +674,30 @@ struct MaintenanceTaskCardV: View {
                 }
             }
             
-            // Show expenses if available
-            if let expenses = task.expenses, !expenses.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Cost Breakdown:")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    VStack(alignment: .leading, spacing: 5) {
-                        ForEach(Array(expenses.keys), id: \.self) { key in
-                            if let value = expenses[key], value > 0 {
-                                HStack {
-                                    Text(key.rawValue)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text("₹\(value, specifier: "%.2f")")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                }
-                            }
-                        }
+            Button(action: {
+                Task {
+                    if let invoice = await task.generateInvoice() {
+                        generatedInvoice = invoice
+                        showingInvoicePreview = true
                     }
-                    .padding(10)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
-                    
-                    HStack {
-                        Text("Total")
-                            .fontWeight(.medium)
-                        Spacer()
-                        Text("₹\(totalExpense, specifier: "%.2f")")
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                    }
-                    .padding(.top, 5)
                 }
-                .padding(.top, 5)
+            }) {
+                HStack {
+                    Image(systemName: "doc.text.fill")
+                    Text("View Invoice")
+                }
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(8)
+            }
+            .padding(.top, 5)
+            .sheet(isPresented: $showingInvoicePreview) {
+                if let invoice = generatedInvoice {
+                    InvoicePreviewView(invoice: invoice)
+                }
             }
         }
     }
@@ -1025,13 +1014,13 @@ struct MaintenanceTabView: View {
                         selectedSegment = 0
                     }
                     
-//                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
-//                        selectedSegment = 1
-//                    }
-//                    
-//                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
-//                        selectedSegment = 2
-//                    }
+                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
+                        selectedSegment = 1
+                    }
+                    
+                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
+                        selectedSegment = 2
+                    }
                 }
             }
             .padding(.horizontal)
@@ -1121,9 +1110,9 @@ struct SOSTabView: View {
                         sosSelectedSegment = 1
                     }
                     
-//                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
-//                        sosSelectedSegment = 2
-//                    }
+                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
+                        sosSelectedSegment = 2
+                    }
                 }
             }
             .padding(.horizontal)
