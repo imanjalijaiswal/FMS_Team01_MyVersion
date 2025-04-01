@@ -38,6 +38,7 @@ struct MaintenanceView: View {
     @State private var showingInvoicePreview = false
     @State private var generatedInvoice: Invoice?
     @State private var showLocationTracking = false
+    @State private var isLoadingInvoice = false
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -477,15 +478,19 @@ struct MaintenanceView: View {
             await dataController.loadPersonnelTasks()
             
             // 4. Try to generate invoice
-            if let updatedTask = dataController.personnelTasks.first(where: { $0.id == task.id }),
-               let invoice = await updatedTask.generateInvoice() {
-                DispatchQueue.main.async {
-                    self.generatedInvoice = invoice
-                    self.showingInvoiceSheet = false
-                    self.showingInvoicePreview = true
+            do {
+                if let updatedTask = dataController.personnelTasks.first(where: { $0.id == task.id }),
+                   let invoice = await updatedTask.generateInvoice() {
+                    DispatchQueue.main.async {
+                        self.generatedInvoice = invoice
+                        self.showingInvoiceSheet = false
+                        self.showingInvoicePreview = true
+                    }
+                } else {
+                    print("DEBUG: Failed to generate invoice")
                 }
-            } else {
-                print("Failed to generate invoice")
+            } catch {
+                print("DEBUG ERROR: Error generating invoice: \(error.localizedDescription)")
             }
             
             // 5. Update local tasks list
@@ -505,6 +510,7 @@ struct MaintenanceTaskCardV: View {
     @State private var completionDays = 1
     @State private var showingInvoicePreview = false
     @State private var generatedInvoice: Invoice?
+    @State private var isLoadingInvoice = false  // Add loading state
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -675,16 +681,42 @@ struct MaintenanceTaskCardV: View {
             }
             
             Button(action: {
+                // Set loading state to true before starting the task
+                isLoadingInvoice = true
+                
                 Task {
-                    if let invoice = await task.generateInvoice() {
-                        generatedInvoice = invoice
-                        showingInvoicePreview = true
+                    do {
+                        if let invoice = await task.generateInvoice() {
+                            // Update UI state on main thread
+                            DispatchQueue.main.async {
+                                self.generatedInvoice = invoice
+                                self.isLoadingInvoice = false
+                                self.showingInvoicePreview = true
+                            }
+                        } else {
+                            print("DEBUG: Failed to generate invoice for task ID: \(task.taskID)")
+                            DispatchQueue.main.async {
+                                self.isLoadingInvoice = false
+                            }
+                        }
+                    } catch {
+                        print("DEBUG: Error generating invoice: \(error)")
+                        DispatchQueue.main.async {
+                            self.isLoadingInvoice = false
+                        }
                     }
                 }
             }) {
                 HStack {
-                    Image(systemName: "doc.text.fill")
-                    Text("View Invoice")
+                    if isLoadingInvoice {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                            .padding(.trailing, 5)
+                    } else {
+                        Image(systemName: "doc.text.fill")
+                    }
+                    Text(isLoadingInvoice ? "Loading..." : "View Invoice")
                 }
                 .fontWeight(.medium)
                 .foregroundColor(.white)
@@ -693,10 +725,15 @@ struct MaintenanceTaskCardV: View {
                 .background(Color.blue)
                 .cornerRadius(8)
             }
+            .disabled(isLoadingInvoice)
             .padding(.top, 5)
             .sheet(isPresented: $showingInvoicePreview) {
                 if let invoice = generatedInvoice {
                     InvoicePreviewView(invoice: invoice)
+                } else {
+                    // Fallback view if invoice is nil
+                    Text("Could not load invoice")
+                        .padding()
                 }
             }
         }
@@ -956,6 +993,7 @@ struct InvoicePreviewView: View {
                 .padding()
             }
             .navigationTitle("Invoice Preview")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationBarItems(trailing: Button("Close") {
                 presentationMode.wrappedValue.dismiss()
             })
@@ -985,10 +1023,13 @@ struct MaintenanceTabView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            // Fixed header layout to prevent text wrapping
+            HStack(alignment: .center) {
                 Text("Maintenance")
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .padding(.leading)
                 
                 Spacer()
@@ -1004,12 +1045,13 @@ struct MaintenanceTabView: View {
             .padding(.bottom, 10)
             .padding(.top, 70)
             
+            // Improved segment control with fixed height and better spacing
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(UIColor.systemGray5))
-                    .frame(height: 45)
+                    .frame(height: 50)
                 
-                HStack(spacing: 0) {
+                HStack(spacing: 2) {
                     SegmentButton(text: "Assigned", isSelected: selectedSegment == 0) {
                         selectedSegment = 0
                     }
@@ -1075,11 +1117,13 @@ struct SOSTabView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Navigation Title
-            HStack {
+            // Updated Navigation Title with same layout improvements
+            HStack(alignment: .center) {
                 Text("SOS")
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .padding(.leading)
                 
                 Spacer()
@@ -1095,13 +1139,13 @@ struct SOSTabView: View {
             .padding(.bottom, 10)
             .padding(.top, 70)
             
-            // Segment Controller for SOS
+            // Updated Segment Controller for SOS with consistent height and spacing
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(UIColor.systemGray5))
-                    .frame(height: 45)
+                    .frame(height: 50)
                 
-                HStack(spacing: 0) {
+                HStack(spacing: 2) {
                     SegmentButton(text: "Pre-inspect", isSelected: sosSelectedSegment == 0) {
                         sosSelectedSegment = 0
                     }
@@ -1159,21 +1203,21 @@ struct SegmentButton: View {
     var body: some View {
         Button(action: action) {
             Text(text)
-                .font(.headline)
-                .fontWeight(isSelected ? .semibold : .regular)
+                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
                 .foregroundColor(isSelected ? .black : .gray)
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
                 .background(
                     Group {
                         if isSelected {
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.white)
                                 .padding(4)
                         }
                     }
                 )
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
