@@ -929,7 +929,8 @@ struct AddMaintenancePersonnelView: View {
                                     createdAt: .now,
                                     activeStatus: true
                                 ),
-                                totalRepairs: 0
+                                totalRepairs: 0,
+                                serviceCenterID: 1
                             )
                             
                             Task {

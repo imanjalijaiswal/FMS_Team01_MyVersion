@@ -28,7 +28,7 @@ protocol DatabaseAPIIntegrable {
     func addNewMaintenancePersonnelMetaData(by id: UUID,
                                             phoneNumber: String,
                                             fullName: String,
-                                            employeeID: Int) async throws -> MaintenancePersonnel
+                                            employeeID: Int, serviceCenterID: Int) async throws -> MaintenancePersonnel
     
     func getRegisteredMaintenancePersonnels() async throws -> [MaintenancePersonnel]
     
@@ -64,6 +64,10 @@ protocol DatabaseAPIIntegrable {
     func updateVehicleStatus(by id: Int, with status: VehicleStatus) async throws
     
     func updateVehicleActiveStatus(by id: Int, with status: Bool) async throws
+    
+    func getRegisteredServiceCenters() async throws -> [ServiceCenter]
+    
+    func getVehicleServiceCenterAssignedStatus(by id: Int) async throws -> Bool
     
     
     //MARK: Trip APIs

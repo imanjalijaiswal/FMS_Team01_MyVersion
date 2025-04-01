@@ -62,6 +62,7 @@ struct Driver: User {
 struct MaintenancePersonnel: User {
     var meta_data: UserMetaData
     var totalRepairs: Int
+    var serviceCenterID: Int
     
     var id: UUID { meta_data.id }
     
@@ -152,6 +153,14 @@ struct AppUser: Codable, Equatable, Identifiable {
         switch userData {
         case .maintenancePersonnel(let personnel):
             return personnel.totalRepairs
+        default: return nil
+        }
+    }
+    
+    var serviceCenterID: Int? {
+        switch userData {
+        case .maintenancePersonnel(let personnel):
+            return personnel.serviceCenterID
         default: return nil
         }
     }

@@ -21,6 +21,18 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func getVehicleServiceCenterAssignedStatus(by id: Int) async throws -> Bool {
+        return try await client
+            .rpc("get_service_center_assigned_status_by_id", params: ["p_id": id])
+            .execute().value
+    }
+    
+    func getRegisteredServiceCenters() async throws -> [ServiceCenter] {
+        return try await client
+            .rpc("get_registered_vehicle_service_centers")
+            .execute().value
+    }
+    
     func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID, for vehicleID: Int, ofType type: MaintenanceTaskType, _ issueNote: String) async throws -> MaintenanceTask {
         struct AssignMaintenanceTaskParams: Codable {
             let p_assigned_by: String
@@ -215,18 +227,20 @@ class RemoteController: DatabaseAPIIntegrable {
             .execute().value
     }
     
-    func addNewMaintenancePersonnelMetaData(by id: UUID, phoneNumber: String, fullName: String, employeeID: Int) async throws -> MaintenancePersonnel {
+    func addNewMaintenancePersonnelMetaData(by id: UUID, phoneNumber: String, fullName: String, employeeID: Int, serviceCenterID: Int) async throws -> MaintenancePersonnel {
         struct AddDriverParams: Encodable {
             let p_id: UUID
             let p_phone: String
             let p_display_name: String
             let p_employee_id: Int
             let p_created_at: String
+            let p_service_center_id: Int
         }
         
         let params = AddDriverParams(p_id: id, p_phone: phoneNumber, p_display_name: fullName,
                                      p_employee_id: employeeID,
-                                     p_created_at: ISO8601DateFormatter().string(from: .now))
+                                     p_created_at: ISO8601DateFormatter().string(from: .now),
+                                     p_service_center_id: serviceCenterID)
         
         let personnel: MaintenancePersonnel = try await client
             .rpc("add_new_maintenance_personnel", params: params).execute().value
