@@ -49,3 +49,8 @@ struct Vehicle: Identifiable, Codable, Equatable{
     var activeStatus: Bool
 }
 
+struct ServiceCenter: Identifiable, Codable, Equatable {
+    var id: Int
+    var coordinate: String
+    var isAssigned: Bool
+}

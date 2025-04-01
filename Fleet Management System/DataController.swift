@@ -23,6 +23,8 @@ class IFEDataController: ObservableObject {
     @Published var managerAssignedMaintenanceTasks: [MaintenanceTask] = []
     @Published var personnelTasks: [MaintenanceTask] = []
     @Published var vehicleCompanies: [String] = []
+    @Published var serviceCenters: [ServiceCenter] = []
+    
     let remoteController = RemoteController.shared
     
     init() {
@@ -31,6 +33,7 @@ class IFEDataController: ObservableObject {
             if let user = user {
                 if user.role == .driver {
                     await loadTripsForDriver()
+                    await loadServiceCenters()
                 } else if user.role == .maintenancePersonnel {
                     await loadPersonnelTasks()
                 } else {
@@ -40,6 +43,7 @@ class IFEDataController: ObservableObject {
                     await loadTrips()
                     await loadManagerAssignedMaintenanceTasks()
                     await loadVehicleCompanies()
+                    await loadServiceCenters()
                 }
             }
         }
@@ -113,6 +117,19 @@ class IFEDataController: ObservableObject {
             }
         }catch {
             print("Error while fetching trips for driver : \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    func loadServiceCenters() async {
+        do {
+            if let user = user {
+                if user.role == .driver || user.role == .fleetManager {
+                    serviceCenters = try await remoteController.getRegisteredServiceCenters()
+                }
+            }
+        }catch {
+            print("Error while fetching the registered service centers : \(error.localizedDescription)")
         }
     }
     
@@ -665,7 +682,7 @@ class IFEDataController: ObservableObject {
             let employeeID = try await remoteController.getMaxEmployeeID(ofType: .maintenancePersonnel)
             
             // Add the driver metadata
-            let newPersonnel = try await remoteController.addNewMaintenancePersonnelMetaData(by: new_personnel_uid, phoneNumber: personnel.meta_data.phone, fullName: personnel.meta_data.fullName, employeeID: employeeID+1)
+            let newPersonnel = try await remoteController.addNewMaintenancePersonnelMetaData(by: new_personnel_uid, phoneNumber: personnel.meta_data.phone, fullName: personnel.meta_data.fullName, employeeID: employeeID+1, serviceCenterID: personnel.serviceCenterID)
             
             // Make sure the current user is still set correctly after driver creation
             if user == nil || user?.role != .fleetManager {
@@ -685,6 +702,7 @@ class IFEDataController: ObservableObject {
             print("Error adding maintenance personnel: \(error.localizedDescription)")
         }
     }
+    
     func removeMaintenancePersonnel(_ personnel: MaintenancePersonnel) {
         Task {
             do {
@@ -700,6 +718,7 @@ class IFEDataController: ObservableObject {
             }
         }
     }
+    
     func enableMaintenancePersonnel(_ personnel: MaintenancePersonnel) {
         Task {
             do {
@@ -837,6 +856,35 @@ class IFEDataController: ObservableObject {
             try await remoteController.createInvoiceForMaintenanceTask(by: id, expenses: expenses, repairNote)
         } catch {
             print("Error while creating the invoice for maintenance task: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Retrieves the assigned status of a service center to maintenance personnel asynchronously.
+    ///
+    /// This function checks whether a specific service center (identified by its `id`) has been assigned to a maintenace personnel
+    /// If the operation fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameter id: The unique identifier of the service center whose assignment status is being checked.
+    /// - Returns: An optional `Bool` indicating whether the service center is assigned to a maintenance personnel. Returns `nil` if the fetch operation fails.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// if let isAssigned = await getVehicleServiceCenterAssignedStatus(by: vehicleID) {
+    ///     if isAssigned {
+    ///         print("Service center is assigned to a maintenance personnel.")
+    ///     } else {
+    ///         print("Service Center is not assigned to any maintenance personnel.")
+    ///     }
+    /// } else {
+    ///     print("Failed to retrieve service center assignment status.")
+    /// }
+    /// ```
+    func getVehicleServiceCenterAssignedStatus(by id: Int) async -> Bool? {
+        do {
+            return try await remoteController.getVehicleServiceCenterAssignedStatus(by: id)
+        } catch {
+            print("Error while fetching the assinged status of service center: \(error.localizedDescription)")
+            return nil
         }
     }
 }
