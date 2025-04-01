@@ -30,7 +30,7 @@ struct DriverRowView: View {
     @ObservedObject var viewModel: IFEDataController
     
     var body: some View {
-        NavigationLink(destination: DriverDetailView(driver: driver, viewModel: viewModel)) {
+        NavigationLink(destination: DriverDetailView(driver: driver, viewModel: viewModel).navigationBarBackButtonHidden(false)) {
             HStack(spacing: 12) {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 32))
@@ -92,9 +92,7 @@ struct MaintenancePersonnelRowView: View {
     @ObservedObject var viewModel: IFEDataController
     
     var statusText: String {
-//        if !personnel.activeStatus {
-//            return "Inactive"
-         if personnel.meta_data.firstTimeLogin {
+        if personnel.meta_data.firstTimeLogin {
             return "Offline"
         } else {
             return "Available"
@@ -102,7 +100,7 @@ struct MaintenancePersonnelRowView: View {
     }
     
     var body: some View {
-        NavigationLink(destination: MaintenancePersonnelDetailView(personnel: personnel, viewModel: viewModel)) {
+        NavigationLink(destination: MaintenancePersonnelDetailView(personnel: personnel, viewModel: viewModel).navigationBarBackButtonHidden(false)) {
             HStack(spacing: 12) {
                 Image(systemName: "wrench.fill")
                     .font(.system(size: 32))
@@ -494,6 +492,7 @@ struct MaintenancePersonnelDetailView: View {
                     }
                 } else {
                     InfoRow(title: "Phone", value: editedPhone.isEmpty ? "Not available" : editedPhone, textColor: .primary)
+                    InfoRow(title: "Service Center", value: editedPhone.isEmpty ? "Not available" : editedPhone, textColor: .primary)
                 }
             }
             
@@ -547,6 +546,7 @@ struct MaintenancePersonnelDetailView: View {
         }
         .onAppear {
             editedPhone = personnel.meta_data.phone
+//            editedCenter = 
         }
     }
 }
@@ -804,6 +804,21 @@ struct AddMaintenancePersonnelView: View {
     @State private var showNameError = false
     @State private var showEmailExistsError = false
     @State private var showPhoneExistsError = false
+    @State private var serviceCenter: Int = 0
+    
+    var availableServiceCenterLocations: [Int: String] {
+        var availableServiceCenters = viewModel.serviceCenters.filter { !$0.isAssigned }
+        
+        var centers: [Int: String] = Dictionary(uniqueKeysWithValues: availableServiceCenters.compactMap { center in
+            guard let location = viewModel.serviceCenterLocations[center.id] else { return nil }
+            return (center.id, location)
+        })
+
+        // Add key 0 with a default value
+        centers[0] = "Select Service Center"
+
+        return centers
+    }
     
     private func isEmailExists(_ email: String) -> Bool {
         return viewModel.maintenancePersonnels.contains { $0.meta_data.email.lowercased() == email.lowercased() }
@@ -817,7 +832,8 @@ struct AddMaintenancePersonnelView: View {
         !firstName.isEmpty && !lastName.isEmpty && 
         isValidFullName("\(firstName) \(lastName)") &&
         !email.isEmpty && isValidEmail(email) && !isEmailExists(email) &&
-        !phone.isEmpty && isValidPhone(phone) && !isPhoneExists(phone)
+        !phone.isEmpty && isValidPhone(phone) && !isPhoneExists(phone) &&
+        (serviceCenter != 0)
     }
     
     func generatePassword() -> String {
@@ -902,6 +918,12 @@ struct AddMaintenancePersonnelView: View {
                                 .font(.caption)
                         }
                     }
+                    Picker("Service Center", selection: $serviceCenter) {
+                        ForEach(availableServiceCenterLocations.sorted(by: { $0.key < $1.key }), id: \.key) { key, center in
+                            Text(center).tag(key) // Use the key as the tag
+                        }
+                    }
+
                 }
             }
             .navigationTitle("Add Maintenance Personnel")
@@ -917,25 +939,30 @@ struct AddMaintenancePersonnelView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         if isFormValid {
-                            let newPersonnel = MaintenancePersonnel(
-                                meta_data: UserMetaData(
-                                    id: UUID(),
-                                    fullName: "\(firstName) \(lastName)", 
-                                    email: email,
-                                    phone: phone,
-                                    role: .maintenancePersonnel,
-                                    employeeID: Int(employeeId) ?? -1,
-                                    firstTimeLogin: true,
-                                    createdAt: .now,
-                                    activeStatus: true
-                                ),
-                                totalRepairs: 0,
-                                serviceCenterID: 1
-                            )
-                            
                             Task {
+                                let newPersonnel = MaintenancePersonnel(
+                                    meta_data: UserMetaData(
+                                        id: UUID(),
+                                        fullName: "\(firstName) \(lastName)",
+                                        email: email,
+                                        phone: phone,
+                                        role: .maintenancePersonnel,
+                                        employeeID: Int(employeeId) ?? -1,
+                                        firstTimeLogin: true,
+                                        createdAt: .now,
+                                        activeStatus: true
+                                    ),
+                                    totalRepairs: 0,
+                                    serviceCenterID: self.serviceCenter
+                                )
+                                
                                 await viewModel.addMaintenancePersonnel(newPersonnel, password: generatedPassword)
                                 viewModel.sendWelcomeEmail(to: email, password: generatedPassword)
+                                
+                                let index = viewModel.serviceCenters.firstIndex(where: {
+                                    $0.id == self.serviceCenter
+                                })
+                                viewModel.serviceCenters[index!].isAssigned = true
                                 dismiss()
                             }
                         }
@@ -946,6 +973,9 @@ struct AddMaintenancePersonnelView: View {
             }
         }
         .onAppear {
+//            if !availableServiceCenterLocations.isEmpty {
+//                serviceCenter = "Select Service Center"
+//            }
             generatedPassword = generatePassword()
         }
     }

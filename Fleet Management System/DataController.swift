@@ -24,6 +24,15 @@ class IFEDataController: ObservableObject {
     @Published var personnelTasks: [MaintenanceTask] = []
     @Published var vehicleCompanies: [String] = []
     @Published var serviceCenters: [ServiceCenter] = []
+    @Published var serviceCenterLocations: [Int: String] = [:]
+    
+//    var availableServiceCenterLocations: [String] {
+//        let availableServiceCenters = serviceCenters.filter { !$0.isAssigned }
+//        
+//        return availableServiceCenters.compactMap { center in
+//            serviceCenterLocations[center.id]
+//        }
+//    }
     
     let remoteController = RemoteController.shared
     
@@ -44,10 +53,12 @@ class IFEDataController: ObservableObject {
                     await loadManagerAssignedMaintenanceTasks()
                     await loadVehicleCompanies()
                     await loadServiceCenters()
+                    await loadServiceCenterLocations()
                 }
             }
         }
     }
+    
     
     @MainActor
     private func fetchUser() async {
@@ -132,6 +143,27 @@ class IFEDataController: ObservableObject {
             print("Error while fetching the registered service centers : \(error.localizedDescription)")
         }
     }
+    
+    @MainActor
+    func loadServiceCenterLocations() async {
+        do {
+            if let user = user, user.role == .driver || user.role == .fleetManager {
+                for (index, serviceCenter) in serviceCenters.enumerated() {
+                    getAddress(from: serviceCenter.coordinate) { [weak self] address in
+                        DispatchQueue.main.async {
+                            if let address = address {
+                                self?.serviceCenterLocations[serviceCenter.id] = address
+                            } else {
+                                print("Failed to get address for: \(serviceCenter.coordinate)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
     
     @MainActor
     func loadPersonnelTasks() async {
