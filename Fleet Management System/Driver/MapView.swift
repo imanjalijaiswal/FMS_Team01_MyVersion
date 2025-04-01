@@ -393,9 +393,20 @@ class MapViewModel: NSObject, ObservableObject {
             return
         }
         
-        // Update trip status to completed
+        // Show post-trip inspection sheet
         if let trip = currentTrip {
-            tripViewModel.updateTripStatus(trip, to: .completed)
+            let tripOverviewView = TripOverviewView(
+                task: trip,
+                selectedTab: .constant(1),
+                isInDestinationGeofence: true
+            )
+            // Present the TripOverviewView
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let rootViewController = window.rootViewController {
+                let hostingController = UIHostingController(rootView: tripOverviewView)
+                rootViewController.present(hostingController, animated: true)
+            }
         }
         
         isNavigating = false
