@@ -912,6 +912,28 @@ class IFEDataController: ObservableObject {
             return nil
         }
     }
+    
+    /// Updates the service center location of a maintenance personnel asynchronously.
+    ///
+    /// This function updates the assigned service center of a maintenance personnel identified by their unique `id` with a new service center ID.
+    /// If the operation fails, it prints an error message.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the maintenance personnel whose service center needs to be updated.
+    ///   - newCenterID: The identifier of the new service center to be assigned.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// await updateMaintenancePersonnelServiceCenter(by: personnelID, with: newCenterID)
+    /// print("Service center updated successfully!")
+    /// ```
+    func updateMaintenancePersonnelServiceCenter(by id: UUID, with newCenterID: Int) async {
+        do {
+            try await remoteController.updateMaintenancePersonnelServiceCenter(by: id, with: newCenterID)
+        } catch {
+            print("Error while updating service center location of maintenance personnel: \(error.localizedDescription)")
+        }
+    }
 }
 
 func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {

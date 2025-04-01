@@ -71,6 +71,8 @@ protocol DatabaseAPIIntegrable {
     
     func getVehicleServiceCenter(by id: Int) async throws -> ServiceCenter
     
+    func updateMaintenancePersonnelServiceCenter(by id: UUID, with newCenterID: Int) async throws
+    
     //MARK: Trip APIs
     func assignNewTrip(assignedBy: UUID,
                        pickupCoordinates: (latitude: Double, longitude: Double),

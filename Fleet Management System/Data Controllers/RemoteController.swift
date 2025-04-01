@@ -21,6 +21,19 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func updateMaintenancePersonnelServiceCenter(by id: UUID, with newCenterID: Int) async throws {
+        struct UpdateServiceCenterParams: Codable {
+            let p_id: String
+            let p_service_center_id: Int
+        }
+        
+        let params = UpdateServiceCenterParams(p_id: id.uuidString, p_service_center_id: newCenterID)
+        
+        try await client
+            .rpc("update_maintenance_personnel_service_center_by_id", params: params)
+            .execute()
+    }
+    
     func getVehicleServiceCenter(by id: Int) async throws -> ServiceCenter {
         return try await client
             .rpc("get_service_center_by_id", params: ["p_id": id])
