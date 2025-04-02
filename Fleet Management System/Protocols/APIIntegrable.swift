@@ -48,6 +48,9 @@ protocol DatabaseAPIIntegrable {
     
     func getMaxEmployeeID(ofType type: Role) async throws -> Int
     
+    func getMaintenancePersonnel(ofCenter centerID: Int) async throws -> MaintenancePersonnel
+    
+    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async throws -> UserMetaData
     
     
     //MARK: Vehicle APIs
