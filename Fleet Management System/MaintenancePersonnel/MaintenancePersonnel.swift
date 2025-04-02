@@ -39,6 +39,7 @@ struct MaintenanceView: View {
     @State private var generatedInvoice: Invoice?
     @State private var showLocationTracking = false
     @State private var isLoadingInvoice = false
+    @State private var viewRefreshTrigger = UUID() // Add refresh trigger for views
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -387,57 +388,81 @@ struct MaintenanceView: View {
     
     func startWork(task: MaintenanceTask) {
         print("DEBUG: Starting work on task #\(task.taskID)")
-        Task {
-            // Use dataController.makeMaintenanceTaskInProgress for updating task status
-            await dataController.makeMaintenanceTaskInProgress(by: task.id)
-            print("DEBUG: Made task in-progress, now reloading tasks")
-            await dataController.loadPersonnelTasks() // Reload tasks from data controller
+        
+        // Modify task status directly on main thread to ensure UI updates
+        DispatchQueue.main.async {
+            // 1. First create a modified task with the new status
+            var updatedTask = task
+            updatedTask.status = .inProgress
             
-            let updatedTasksFromController = dataController.personnelTasks
+            // 2. Find and replace the existing task in the array
+            var newTasks = self.tasks.filter { $0.id != task.id }
+            newTasks.append(updatedTask)
             
-            // Create a mutable copy of the current tasks
-            var updatedTasks = self.tasks
+            // 3. Update the tasks array with the new collection
+            self.tasks = newTasks
             
-            // Find and update the specific task in our local array
-            if let index = updatedTasks.firstIndex(where: { $0.id == task.id }) {
-                updatedTasks[index].status = .inProgress
-                print("DEBUG: Updated task status locally")
+            // 4. Generate a new refresh trigger to force UI updates
+            self.viewRefreshTrigger = UUID()
+            
+            print("DEBUG: Local task status updated to .inProgress. Task count: \(self.tasks.count)")
+            
+            // 5. Log the status of all tasks to verify
+            for t in self.tasks {
+                print("DEBUG: Task #\(t.taskID) status: \(t.status.rawValue)")
             }
             
-            // Try to get the latest tasks from API
+            // 6. Immediately switch to In Progress tab to show the updated task
+            self.selectedSegment = 1
+            
+            // 7. Log filtered tasks to verify they're being updated correctly
+            let inProgressTasks = self.tasks.filter { $0.status == .inProgress && $0.type == .regularMaintenance }
+            print("DEBUG: Number of tasks with .inProgress status: \(inProgressTasks.count)")
+            
+            // 8. Force a UI update after a short delay to ensure everything is processed
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.viewRefreshTrigger = UUID()
+            }
+        }
+        
+        // Update the server in the background
+        Task {
             do {
-                let apiTasks = try await RemoteController.shared.getMaintenancePersonnelTasks(by: user?.id ?? UUID())
-                print("DEBUG: Reloaded \(apiTasks.count) tasks from API after starting work")
+                await dataController.makeMaintenanceTaskInProgress(by: task.id)
+                print("DEBUG: Task status updated on server")
                 
+                // Refresh data from server
+                await dataController.loadPersonnelTasks()
+                
+                // Update UI on main thread
                 DispatchQueue.main.async {
-                    self.tasks = apiTasks
+                    // Create a new array with server data but ensure our task is properly updated
+                    var refreshedTasks = dataController.personnelTasks
                     
-                    // Verify the task status was updated properly in the fetched data
-                    if let index = self.tasks.firstIndex(where: { $0.id == task.id }) {
-                        if self.tasks[index].status != .inProgress {
-                            print("DEBUG: API returned task with incorrect status, fixing locally")
-                            self.tasks[index].status = .inProgress
+                    // Double-check that our task has the correct status
+                    if let idx = refreshedTasks.firstIndex(where: { $0.id == task.id }) {
+                        if refreshedTasks[idx].status != .inProgress {
+                            print("DEBUG: Fixing task status from server data")
+                            refreshedTasks[idx].status = .inProgress
                         }
                     } else {
-                        print("DEBUG: Task not found in API response, using local update")
-                        self.tasks = updatedTasks
+                        // If task isn't in refreshed data, keep our modified version
+                        print("DEBUG: Task not found in server data, preserving local change")
+                        let updatedTask = task
+                        var localCopy = updatedTask
+                        localCopy.status = .inProgress
+                        refreshedTasks.append(localCopy)
                     }
                     
-                    // Immediately switch to the In Progress tab
+                    // Update tasks and force refresh
+                    self.tasks = refreshedTasks
+                    self.viewRefreshTrigger = UUID()
+                    
+                    // Keep the In Progress tab selected
                     self.selectedSegment = 1
-                    print("DEBUG: Switched to In Progress tab. Tasks count: \(self.tasks.count), Filtered tasks: \(self.filteredTasks.count)")
                 }
             } catch {
-                print("DEBUG ERROR: Failed to reload tasks from API: \(error.localizedDescription)")
-                
-                DispatchQueue.main.async {
-                    // Use our already updated tasks array
-                    self.tasks = updatedTasks
-                    
-                    // Immediately switch to the In Progress tab
-                    self.selectedSegment = 1
-                    print("DEBUG: Switched to In Progress tab (after API error). Tasks count: \(self.tasks.count), Filtered tasks: \(self.filteredTasks.count)")
-                }
+                print("DEBUG ERROR: Failed to update task status on server: \(error.localizedDescription)")
             }
         }
     }
@@ -1043,7 +1068,7 @@ struct MaintenanceTabView: View {
     let onStartWork: (MaintenanceTask) -> Void
     let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
     let onCreateInvoice: (MaintenanceTask) -> Void
-
+    
     var body: some View {
         VStack(spacing: 0) {
             // Header with fixed size and constrained font size
@@ -1150,7 +1175,7 @@ struct MaintenanceTabView: View {
                                 .foregroundColor(.gray)
                                 .padding(.top, 40)
                         } else {
-                            ForEach(filteredTasks) { task in
+                            ForEach(filteredTasks, id: \.id) { task in
                                 MaintenanceTaskCardV(
                                     task: task,
                                     vehicleLicense: vehicleLicenseMap[task.vehicleID],
@@ -1164,12 +1189,13 @@ struct MaintenanceTabView: View {
                                         onCreateInvoice(task)
                                     }
                                 )
-                                .id("\(task.id)-\(task.estimatedCompletionDate?.timeIntervalSince1970 ?? 0)")
+                                .id("\(task.id)-\(task.status.rawValue)")
                             }
                         }
                     }
                     .padding()
                 }
+                .id(selectedSegment) // Force refresh when tab changes
             }
         }
     }
