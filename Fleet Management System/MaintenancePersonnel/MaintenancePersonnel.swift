@@ -41,6 +41,7 @@ struct MaintenanceView: View {
     @State private var isLoadingInvoice = false
     @State private var viewRefreshTrigger = UUID() // Add refresh trigger for views
     @State private var isInvoiceFormLoading = false // New state for invoice form loading
+    @State private var isInvoiceGenerating = false // Add new state
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -51,6 +52,14 @@ struct MaintenanceView: View {
         let partsAmount = Double(partsCost) ?? 0
         let otherAmount = Double(otherCost) ?? 0
         return laborAmount + partsAmount + otherAmount
+    }
+    
+    // Check if any cost has been entered
+    private var hasAnyCostEntered: Bool {
+        let laborAmount = Double(laborCost) ?? 0
+        let partsAmount = Double(partsCost) ?? 0
+        let otherAmount = Double(otherCost) ?? 0
+        return laborAmount > 0 || partsAmount > 0 || otherAmount > 0
     }
     
     var body: some View {
@@ -203,20 +212,35 @@ struct MaintenanceView: View {
                         }
                         
                         Section {
-                            Button("Complete Task & Generate Invoice") {
+                            Button(action: {
                                 completeTaskAndGenerateInvoice(task: task)
+                            }) {
+                                if isLoadingInvoice {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        Text("Generating Invoice...")
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                    }
+                                } else {
+                                    Text("Complete Task & Generate Invoice")
+                                        .foregroundColor(.white)
+                                }
                             }
                             .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
                             .padding()
-                            .background(Color.blue)
+                            .background(hasAnyCostEntered ? Color.blue : Color.blue.opacity(0.5))
                             .cornerRadius(8)
+                            .disabled(!hasAnyCostEntered || isLoadingInvoice)
                         }
                     }
                     .navigationTitle("Create Invoice")
                     .navigationBarItems(trailing: Button("Cancel") {
                         showingInvoiceSheet = false
                     })
+                    .disabled(isLoadingInvoice)
                 } else {
                     Text("No task selected")
                 }
@@ -224,7 +248,7 @@ struct MaintenanceView: View {
         }
         .sheet(isPresented: $showingInvoicePreview) {
             if let invoice = generatedInvoice {
-                InvoicePreviewView(invoice: invoice)
+                LoadingInvoicePreview(invoice: invoice)
             }
         }
         .sheet(isPresented: $showingProfile) {
@@ -510,6 +534,9 @@ struct MaintenanceView: View {
     }
     
     func completeTaskAndGenerateInvoice(task: MaintenanceTask) {
+        // Set loading state
+        isLoadingInvoice = true
+        
         // Create expense dictionary
         var expenses: [MaintenanceExpenseType: Double] = [:]
         expenses[.laborsCost] = Double(laborCost) ?? 0
@@ -517,31 +544,210 @@ struct MaintenanceView: View {
         expenses[.otherCost] = Double(otherCost) ?? 0
         
         Task {
-            // 1. Update task with expenses and repair note
-            await dataController.createInvoiceForMaintenanceTask(by: task.id, expenses: expenses, repairNote)
-            
-            await dataController.loadPersonnelTasks()
-            
-            // 4. Try to generate invoice
             do {
-                if let updatedTask = dataController.personnelTasks.first(where: { $0.id == task.id }),
-                   let invoice = await updatedTask.generateInvoice() {
-                    DispatchQueue.main.async {
-                        self.generatedInvoice = invoice
-                        self.showingInvoiceSheet = false
-                        self.showingInvoicePreview = true
+                // 1. Update task with expenses and repair note
+                await dataController.createInvoiceForMaintenanceTask(by: task.id, expenses: expenses, repairNote)
+                
+                // 2. Reload tasks to get updated data
+                await dataController.loadPersonnelTasks()
+                
+                // 3. Find the updated task
+                if let updatedTask = dataController.personnelTasks.first(where: { $0.id == task.id }) {
+                    // 4. Generate invoice
+                    if let invoice = await updatedTask.generateInvoice() {
+                        DispatchQueue.main.async {
+                            self.generatedInvoice = invoice
+                            self.showingInvoiceSheet = false
+                            
+                            // Small delay before showing preview
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                self.isLoadingInvoice = false
+                                self.showingInvoicePreview = true
+                            }
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.isLoadingInvoice = false
+                            print("DEBUG: Failed to generate invoice - invoice generation returned nil")
+                        }
                     }
                 } else {
-                    print("DEBUG: Failed to generate invoice")
+                    DispatchQueue.main.async {
+                        self.isLoadingInvoice = false
+                        print("DEBUG: Failed to find updated task after completion")
+                    }
+                }
+                
+                // 5. Update local tasks list
+                DispatchQueue.main.async {
+                    self.tasks = dataController.personnelTasks
                 }
             } catch {
-                print("DEBUG ERROR: Error generating invoice: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.isLoadingInvoice = false
+                    print("DEBUG ERROR: Error completing task and generating invoice: \(error.localizedDescription)")
+                }
             }
-            
-            // 5. Update local tasks list
-            DispatchQueue.main.async {
-                self.tasks = dataController.personnelTasks
+        }
+    }
+}
+
+// New loading wrapper view for invoice preview
+struct LoadingInvoicePreview: View {
+    let invoice: Invoice
+    @State private var isLoading = true
+    
+    var body: some View {
+        ZStack {
+            if isLoading {
+                NavigationView {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(2)
+                        Text("Preparing Invoice...")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Invoice Preview")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+            } else {
+                InvoicePreviewView(invoice: invoice)
             }
+        }
+        .onAppear {
+            // Add a delay to ensure proper loading state is shown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation {
+                    isLoading = false
+                }
+            }
+        }
+    }
+}
+
+// Update InvoicePreviewView to remove loading state
+struct InvoicePreviewView: View {
+    let invoice: Invoice
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    HStack {
+                        Text("INVOICE")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing) {
+                            Text("Date: \(invoice.createdAt.formatted(.dateTime.day().month().year()))")
+                            Text("Invoice #: INV-\(invoice.taskID)")
+                        }
+                    }
+                    .padding(.bottom)
+                    
+                    // Vehicle Information
+                    Group {
+                        Text("Vehicle Details")
+                            .font(.headline)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Vehicle lN: \(invoice.vehicleLicenseNumber)")
+                                Text("Service Type: \(invoice.type.rawValue)")
+                                Text("Task ID: \(invoice.taskID)")
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    
+                    // Costs
+                    Group {
+                        Text("Cost Breakdown")
+                            .font(.headline)
+                        
+                        VStack(spacing: 15) {
+                            ForEach(Array(invoice.expenses.keys), id: \.self) { key in
+                                if let value = invoice.expenses[key] {
+                                    HStack {
+                                        Text(key.rawValue)
+                                        Spacer()
+                                        Text("₹\(value, specifier: "%.2f")")
+                                    }
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text("Subtotal")
+                                Spacer()
+                                Text("₹\(invoice.totalExpense, specifier: "%.2f")")
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text("Total")
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Text("₹\(invoice.totalExpense, specifier: "%.2f")")
+                                    .fontWeight(.bold)
+                            }
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    
+                    // Notes
+                    Group {
+                        Text("Issue Description")
+                            .font(.headline)
+                        
+                        Text(invoice.issueNote.isEmpty ? "No issue description provided" : invoice.issueNote)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(8)
+                        
+                        Text("Repair Notes")
+                            .font(.headline)
+                        
+                        Text(invoice.repairNote.isEmpty ? "No repair notes provided" : invoice.repairNote)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(8)
+                    }
+                    
+                    // Footer
+                    VStack(alignment: .center, spacing: 5) {
+                        Text("Thank you for your business")
+                            .font(.headline)
+//                        Text("Fleet Management System")
+//                            .font(.subheadline)
+//                        Text("Contact: vk092731@gmail.com")
+//                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top)
+                }
+                .padding()
+            }
+            .navigationTitle("Invoice Preview")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(trailing: Button("Close") {
+                dismiss()
+            })
         }
     }
 }
@@ -949,131 +1155,6 @@ struct SOSTaskCard: View {
             return .red
         default:
             return .gray
-        }
-    }
-}
-
-struct InvoicePreviewView: View {
-    let invoice: Invoice
-    @Environment(\.presentationMode) var presentationMode
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Header
-                    HStack {
-                        Text("INVOICE")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing) {
-                            Text("Date: \(invoice.createdAt.formatted(.dateTime.day().month().year()))")
-                            Text("Invoice #: INV-\(invoice.taskID)")
-                        }
-                    }
-                    .padding(.bottom)
-                    
-                    // Vehicle Information
-                    Group {
-                        Text("Vehicle Details")
-                            .font(.headline)
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("Vehicle lN: \(invoice.vehicleLicenseNumber)")
-                                Text("Service Type: \(invoice.type.rawValue)")
-                                Text("Task ID: \(invoice.taskID)")
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                    
-                    // Costs
-                    Group {
-                        Text("Cost Breakdown")
-                            .font(.headline)
-                        
-                        VStack(spacing: 15) {
-                            ForEach(Array(invoice.expenses.keys), id: \.self) { key in
-                                if let value = invoice.expenses[key] {
-                                    HStack {
-                                        Text(key.rawValue)
-                                        Spacer()
-                                        Text("₹\(value, specifier: "%.2f")")
-                                    }
-                                }
-                            }
-                            
-                            Divider()
-                            
-                            HStack {
-                                Text("Subtotal")
-                                Spacer()
-                                Text("₹\(invoice.totalExpense, specifier: "%.2f")")
-                            }
-                            
-                            Divider()
-                            
-                            HStack {
-                                Text("Total")
-                                    .fontWeight(.bold)
-                                Spacer()
-                                let finalAmount = invoice.totalExpense
-                                Text("₹\(finalAmount, specifier: "%.2f")")
-                                    .fontWeight(.bold)
-                            }
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                    
-                    // Notes
-                    Group {
-                        Text("Issue Description")
-                            .font(.headline)
-                        
-                        Text(invoice.issueNote.isEmpty ? "No issue description provided" : invoice.issueNote)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                        
-                        Text("Repair Notes")
-                            .font(.headline)
-                        
-                        Text(invoice.repairNote.isEmpty ? "No repair notes provided" : invoice.repairNote)
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                    }
-                    
-                    // Footer
-                    VStack(alignment: .center, spacing: 5) {
-                        Text("Thank you for your business")
-                            .font(.headline)
-                        Text("Fleet Management System")
-                            .font(.subheadline)
-                        Text("Contact: vk092731@gmail.com")
-                            .font(.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top)
-                }
-                .padding()
-            }
-            .navigationTitle("Invoice Preview")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(trailing: Button("Close") {
-                presentationMode.wrappedValue.dismiss()
-            })
         }
     }
 }
