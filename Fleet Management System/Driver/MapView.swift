@@ -400,6 +400,7 @@ class MapViewModel: NSObject, ObservableObject {
                 selectedTab: .constant(1),
                 isInDestinationGeofence: true
             )
+            cleanupMap()
             // Present the TripOverviewView
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                let window = windowScene.windows.first,
@@ -679,6 +680,40 @@ class MapViewModel: NSObject, ObservableObject {
                 print("Notification scheduled successfully")
             }
         }
+    }
+    
+    func cleanupMap() {
+        // Clean up map
+        route = nil
+        pickupRoute = nil
+        pickupGeofenceOverlay = nil
+        destinationGeofenceOverlay = nil
+        currentRoute = nil
+        isNavigating = false
+        isInNavigationMode = false
+        currentTrip = nil
+        hasReachedPickup = false
+        hasReachedDestination = false
+        currentStepIndex = 0
+        navigationAnnouncements = ""
+        upcomingDirections = []
+        nextDirectionAnnotation = nil
+        remainingDistance = 0
+        remainingTime = 0
+        estimatedArrivalTime = nil
+        pickupDistance = 0
+        pickupTime = 0
+        nextManeuver = ""
+        distanceToNextManeuver = 0
+        showingPickupRoute = true
+        
+        // Stop location updates
+        locationManager?.stopUpdatingLocation()
+        locationManager?.stopUpdatingHeading()
+        
+        // Invalidate timers
+        routeUpdateTimer?.invalidate()
+        navigationUpdateTimer?.invalidate()
     }
 }
 
