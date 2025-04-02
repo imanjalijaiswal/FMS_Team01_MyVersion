@@ -42,6 +42,8 @@ struct MaintenanceView: View {
     @State private var viewRefreshTrigger = UUID() // Add refresh trigger for views
     @State private var isInvoiceFormLoading = false // New state for invoice form loading
     @State private var isInvoiceGenerating = false // Add new state
+    @State private var refreshTimer: Timer? // Add timer for auto refresh
+    @State private var isRefreshing = false // Add state for pull-to-refresh
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -91,7 +93,16 @@ struct MaintenanceView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         self.isInvoiceFormLoading = false
                     }
-                }
+                },
+                onRefresh: {
+                    self.isRefreshing = true
+                    self.refreshAllTasks()
+                    // Set refreshing to false after a small delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.isRefreshing = false
+                    }
+                },
+                isRefreshing: isRefreshing
             )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
@@ -112,7 +123,16 @@ struct MaintenanceView: View {
                 onTrackTask: { task in
                     selectedTask = task
                     showLocationTracking = true
-                }
+                },
+                onRefresh: {
+                    self.isRefreshing = true
+                    self.refreshAllTasks()
+                    // Set refreshing to false after a small delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.isRefreshing = false
+                    }
+                },
+                isRefreshing: isRefreshing
             )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
@@ -131,6 +151,17 @@ struct MaintenanceView: View {
             
             loadTasks()
             loadSOSTasks()
+            
+            // Setup periodic refresh timer (every 30 seconds)
+//            refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+                print("DEBUG: Auto-refreshing tasks")
+//                self.refreshAllTasks()
+//            }
+        }
+        .onDisappear {
+            // Clean up timer when view disappears
+            refreshTimer?.invalidate()
+            refreshTimer = nil
         }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -617,6 +648,15 @@ struct MaintenanceView: View {
                     print("DEBUG ERROR: Error completing task and generating invoice: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+    
+    // Add a new method for refreshing all tasks
+    func refreshAllTasks() {
+        // Only refresh if we're not already loading
+        if !isLoading && !isSosLoading {
+            loadTasks()
+            loadSOSTasks()
         }
     }
 }
@@ -1198,6 +1238,8 @@ struct MaintenanceTabView: View {
     let onStartWork: (MaintenanceTask) -> Void
     let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
     let onCreateInvoice: (MaintenanceTask) -> Void
+    let onRefresh: () -> Void // Add refresh callback
+    let isRefreshing: Bool // Add refreshing state
     
     var body: some View {
         VStack(spacing: 0) {
@@ -1212,13 +1254,26 @@ struct MaintenanceTabView: View {
                     .padding(.top, 50)
                     .padding(.bottom, 15)
                     .overlay(
-                        Button(action: onShowProfile) {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .frame(width: 35, height: 35)
-                                .foregroundColor(.blue)
+                        HStack {
+                            Spacer()
+                            
+                            // Add refresh button
+//                            Button(action: onRefresh) {
+//                                Image(systemName: "arrow.clockwise")
+//                                    .resizable()
+//                                    .frame(width: 20, height: 22)
+//                                    .foregroundColor(.blue)
+//                            }
+//                            .padding(.trailing, 10)
+                            
+                            Button(action: onShowProfile) {
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .frame(width: 35, height: 35)
+                                    .foregroundColor(.blue)
+                            }
+                            .padding(.trailing)
                         }
-                        .padding(.trailing)
                         .padding(.top, 50)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                     )
@@ -1297,7 +1352,11 @@ struct MaintenanceTabView: View {
                     .padding()
                 Spacer()
             } else {
+                // Replace ScrollView with RefreshableScrollView
                 ScrollView {
+                    // Add pull-to-refresh functionality
+                    PullToRefresh(coordinateSpaceName: "pullToRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
+                    
                     LazyVStack(spacing: 16) {
                         if filteredTasks.isEmpty {
                             Text("No tasks available")
@@ -1325,9 +1384,44 @@ struct MaintenanceTabView: View {
                     }
                     .padding()
                 }
+                .coordinateSpace(name: "pullToRefresh")
                 .id(selectedSegment) // Force refresh when tab changes
             }
         }
+    }
+}
+
+// Add PullToRefresh view for the pull-to-refresh functionality
+struct PullToRefresh: View {
+    var coordinateSpaceName: String
+    var onRefresh: () -> Void
+    var isRefreshing: Bool
+    
+    @State private var refresh: CGFloat = 0
+    
+    var body: some View {
+        GeometryReader { geo in
+            if geo.frame(in: .named(coordinateSpaceName)).minY > 50 && !isRefreshing {
+                Spacer()
+                    .onAppear {
+                        onRefresh()
+                    }
+            } else if isRefreshing {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            }
+            ZStack(alignment: .center) {
+                if geo.frame(in: .named(coordinateSpaceName)).minY > 0 && !isRefreshing {
+                    ProgressView()
+                        .offset(y: -25)
+                }
+            }
+            .frame(width: geo.size.width)
+        }
+        .padding(.top, -50)
     }
 }
 
@@ -1340,6 +1434,8 @@ struct SOSTabView: View {
     let userNameMap: [UUID: String]
     let onShowProfile: () -> Void
     let onTrackTask: (MaintenanceTask) -> Void
+    let onRefresh: () -> Void // Remove default value to match actual usage
+    let isRefreshing: Bool // Remove default value to match actual usage
     
     var body: some View {
         VStack(spacing: 0) {
@@ -1354,13 +1450,26 @@ struct SOSTabView: View {
                     .padding(.top, 50)
                     .padding(.bottom, 15)
                     .overlay(
-                        Button(action: onShowProfile) {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .frame(width: 35, height: 35)
-                                .foregroundColor(.blue)
+                        HStack {
+                            Spacer()
+                            
+                            // Add refresh button
+                            Button(action: onRefresh) {
+                                Image(systemName: "arrow.clockwise")
+                                    .resizable()
+                                    .frame(width: 20, height: 22)
+                                    .foregroundColor(.blue)
+                            }
+                            .padding(.trailing, 10)
+                            
+                            Button(action: onShowProfile) {
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .frame(width: 35, height: 35)
+                                    .foregroundColor(.blue)
+                            }
+                            .padding(.trailing)
                         }
-                        .padding(.trailing)
                         .padding(.top, 50)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                     )
@@ -1440,6 +1549,9 @@ struct SOSTabView: View {
                 Spacer()
             } else {
                 ScrollView {
+                    // Add pull-to-refresh functionality
+                    PullToRefresh(coordinateSpaceName: "sosRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
+                    
                     LazyVStack(spacing: 16) {
                         if filteredSOSTasks.isEmpty {
                             Text("No tasks available")
@@ -1462,6 +1574,8 @@ struct SOSTabView: View {
                     }
                     .padding()
                 }
+                .coordinateSpace(name: "sosRefresh")
+                .id(sosSelectedSegment) // Force refresh when tab changes
             }
         }
     }
