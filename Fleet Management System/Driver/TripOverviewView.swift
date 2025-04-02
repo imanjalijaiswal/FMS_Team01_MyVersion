@@ -484,6 +484,7 @@ struct EndTripButton: View {
                     if !isInspectionCompleted {
                         showInspection = true
                     } else {
+                        // Clean up map before ending trip
                         // End trip action
                         dataController.updateTripStatus(task, to: .completed)
                         // Dismiss the view after completing the trip
@@ -494,7 +495,7 @@ struct EndTripButton: View {
                         }
                     }
                 }) {
-                    Text(isInspectionCompleted ? "End Trip" : "Post-Trip Inspection")
+                    Text(isInspectionCompleted ? "Mark as Completed" : "Post-Trip Inspection")
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
