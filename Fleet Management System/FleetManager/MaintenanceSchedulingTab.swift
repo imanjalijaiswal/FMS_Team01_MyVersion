@@ -95,10 +95,10 @@ struct MaintenanceSchedulingView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack {
-                        Button(action: refreshData) {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.primaryGradientEnd)
-                        }
+//                        Button(action: refreshData) {
+//                            Image(systemName: "arrow.clockwise")
+//                                .foregroundColor(.primaryGradientEnd)
+//                        }
                         
                         Button(action: {
                             showScheduleForm = true

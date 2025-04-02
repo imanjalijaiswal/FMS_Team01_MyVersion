@@ -162,6 +162,8 @@ struct StaffView: View {
     @State private var selectedFilter = ""
     @State private var selectedRole = 0
     @State private var showingAddStaff = false
+    @State private var isRefreshing = false
+    @State private var viewRefreshTrigger = UUID()
     
     // Separate filters for drivers and maintenance
     let driverFilters = ["All", DriverStatus.available.rawValue, DriverStatus.onTrip.rawValue, "Inactive", DriverStatus.Offline.rawValue]
@@ -270,6 +272,22 @@ struct StaffView: View {
         }
     }
     
+    func refreshData() {
+        self.isRefreshing = true
+        
+        Task {
+            await viewModel.loadDrivers()
+            await viewModel.loadMaintenancePersonnels()
+            await viewModel.loadVehicleCompanies()
+            await viewModel.loadServiceCenters()
+            
+            DispatchQueue.main.async {
+                self.isRefreshing = false
+                self.viewRefreshTrigger = UUID() // Force view update
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             Picker("Staff Type", selection: $selectedRole) {
@@ -290,8 +308,11 @@ struct StaffView: View {
                 filters: filtersWithCount,
                 selectedFilter: $selectedFilter
             )
+            .id(viewRefreshTrigger)
             
             ScrollView {
+                PullToRefresh(coordinateSpaceName: "staffPullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
+                
                 VStack(spacing: 12) {
                     if selectedRole == 0 {
                         ForEach(filteredStaff) { staff in
@@ -312,8 +333,11 @@ struct StaffView: View {
                     }
                 }
                 .padding(.horizontal)
+                .id(viewRefreshTrigger)
             }
+            .coordinateSpace(name: "staffPullToRefresh")
         }
+        .id(viewRefreshTrigger)
         .navigationTitle("Staff")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -322,6 +346,13 @@ struct StaffView: View {
                         .foregroundColor(.primaryGradientEnd)
                 }
             }
+            
+//            ToolbarItem(placement: .topBarLeading) {
+//                Button(action: refreshData) {
+//                    Image(systemName: "arrow.clockwise")
+//                        .foregroundColor(.primaryGradientEnd)
+//                }
+//            }
         }
         .sheet(isPresented: $showingAddStaff) {
             if selectedRole == 0 {
