@@ -533,7 +533,7 @@ struct MaintenancePersonnelDetailView: View {
                         }
                     }
                 }
-                .foregroundColor(.primaryGradientEnd)
+                
             }
         }
         .alert("Make Personnel Inactive", isPresented: $showingDisableAlert) {
@@ -546,7 +546,7 @@ struct MaintenancePersonnelDetailView: View {
         }
         .onAppear {
             editedPhone = personnel.meta_data.phone
-//            editedCenter = 
+//            editedCenter =
         }
     }
 }
@@ -594,13 +594,26 @@ struct AddDriverView: View {
     @State private var showEmailError = false
     @State private var showPhoneError = false
     @State private var showNameError = false
-    @State private var showLicenseError = false
     @State private var showEmailExistsError = false
     @State private var showPhoneExistsError = false
+    @State private var showLicenseError = false
     @State private var showLicenseExistsError = false
     
     private func isEmailExists(_ email: String) -> Bool {
-        return viewModel.drivers.contains { $0.meta_data.email.lowercased() == email.lowercased() }
+        // Check if email exists in drivers
+        let existsInDrivers = viewModel.drivers.contains {
+            $0.meta_data.email.lowercased() == email.lowercased()
+        }
+        
+        // Check if email exists in maintenance personnel
+        let existsInMaintenance = viewModel.maintenancePersonnels.contains {
+            $0.meta_data.email.lowercased() == email.lowercased()
+        }
+        
+        // Check if email exists in fleet manager (current user)
+        let existsInManager = viewModel.user?.meta_data.email.lowercased() == email.lowercased()
+        
+        return existsInDrivers || existsInMaintenance || existsInManager
     }
     
     private func isPhoneExists(_ phone: String) -> Bool {
@@ -640,8 +653,13 @@ struct AddDriverView: View {
                         TextField("First Name", text: $firstName)
                             .textContentType(.givenName)
                             .onChange(of: firstName) { _, newValue in
-                                showNameError = !firstName.isEmpty && !lastName.isEmpty && !isValidFullName("\(firstName) \(lastName)")
+                                showNameError = !newValue.isEmpty && !isValidFullName(newValue)
                             }
+                        if showNameError {
+                            Text("Please enter only letters")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -650,12 +668,11 @@ struct AddDriverView: View {
                             .onChange(of: lastName) { _, newValue in
                                 showNameError = !firstName.isEmpty && !lastName.isEmpty && !isValidFullName("\(firstName) \(lastName)")
                             }
-                    }
-                    
-                    if showNameError {
-                        Text("Please enter a valid name (letters only)")
-                            .foregroundColor(.red)
-                            .font(.caption)
+                        if showNameError {
+                            Text("Please enter a valid name (letters only)")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -821,7 +838,20 @@ struct AddMaintenancePersonnelView: View {
     }
     
     private func isEmailExists(_ email: String) -> Bool {
-        return viewModel.maintenancePersonnels.contains { $0.meta_data.email.lowercased() == email.lowercased() }
+        // Check if email exists in maintenance personnel
+        let existsInMaintenance = viewModel.maintenancePersonnels.contains {
+            $0.meta_data.email.lowercased() == email.lowercased()
+        }
+        
+        // Check if email exists in drivers
+        let existsInDrivers = viewModel.drivers.contains {
+            $0.meta_data.email.lowercased() == email.lowercased()
+        }
+        
+        // Check if email exists in fleet manager (current user)
+        let existsInManager = viewModel.user?.meta_data.email.lowercased() == email.lowercased()
+        
+        return existsInMaintenance || existsInDrivers || existsInManager
     }
     
     private func isPhoneExists(_ phone: String) -> Bool {
@@ -829,7 +859,7 @@ struct AddMaintenancePersonnelView: View {
     }
     
     private var isFormValid: Bool {
-        !firstName.isEmpty && !lastName.isEmpty && 
+        !firstName.isEmpty && !lastName.isEmpty &&
         isValidFullName("\(firstName) \(lastName)") &&
         !email.isEmpty && isValidEmail(email) && !isEmailExists(email) &&
         !phone.isEmpty && isValidPhone(phone) && !isPhoneExists(phone) &&
@@ -858,19 +888,22 @@ struct AddMaintenancePersonnelView: View {
                         TextField("First Name", text: $firstName)
                             .textContentType(.givenName)
                             .onChange(of: firstName) { _, newValue in
-                                showNameError = !firstName.isEmpty && !lastName.isEmpty && 
-                                              !isValidFullName("\(firstName) \(lastName)")
+                                showNameError = !newValue.isEmpty && !isValidFullName(newValue)
                             }
+                        if showNameError {
+                            Text("Please enter only letters")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         TextField("Last Name", text: $lastName)
                             .textContentType(.familyName)
                             .onChange(of: lastName) { _, newValue in
-                                showNameError = !firstName.isEmpty && !lastName.isEmpty && 
+                                showNameError = !firstName.isEmpty && !lastName.isEmpty &&
                                               !isValidFullName("\(firstName) \(lastName)")
                             }
-                        
                         if showNameError {
                             Text("Please enter a valid name (letters only)")
                                 .foregroundColor(.red)
@@ -999,97 +1032,3 @@ struct MaintenancePersonnelListView: View {
         }
     }
 }
-
-
-    
-    
-
-
-/*
-#Preview{
-    StaffView()
-=======
-#Preview {
-    // Create a preview with sample data
-    let mockController = IFEDataController.shared
-    mockController.drivers = [
-        // Available driver
-        Driver(
-            meta_data: UserMetaData(
-                id: UUID(),
-                fullName: "Arnav Chauhan",
-                email: "arnav@example.com",
-                phone: "+917043788123",
-                role: .driver,
-                employeeID: 1001,
-                firstTimeLogin: false,
-                createdAt: Date(),
-                activeStatus: true
-            ),
-            licenseNumber: "DL0120230000001",
-            totalTrips: 24,
-            status: .available
-        ),
-        
-        // On Trip driver
-        Driver(
-            meta_data: UserMetaData(
-                id: UUID(),
-                fullName: "Raj Kumar",
-                email: "raj@example.com",
-                phone: "+919876543210",
-                role: .driver,
-                employeeID: 1002,
-                firstTimeLogin: false,
-                createdAt: Date(),
-                activeStatus: true
-            ),
-            licenseNumber: "DL0120230000002",
-            totalTrips: 15,
-            status: .onTrip
-        ),
-        
-        // Inactive driver
-        Driver(
-            meta_data: UserMetaData(
-                id: UUID(),
-                fullName: "Meera Singh",
-                email: "meera@example.com",
-                phone: "+919876543211",
-                role: .driver,
-                employeeID: 1003,
-                firstTimeLogin: false,
-                createdAt: Date(),
-                activeStatus: false
-            ),
-            licenseNumber: "DL0120230000003",
-            totalTrips: 32,
-            status: .available
-        ),
-        
-        // Offline driver (first time login)
-        Driver(
-            meta_data: UserMetaData(
-                id: UUID(),
-                fullName: "Anil Patel",
-                email: "anil@example.com",
-                phone: "+919876543212",
-                role: .driver,
-                employeeID: 1004,
-                firstTimeLogin: true,
-                createdAt: Date(),
-                activeStatus: true
-            ),
-            licenseNumber: "DL0120230000004",
-            totalTrips: 0,
-            status: .Offline
-        )
-    ]
-    
-    return NavigationView {
-        StaffView()
-            .environmentObject(mockController)
-    }
->>>>>>> Arnav_Screen:Fleet Management System/FleetManager/Driver.swift
-}
-*/
