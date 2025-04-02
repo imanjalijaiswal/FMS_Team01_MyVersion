@@ -251,6 +251,8 @@ struct VehiclesView: View {
     @State private var searchText = ""
     @State private var selectedFilter = ""
     @State private var showingAddVehicle = false
+    @State private var isRefreshing = false
+    @State private var viewRefreshTrigger = UUID()
     
     private var availableCount: Int {
         viewModel.vehicles.filter { $0.status == .available && $0.activeStatus }.count
@@ -315,6 +317,19 @@ struct VehiclesView: View {
         }
     }
     
+    func refreshData() {
+        self.isRefreshing = true
+        
+        Task {
+            await viewModel.loadVehicles()
+            
+            DispatchQueue.main.async {
+                self.isRefreshing = false
+                self.viewRefreshTrigger = UUID() // Force view update
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             SearchBar(text: $searchText)
@@ -325,8 +340,11 @@ struct VehiclesView: View {
                 filters: filtersWithCount,
                 selectedFilter: $selectedFilter
             )
+            .id(viewRefreshTrigger)
             
             ScrollView {
+                PullToRefresh(coordinateSpaceName: "vehiclesPullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
+                
                 VStack(spacing: 12) {
                     ForEach(filteredVehicles) { vehicle in
                         VehicleRowView(vehicle: vehicle, viewModel: viewModel)
@@ -337,15 +355,26 @@ struct VehiclesView: View {
                     }
                 }
                 .padding(.horizontal)
+                .id(viewRefreshTrigger)
             }
+            .coordinateSpace(name: "vehiclesPullToRefresh")
         }
+        .id(viewRefreshTrigger)
         .navigationTitle("Vehicles")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { showingAddVehicle = true }) {
                     Image(systemName: "plus")
+                        .foregroundColor(.primaryGradientEnd)
                 }
             }
+            
+//            ToolbarItem(placement: .topBarLeading) {
+//                Button(action: refreshData) {
+//                    Image(systemName: "arrow.clockwise")
+//                        .foregroundColor(.primaryGradientEnd)
+//                }
+//            }
         }
         .sheet(isPresented: $showingAddVehicle) {
             VehicleDetailsView(viewModel: viewModel)

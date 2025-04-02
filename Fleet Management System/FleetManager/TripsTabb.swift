@@ -13,6 +13,8 @@ struct TripsView: View {
     @State private var searchText = ""
     @State private var selectedFilter = "All"
     @StateObject private var viewModel = IFEDataController.shared
+    @State private var isRefreshing = false
+    @State private var viewRefreshTrigger = UUID()
     
     let filters = ["All", "Scheduled", "In Progress", "Completed"]
     
@@ -45,6 +47,21 @@ struct TripsView: View {
         }
     }
     
+    func refreshData() {
+        self.isRefreshing = true
+        
+        Task {
+            await viewModel.loadTrips()
+            await viewModel.loadVehicles()
+            await viewModel.loadDrivers()
+            
+            DispatchQueue.main.async {
+                self.isRefreshing = false
+                self.viewRefreshTrigger = UUID() // Force view update
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             SearchBar(text: $searchText)
@@ -55,8 +72,11 @@ struct TripsView: View {
                 filters: filters,
                 selectedFilter: $selectedFilter
             )
+            .id(viewRefreshTrigger)
             
             ScrollView {
+                PullToRefresh(coordinateSpaceName: "tripsPullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
+                
                 VStack(spacing: 16) {
                     if filteredTrips.isEmpty {
                         Text("No trips available")
@@ -69,8 +89,11 @@ struct TripsView: View {
                     }
                 }
                 .padding(.horizontal)
+                .id(viewRefreshTrigger)
             }
+            .coordinateSpace(name: "tripsPullToRefresh")
         }
+        .id(viewRefreshTrigger)
         .navigationTitle("Trips")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -84,6 +107,13 @@ struct TripsView: View {
                     AssignTripView(viewModel: viewModel)
                 }
             }
+            
+//            ToolbarItem(placement: .topBarLeading) {
+//                Button(action: refreshData) {
+//                    Image(systemName: "arrow.clockwise")
+//                        .foregroundColor(.primaryGradientEnd)
+//                }
+//            }
         }
         .background(.white)
     }

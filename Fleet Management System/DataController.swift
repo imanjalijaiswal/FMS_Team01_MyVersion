@@ -61,7 +61,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadDrivers() async {
+     func loadDrivers() async {
         do {
             drivers = try await remoteController.getRegisteredDrivers()
         } catch {
@@ -70,7 +70,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadVehicles() async {
+    func loadVehicles() async {
         do {
             vehicles = try await remoteController.getRegisteredVehicles()
         } catch {
@@ -79,7 +79,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadMaintenancePersonnels() async {
+     func loadMaintenancePersonnels() async {
         do {
             maintenancePersonnels = try await remoteController.getRegisteredMaintenancePersonnels()
         } catch {
@@ -88,7 +88,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadTrips() async {
+     func loadTrips() async {
         do {
             if let user = user {
                 if user.role == .fleetManager {
@@ -101,7 +101,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadVehicleCompanies() async {
+     func loadVehicleCompanies() async {
         do {
             vehicleCompanies = try await remoteController.getRegisteredVehicleCompanies()
         } catch {
