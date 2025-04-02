@@ -578,6 +578,28 @@ struct MaintenanceView: View {
                             print("DEBUG: Failed to generate invoice - invoice generation returned nil")
                         }
                     }
+                    
+                    // 5. Update local task status
+                    DispatchQueue.main.async {
+                        // Update the status of the task in our local array
+                        if let index = self.tasks.firstIndex(where: { $0.id == task.id }) {
+                            var updatedLocalTask = self.tasks[index]
+                            updatedLocalTask.status = .completed
+                            updatedLocalTask.completionDate = Date()
+                            
+                            // Replace the task in the array
+                            self.tasks.remove(at: index)
+                            self.tasks.append(updatedLocalTask)
+                            
+                            // Update view to reflect changes
+                            self.viewRefreshTrigger = UUID()
+                            
+                            // Switch to Completed segment after a small delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                self.selectedSegment = 2 // Switch to Completed segment
+                            }
+                        }
+                    }
                 } else {
                     DispatchQueue.main.async {
                         self.isLoadingInvoice = false
@@ -585,7 +607,7 @@ struct MaintenanceView: View {
                     }
                 }
                 
-                // 5. Update local tasks list
+                // 6. Update local tasks list with data from server
                 DispatchQueue.main.async {
                     self.tasks = dataController.personnelTasks
                 }
