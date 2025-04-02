@@ -79,7 +79,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadVehicles() async {
+    func loadVehicles() async {
         do {
             vehicles = try await remoteController.getRegisteredVehicles()
         } catch {
