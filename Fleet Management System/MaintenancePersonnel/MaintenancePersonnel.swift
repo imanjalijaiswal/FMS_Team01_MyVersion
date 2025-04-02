@@ -42,7 +42,6 @@ struct MaintenanceView: View {
     @State private var viewRefreshTrigger = UUID() // Add refresh trigger for views
     @State private var isInvoiceFormLoading = false // New state for invoice form loading
     @State private var isInvoiceGenerating = false // Add new state
-    @State private var refreshTimer: Timer? // Add timer for auto refresh
     @State private var isRefreshing = false // Add state for pull-to-refresh
     
     // Reference to data controllers
@@ -140,7 +139,6 @@ struct MaintenanceView: View {
                 Text("SOS")
             }
             .tag(1)
-//            .badge(5)
         }
         .onAppear {
             // Set the TabView appearance to match iOS design
@@ -151,17 +149,6 @@ struct MaintenanceView: View {
             
             loadTasks()
             loadSOSTasks()
-            
-            // Setup periodic refresh timer (every 30 seconds)
-//            refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-                print("DEBUG: Auto-refreshing tasks")
-//                self.refreshAllTasks()
-//            }
-        }
-        .onDisappear {
-            // Clean up timer when view disappears
-            refreshTimer?.invalidate()
-            refreshTimer = nil
         }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }

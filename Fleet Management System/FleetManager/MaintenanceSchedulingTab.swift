@@ -6,7 +6,6 @@ struct MaintenanceSchedulingView: View {
     @State private var selectedFilter = ""
     @StateObject private var viewModel = IFEDataController.shared
     @State private var isRefreshing = false
-    @State private var refreshTimer: Timer?
     @State private var viewRefreshTrigger = UUID()
     
     private var scheduledCount: Int {
@@ -129,15 +128,7 @@ struct MaintenanceSchedulingView: View {
                 selectedFilter = filters[0]
             }
             
-            refreshData()
-            
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-                refreshData()
-            }
-        }
-        .onDisappear {
-            refreshTimer?.invalidate()
-            refreshTimer = nil
+            // Initial data load removed
         }
     }
     
