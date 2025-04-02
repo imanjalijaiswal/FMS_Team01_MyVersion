@@ -89,7 +89,6 @@ struct MaintenanceView: View {
                     self.selectedTask = task
                     self.showingInvoiceSheet = true
                     
-                    // Add small delay to ensure task is properly loaded before showing content
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         self.isInvoiceFormLoading = false
                     }
@@ -97,7 +96,6 @@ struct MaintenanceView: View {
                 onRefresh: {
                     self.isRefreshing = true
                     self.refreshAllTasks()
-                    // Set refreshing to false after a small delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         self.isRefreshing = false
                     }
@@ -127,7 +125,6 @@ struct MaintenanceView: View {
                 onRefresh: {
                     self.isRefreshing = true
                     self.refreshAllTasks()
-                    // Set refreshing to false after a small delay
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         self.isRefreshing = false
                     }
@@ -140,8 +137,8 @@ struct MaintenanceView: View {
                 Text("SOS")
             }
             .tag(1)
-//            .badge(5)
         }
+        .accentColor(.primaryGradientEnd)
         .onAppear {
             // Set the TabView appearance to match iOS design
             UITabBar.appearance().backgroundColor = .systemBackground
@@ -262,7 +259,7 @@ struct MaintenanceView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(hasAnyCostEntered ? Color.blue : Color.blue.opacity(0.5))
+                            .background(hasAnyCostEntered ? Color.primaryGradientStart : Color.primaryGradientStart.opacity(0.5))
                             .cornerRadius(8)
                             .disabled(!hasAnyCostEntered || isLoadingInvoice)
                         }
@@ -270,7 +267,8 @@ struct MaintenanceView: View {
                     .navigationTitle("Create Invoice")
                     .navigationBarItems(trailing: Button("Cancel") {
                         showingInvoiceSheet = false
-                    })
+                    }
+                    .foregroundColor(.primaryGradientStart))
                     .disabled(isLoadingInvoice)
                 } else {
                     Text("No task selected")
@@ -302,9 +300,6 @@ struct MaintenanceView: View {
                 }
             }
         }
-
-
-        .accentColor(.blue)
     }
     
     var filteredTasks: [MaintenanceTask] {
@@ -708,7 +703,7 @@ struct InvoicePreviewView: View {
                     // Header
                     HStack {
                         Text("INVOICE")
-                            .font(.largeTitle)
+                            .font(.title2)
                             .fontWeight(.bold)
                         
                         Spacer()
@@ -816,7 +811,8 @@ struct InvoicePreviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarItems(trailing: Button("Close") {
                 dismiss()
-            })
+            }
+            .foregroundColor(.primaryGradientStart))
         }
     }
 }
@@ -839,11 +835,13 @@ struct MaintenanceTaskCardV: View {
             // Common header for all card types
             HStack {
                 if let license = vehicleLicense {
-                    Text("Vehicle: \(license)")
-                        .font(.headline)
+                    Text("\(license)")
+                        .font(.subheadline)
+                        .foregroundColor(.statusOrange)
                 } else {
                     Text("Vehicle ID: \(task.vehicleID)")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .foregroundColor(.primaryGradientStart)
                 }
                 
                 Spacer()
@@ -867,13 +865,15 @@ struct MaintenanceTaskCardV: View {
             .padding(.top, 5)
             
             Text("Task ID: \(task.taskID)")
-                .foregroundColor(.secondary)
+                .font(.subheadline)
+                .foregroundColor(.textSecondary)
             
             HStack(spacing: 5) {
                 Image(systemName: "wrench.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.primaryGradientStart)
                 Text(task.type.rawValue)
-                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
             }
             
             // Content specific to status
@@ -886,13 +886,13 @@ struct MaintenanceTaskCardV: View {
             }
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(statusColor.opacity(0.3), lineWidth: 1)
-        )
+//        .overlay(
+//            RoundedRectangle(cornerRadius: 12)
+//                .stroke(statusColor.opacity(0.3), lineWidth: 1)
+//        )
         .id(refreshID) // Force refresh when refreshID changes
         .onAppear {
             // Calculate completionDays from task.estimatedCompletionDate when the view appears
@@ -918,18 +918,19 @@ struct MaintenanceTaskCardV: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 5) {
                 Image(systemName: "clock")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.primaryGradientStart)
                 
-                // Use either the temporary estimated date or the task's date
                 let displayDate = temporaryEstimatedDate ?? task.estimatedCompletionDate
                 Text("Estimated Date: \(displayDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
-                    .foregroundColor(.secondary)
-                    .id("est-date-\(displayDate?.timeIntervalSince1970 ?? 0)") // Force refresh when date changes
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+                    .id("est-date-\(displayDate?.timeIntervalSince1970 ?? 0)")
             }
             
             HStack {
                 Text("Complete in:")
-                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
                 
                 Spacer()
                 
@@ -937,21 +938,13 @@ struct MaintenanceTaskCardV: View {
                     ForEach(1...7, id: \.self) { day in
                         Button(action: {
                             completionDays = day
-                            
-                            // Set temporary date for immediate UI update
                             temporaryEstimatedDate = Calendar.current.date(byAdding: .day, value: day, to: Date())
-                            
-                            // Force refresh
                             refreshID = UUID()
-                            
-                            // Call the actual update function
                             onDaysSelected(day)
                         }) {
                             HStack {
                                 Text("\(day) day\(day > 1 ? "s" : "")")
-                                
                                 Spacer()
-                                
                                 if day == completionDays {
                                     Image(systemName: "checkmark")
                                 }
@@ -962,6 +955,7 @@ struct MaintenanceTaskCardV: View {
                 label: {
                     HStack {
                         Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
+                            .font(.subheadline)
                             .foregroundColor(.primary)
                         
                         Spacer(minLength: 8)
@@ -972,7 +966,7 @@ struct MaintenanceTaskCardV: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(Color(UIColor.systemBackground))
+                    .background(Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
@@ -984,11 +978,12 @@ struct MaintenanceTaskCardV: View {
             
             Button(action: onStartWork) {
                 Text("Start Work")
+                    .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.blue)
+                    .background(Color.primaryGradientStart)
                     .cornerRadius(8)
             }
             .padding(.top, 5)
@@ -1000,19 +995,21 @@ struct MaintenanceTaskCardV: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 5) {
                 Image(systemName: "clock")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.primaryGradientStart)
                 Text("Due: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
-                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
             }
             
             HStack {
                 Button(action: onCreateInvoice) {
                     Text("Create Invoice")
+                        .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(Color.orange)
+                        .background(Color.primaryGradientStart)
                         .cornerRadius(8)
                 }
             }
@@ -1026,20 +1023,18 @@ struct MaintenanceTaskCardV: View {
             if let completionDate = task.completionDate {
                 HStack(spacing: 5) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.statusGreen)
                     Text("Completed: \(completionDate.formatted(.dateTime.day().month(.abbreviated).year()))")
-                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
                 }
             }
             
             Button(action: {
-                // Set loading state to true before starting the task
                 isLoadingInvoice = true
-                
                 Task {
                     do {
                         if let invoice = await task.generateInvoice() {
-                            // Update UI state on main thread
                             DispatchQueue.main.async {
                                 self.generatedInvoice = invoice
                                 self.isLoadingInvoice = false
@@ -1067,14 +1062,16 @@ struct MaintenanceTaskCardV: View {
                             .padding(.trailing, 5)
                     } else {
                         Image(systemName: "doc.text.fill")
+                            .foregroundColor(.white)
                     }
                     Text(isLoadingInvoice ? "Loading..." : "View Invoice")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
                 }
-                .fontWeight(.medium)
-                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(Color.blue)
+                .background(Color.primaryGradientStart)
                 .cornerRadius(8)
             }
             .disabled(isLoadingInvoice)
@@ -1083,7 +1080,6 @@ struct MaintenanceTaskCardV: View {
                 if let invoice = generatedInvoice {
                     InvoicePreviewView(invoice: invoice)
                 } else {
-                    // Fallback view if invoice is nil
                     Text("Could not load invoice")
                         .padding()
                 }
@@ -1095,11 +1091,11 @@ struct MaintenanceTaskCardV: View {
     private var statusColor: Color {
         switch task.status {
         case .scheduled:
-            return .blue
+            return .statusOrange
         case .inProgress:
-            return .orange
+            return .primaryGradientStart
         case .completed:
-            return .green
+            return .statusGreen
         }
     }
     
@@ -1122,10 +1118,12 @@ struct SOSTaskCard: View {
             HStack {
                 if let license = vehicleLicense {
                     Text("Vehicle: \(license)")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .foregroundColor(.primaryGradientStart)
                 } else {
                     Text("Vehicle ID: \(task.vehicleID)")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .foregroundColor(.primaryGradientStart)
                 }
                 
                 Spacer()
@@ -1149,32 +1147,36 @@ struct SOSTaskCard: View {
             .padding(.top, 5)
             
             Text("Task ID: \(task.taskID)")
-                .foregroundColor(.secondary)
+                .font(.subheadline)
+                .foregroundColor(.textSecondary)
             
             if let name = assignerName {
                 HStack(spacing: 5) {
                     Image(systemName: "person.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.primaryGradientStart)
                     Text("Driver: \(name)")
-                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
                 }
             }
             
             if let phone = assignerPhone {
                 HStack(spacing: 5) {
                     Image(systemName: "phone.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.primaryGradientStart)
                     Text("Contact: \(phone)")
-                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
                 }
             }
             
             if let date = task.estimatedCompletionDate {
                 HStack(spacing: 5) {
                     Image(systemName: "clock")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.primaryGradientStart)
                     Text("Due: \(date.formatted(.dateTime.day().month(.abbreviated).year()))")
-                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
                 }
             }
             
@@ -1184,28 +1186,30 @@ struct SOSTaskCard: View {
                     // Connect functionality would go here
                 }) {
                     Text("Connect")
+                        .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.green)
+                        .background(Color.statusGreen)
                         .cornerRadius(8)
                 }
                 
                 Button(action: onTrack) {
                     Text("Track")
+                        .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.blue)
+                        .background(Color.primaryGradientStart)
                         .cornerRadius(8)
                 }
             }
             .padding(.top, 5)
         }
         .padding()
-        .background(Color(UIColor.systemBackground))
+        .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         .overlay(
@@ -1217,11 +1221,11 @@ struct SOSTaskCard: View {
     private var typeColor: Color {
         switch task.type {
         case .preInspectionMaintenance:
-            return .blue
+            return .primaryGradientStart
         case .postInspectionMaintenance:
-            return .orange
+            return .statusOrange
         case .emergencyMaintenance:
-            return .red
+            return .statusRed
         default:
             return .gray
         }
@@ -1238,53 +1242,45 @@ struct MaintenanceTabView: View {
     let onStartWork: (MaintenanceTask) -> Void
     let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
     let onCreateInvoice: (MaintenanceTask) -> Void
-    let onRefresh: () -> Void // Add refresh callback
-    let isRefreshing: Bool // Add refreshing state
+    let onRefresh: () -> Void
+    let isRefreshing: Bool
     
     var body: some View {
         VStack(spacing: 0) {
             // Header with fixed size and constrained font size
-            VStack(alignment: .leading) {
+            HStack {
                 Text("Maintenance")
-                    .font(.system(size: 38, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading)
-                    .padding(.top, 50)
-                    .padding(.bottom, 15)
-                    .overlay(
-                        HStack {
-                            Spacer()
-                            
-                            // Add refresh button
-//                            Button(action: onRefresh) {
-//                                Image(systemName: "arrow.clockwise")
-//                                    .resizable()
-//                                    .frame(width: 20, height: 22)
-//                                    .foregroundColor(.blue)
-//                            }
-//                            .padding(.trailing, 10)
-                            
-                            Button(action: onShowProfile) {
-                                Image(systemName: "person.circle.fill")
-                                    .resizable()
-                                    .frame(width: 35, height: 35)
-                                    .foregroundColor(.blue)
-                            }
-                            .padding(.trailing)
-                        }
-                        .padding(.top, 50)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    )
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primaryGradientStart)
+                
+                Spacer()
+                
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                        .resizable()
+                        .frame(width: 20, height: 22)
+                        .foregroundColor(.primaryGradientStart)
+                }
+                .padding(.trailing, 10)
+                
+                Button(action: onShowProfile) {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 35, height: 35)
+                        .foregroundColor(.primaryGradientStart)
+                }
             }
+            .padding(.horizontal)
+            .padding(.top, 50)
+            .padding(.bottom, 15)
             
             // Segment control styled to match the reference image
             ZStack(alignment: .top) {
                 // Background pill
                 RoundedRectangle(cornerRadius: 30)
                     .fill(Color(.systemGray6))
-                    .frame(height: 56)
+                    .frame(height: 48) // Reduced height from 56
                     .padding(.horizontal)
                 
                 HStack(spacing: 0) {
@@ -1292,16 +1288,16 @@ struct MaintenanceTabView: View {
                     Button(action: { selectedSegment = 0 }) {
                         VStack {
                             Text("Assigned")
-                                .font(.system(size: 16, weight: selectedSegment == 0 ? .semibold : .regular))
-                                .foregroundColor(selectedSegment == 0 ? .black : .gray)
-                                .padding(.vertical, 16)
+                                .font(.system(size: 14, weight: selectedSegment == 0 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(selectedSegment == 0 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     selectedSegment == 0 ?
                                         RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        : nil
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
                                 )
                         }
                     }
@@ -1310,16 +1306,16 @@ struct MaintenanceTabView: View {
                     Button(action: { selectedSegment = 1 }) {
                         VStack {
                             Text("In Progress")
-                                .font(.system(size: 16, weight: selectedSegment == 1 ? .semibold : .regular))
-                                .foregroundColor(selectedSegment == 1 ? .black : .gray)
-                                .padding(.vertical, 16)
+                                .font(.system(size: 14, weight: selectedSegment == 1 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(selectedSegment == 1 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     selectedSegment == 1 ?
                                         RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        : nil
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
                                 )
                         }
                     }
@@ -1328,16 +1324,16 @@ struct MaintenanceTabView: View {
                     Button(action: { selectedSegment = 2 }) {
                         VStack {
                             Text("Completed")
-                                .font(.system(size: 16, weight: selectedSegment == 2 ? .semibold : .regular))
-                                .foregroundColor(selectedSegment == 2 ? .black : .gray)
-                                .padding(.vertical, 16)
+                                .font(.system(size: 14, weight: selectedSegment == 2 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(selectedSegment == 2 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     selectedSegment == 2 ?
                                         RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        : nil
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
                                 )
                         }
                     }
@@ -1352,17 +1348,33 @@ struct MaintenanceTabView: View {
                     .padding()
                 Spacer()
             } else {
-                // Replace ScrollView with RefreshableScrollView
                 ScrollView {
-                    // Add pull-to-refresh functionality
                     PullToRefresh(coordinateSpaceName: "pullToRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
                     
                     LazyVStack(spacing: 16) {
                         if filteredTasks.isEmpty {
-                            Text("No tasks available")
-                                .font(.title2)
-                                .foregroundColor(.gray)
-                                .padding(.top, 40)
+                            VStack(spacing: 16) {
+                                Image(systemName: "wrench.and.screwdriver")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.6))
+                                
+                                Text("No tasks available")
+                                    .font(.headline)
+                                    .foregroundColor(.primaryGradientStart)
+                                
+                                Text("You don't have any tasks at the moment")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.8))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .background(Color.white.opacity(0.7))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
                         } else {
                             ForEach(filteredTasks, id: \.id) { task in
                                 MaintenanceTaskCardV(
@@ -1385,9 +1397,10 @@ struct MaintenanceTabView: View {
                     .padding()
                 }
                 .coordinateSpace(name: "pullToRefresh")
-                .id(selectedSegment) // Force refresh when tab changes
+                .id(selectedSegment)
             }
         }
+        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
     }
 }
 
@@ -1440,47 +1453,39 @@ struct SOSTabView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header with fixed size and constrained font size
-            VStack(alignment: .leading) {
+            HStack {
                 Text("SOS")
-                    .font(.system(size: 32, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading)
-                    .padding(.top, 50)
-                    .padding(.bottom, 15)
-                    .overlay(
-                        HStack {
-                            Spacer()
-                            
-                            // Add refresh button
-                            Button(action: onRefresh) {
-                                Image(systemName: "arrow.clockwise")
-                                    .resizable()
-                                    .frame(width: 20, height: 22)
-                                    .foregroundColor(.blue)
-                            }
-                            .padding(.trailing, 10)
-                            
-                            Button(action: onShowProfile) {
-                                Image(systemName: "person.circle.fill")
-                                    .resizable()
-                                    .frame(width: 35, height: 35)
-                                    .foregroundColor(.blue)
-                            }
-                            .padding(.trailing)
-                        }
-                        .padding(.top, 50)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    )
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primaryGradientStart)
+                
+                Spacer()
+                
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                        .resizable()
+                        .frame(width: 20, height: 22)
+                        .foregroundColor(.primaryGradientStart)
+                }
+                .padding(.trailing, 10)
+                
+                Button(action: onShowProfile) {
+                    Image(systemName: "person.circle.fill")
+                        .resizable()
+                        .frame(width: 35, height: 35)
+                        .foregroundColor(.primaryGradientStart)
+                }
             }
+            .padding(.horizontal)
+            .padding(.top, 50)
+            .padding(.bottom, 15)
             
             // Segment control styled to match the reference image
             ZStack(alignment: .top) {
                 // Background pill
                 RoundedRectangle(cornerRadius: 30)
                     .fill(Color(.systemGray6))
-                    .frame(height: 56)
+                    .frame(height: 48) // Reduced height from 56
                     .padding(.horizontal)
                 
                 HStack(spacing: 0) {
@@ -1488,16 +1493,16 @@ struct SOSTabView: View {
                     Button(action: { sosSelectedSegment = 0 }) {
                         VStack {
                             Text("Pre-inspect")
-                                .font(.system(size: 16, weight: sosSelectedSegment == 0 ? .semibold : .regular))
-                                .foregroundColor(sosSelectedSegment == 0 ? .black : .gray)
-                                .padding(.vertical, 16)
+                                .font(.system(size: 14, weight: sosSelectedSegment == 0 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(sosSelectedSegment == 0 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     sosSelectedSegment == 0 ?
                                         RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        : nil
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
                                 )
                         }
                     }
@@ -1506,16 +1511,16 @@ struct SOSTabView: View {
                     Button(action: { sosSelectedSegment = 1 }) {
                         VStack {
                             Text("Post-inspect")
-                                .font(.system(size: 16, weight: sosSelectedSegment == 1 ? .semibold : .regular))
-                                .foregroundColor(sosSelectedSegment == 1 ? .black : .gray)
-                                .padding(.vertical, 16)
+                                .font(.system(size: 14, weight: sosSelectedSegment == 1 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(sosSelectedSegment == 1 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     sosSelectedSegment == 1 ?
                                         RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        : nil
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
                                 )
                         }
                     }
@@ -1524,16 +1529,16 @@ struct SOSTabView: View {
                     Button(action: { sosSelectedSegment = 2 }) {
                         VStack {
                             Text("Emergency")
-                                .font(.system(size: 16, weight: sosSelectedSegment == 2 ? .semibold : .regular))
-                                .foregroundColor(sosSelectedSegment == 2 ? .black : .gray)
-                                .padding(.vertical, 16)
+                                .font(.system(size: 14, weight: sosSelectedSegment == 2 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(sosSelectedSegment == 2 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     sosSelectedSegment == 2 ?
                                         RoundedRectangle(cornerRadius: 30)
-                                        .fill(Color.white)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        : nil
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
                                 )
                         }
                     }
@@ -1549,15 +1554,32 @@ struct SOSTabView: View {
                 Spacer()
             } else {
                 ScrollView {
-                    // Add pull-to-refresh functionality
                     PullToRefresh(coordinateSpaceName: "sosRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
                     
                     LazyVStack(spacing: 16) {
                         if filteredSOSTasks.isEmpty {
-                            Text("No tasks available")
-                                .font(.title2)
-                                .foregroundColor(.gray)
-                                .padding(.top, 40)
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.6))
+                                
+                                Text("No SOS tasks available")
+                                    .font(.headline)
+                                    .foregroundColor(.primaryGradientStart)
+                                
+                                Text("You don't have any SOS tasks at the moment")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.8))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .background(Color.white.opacity(0.7))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
                         } else {
                             ForEach(filteredSOSTasks) { task in
                                 SOSTaskCard(
@@ -1575,9 +1597,10 @@ struct SOSTabView: View {
                     .padding()
                 }
                 .coordinateSpace(name: "sosRefresh")
-                .id(sosSelectedSegment) // Force refresh when tab changes
+                .id(sosSelectedSegment)
             }
         }
+        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
     }
 }
 
@@ -1719,7 +1742,8 @@ struct LocationTrackingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarItems(trailing: Button("Close") {
             dismiss()
-        })
+        }
+        .foregroundColor(.primaryGradientStart))
         .onAppear {
             fetchVehicleLocation()
             getUserLocation()
