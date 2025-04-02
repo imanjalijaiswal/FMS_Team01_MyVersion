@@ -103,7 +103,7 @@ protocol DatabaseAPIIntegrable {
                                       note: String) async throws
     
     //MARK: Maintenance Task
-    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID,
+    func assignNewMaintenanceTask(by id: UUID, to personnelID: UUID,
                                   for vehicleID: Int, ofType type: MaintenanceTaskType,
                                   _ issueNote: String) async throws -> MaintenanceTask
     

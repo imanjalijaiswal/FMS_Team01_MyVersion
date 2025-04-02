@@ -789,12 +789,12 @@ class IFEDataController: ObservableObject {
     /// Assigns a new maintenance task to the specified personnel for a given vehicle.
     ///
     /// This asynchronous function communicates with a remote controller to assign a new maintenance task.
-    /// It takes the manager's ID, personnel's ID, vehicle ID, the type of maintenance task, and an issue note
+    /// It takes the ID of Manager or Driver, personnel's ID, vehicle ID, the type of maintenance task, and an issue note
     /// describing the problem. In case of an error during the assignment, the function returns `nil`
     /// and prints an error message to the console.
     ///
     /// - Parameters:
-    ///   - managerID: The unique identifier of the manager assigning the task.
+    ///   - id: The unique identifier of the manager or driver assigning the task.
     ///   - personnelID: The unique identifier of the personnel to whom the task is being assigned.
     ///   - vehicleID: The ID of the vehicle requiring maintenance.
     ///   - type: The type of maintenance task to be performed.
@@ -813,11 +813,11 @@ class IFEDataController: ObservableObject {
     ///     print("Failed to assign maintenance task.")
     /// }
     /// ```
-    func assignNewMaintenanceTask(by managerID: UUID, to personnelID: UUID,
+    func assignNewMaintenanceTask(by id: UUID, to personnelID: UUID,
                                   for vehicleID: Int, ofType type: MaintenanceTaskType,
                                   _ issueNote: String) async -> MaintenanceTask? {
         do {
-            return try await remoteController.assignNewMaintenanceTask(by: managerID, to: personnelID, for: vehicleID, ofType: type, issueNote)
+            return try await remoteController.assignNewMaintenanceTask(by: id, to: personnelID, for: vehicleID, ofType: type, issueNote)
         } catch {
             print("Error while assigning new maintenance tasks: \(error.localizedDescription)")
             return nil
