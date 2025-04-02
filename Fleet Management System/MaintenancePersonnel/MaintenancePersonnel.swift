@@ -435,9 +435,10 @@ struct MaintenanceView: View {
         
         // Modify task status directly on main thread to ensure UI updates
         DispatchQueue.main.async {
-            // 1. First create a modified task with the new status
+            // 1. First create a modified task with the new status and estimated completion date
             var updatedTask = task
             updatedTask.status = .inProgress
+            updatedTask.estimatedCompletionDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
             
             // 2. Find and replace the existing task in the array
             var newTasks = self.tasks.filter { $0.id != task.id }
@@ -472,8 +473,12 @@ struct MaintenanceView: View {
         // Update the server in the background
         Task {
             do {
+                // Update both status and estimated completion date
                 await dataController.makeMaintenanceTaskInProgress(by: task.id)
-                print("DEBUG: Task status updated on server")
+                if let date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+                    await dataController.updateMaintenanceTaskEstimatedDate(by: task.id, date)
+                }
+                print("DEBUG: Task status and estimated date updated on server")
                 
                 // Refresh data from server
                 await dataController.loadPersonnelTasks()
@@ -483,11 +488,12 @@ struct MaintenanceView: View {
                     // Create a new array with server data but ensure our task is properly updated
                     var refreshedTasks = dataController.personnelTasks
                     
-                    // Double-check that our task has the correct status
+                    // Double-check that our task has the correct status and estimated date
                     if let idx = refreshedTasks.firstIndex(where: { $0.id == task.id }) {
                         if refreshedTasks[idx].status != .inProgress {
                             print("DEBUG: Fixing task status from server data")
                             refreshedTasks[idx].status = .inProgress
+                            refreshedTasks[idx].estimatedCompletionDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
                         }
                     } else {
                         // If task isn't in refreshed data, keep our modified version
@@ -495,6 +501,7 @@ struct MaintenanceView: View {
                         let updatedTask = task
                         var localCopy = updatedTask
                         localCopy.status = .inProgress
+                        localCopy.estimatedCompletionDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
                         refreshedTasks.append(localCopy)
                     }
                     
