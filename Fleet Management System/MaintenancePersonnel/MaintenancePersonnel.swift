@@ -40,6 +40,7 @@ struct MaintenanceView: View {
     @State private var showLocationTracking = false
     @State private var isLoadingInvoice = false
     @State private var viewRefreshTrigger = UUID() // Add refresh trigger for views
+    @State private var isInvoiceFormLoading = false // New state for invoice form loading
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -73,8 +74,14 @@ struct MaintenanceView: View {
                     updateCompletionDays(days: days)
                 },
                 onCreateInvoice: { task in
-                    selectedTask = task
-                    showingInvoiceSheet = true
+                    self.isInvoiceFormLoading = true
+                    self.selectedTask = task
+                    self.showingInvoiceSheet = true
+                    
+                    // Add small delay to ensure task is properly loaded before showing content
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.isInvoiceFormLoading = false
+                    }
                 }
             )
             .edgesIgnoringSafeArea(.top)
@@ -127,8 +134,21 @@ struct MaintenanceView: View {
             Text("Are you sure you want to start work on this task?")
         }
         .sheet(isPresented: $showingInvoiceSheet) {
-            if let task = selectedTask {
-                NavigationView {
+            NavigationView {
+                if isInvoiceFormLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(1.5)
+                        Text("Loading...")
+                            .font(.headline)
+                            .padding(.top, 20)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+                } else if let task = selectedTask {
                     Form {
                         Section(header: Text("Vehicle Information")) {
                             if let license = vehicleLicenseMap[task.vehicleID] {
@@ -197,9 +217,9 @@ struct MaintenanceView: View {
                     .navigationBarItems(trailing: Button("Cancel") {
                         showingInvoiceSheet = false
                     })
+                } else {
+                    Text("No task selected")
                 }
-            } else {
-                Text("No task selected")
             }
         }
         .sheet(isPresented: $showingInvoicePreview) {
