@@ -7,6 +7,9 @@
 
 import Foundation
 import SwiftUICore
+import CoreLocation
+import MapKit
+
 extension Color {
     static let primaryGradientStart = Color(red: 0/255, green: 128/255, blue: 128/255)
     static let primaryGradientEnd = Color(red: 0/255, green: 105/255, blue: 105/255)

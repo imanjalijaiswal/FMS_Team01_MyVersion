@@ -2,7 +2,7 @@
 //  RemoteController.swift
 //  Fleet Management System
 //
-//  Created by Aditya Mathur on 21/03/25.
+//  Created by Devansh Seth on 21/03/25.
 //
 
 import Foundation
@@ -21,6 +21,22 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func updateVehicleCoordinate(by id: Int, latitude: String, longitude: String) async throws -> String {
+        struct UpdateVehicleCoordinateParams: Codable {
+            let p_id: Int
+            let p_latitude: String
+            let p_longitude: String
+        }
+        
+        let params = UpdateVehicleCoordinateParams(p_id: id, p_latitude: latitude, p_longitude: longitude)
+        
+        try await client
+            .rpc("update_vehicle_coordinate_by_id", params: params)
+            .execute()
+        
+        return "\(latitude), \(longitude)"
+    }
+    
     func getMaintenancePersonnel(ofCenter centerID: Int) async throws -> MaintenancePersonnel {
         return try await client
             .rpc("get_maintenance_personnel_of_service_center_by_id", params: ["p_id": centerID])

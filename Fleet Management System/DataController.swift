@@ -2,13 +2,11 @@
 //  DataController.swift
 //  Fleet Management System
 //
-//  Created by Aakash Singh on 23/03/25.
+//  Created by Devansh Seth on 23/03/25.
 //
 import SwiftUI
-import CoreLocation
 import SwiftSMTP
 import Auth
-import MapKit
 
 
 class IFEDataController: ObservableObject {
@@ -1006,6 +1004,35 @@ class IFEDataController: ObservableObject {
             return try await remoteController.getMaintenancePersonnelMetaData(ofCenter: centerID)
         } catch {
             print("Error while fetching personnel meta data of service center (\(centerID)): \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Updates the coordinates of a vehicle asynchronously and returns the updated coordinate as a string.
+    ///
+    /// This function updates the geographical coordinates (latitude and longitude) of a vehicle identified by its `id`.
+    /// If the update operation is successful, it returns the new coordinates as a formatted string `"latitude, longitude"`.
+    /// If the operation fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the vehicle whose coordinates are being updated.
+    ///   - latitude: The new latitude of the vehicle as a `String`.
+    ///   - longitude: The new longitude of the vehicle as a `String`.
+    /// - Returns: An optional `String` representing the updated coordinates in the format `"latitude, longitude"`. Returns `nil` if the update operation fails.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// if let updatedCoordinate = await updateVehicleCoordinate(by: vehicleID, latitude: "28.7041", longitude: "77.1025") {
+    ///     print("Vehicle coordinates updated to: \(updatedCoordinate)")
+    /// } else {
+    ///     print("Failed to update vehicle coordinates.")
+    /// }
+    /// ```
+    func updateVehicleCoordinate(by id: Int, latitude: String, longitude: String) async -> String? {
+        do {
+            return try await remoteController.updateVehicleCoordinate(by: id, latitude: latitude, longitude: longitude)
+        } catch {
+            print("Error while updating vehicle coordinate: \(error.localizedDescription)")
             return nil
         }
     }
