@@ -13,7 +13,7 @@ class MapViewModel: NSObject, ObservableObject {
     
     // Timers
     private var routeUpdateTimer: Timer?
-    private var navigationUpdateTimer: Timer?
+    var navigationUpdateTimer: Timer?
     
     @Published var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 28.6139, longitude: 77.2090),
@@ -327,14 +327,6 @@ class MapViewModel: NSObject, ObservableObject {
     }
     
     func startNavigation() {
-        guard hasReachedPickup else {
-            scheduleNotification(
-                title: "Cannot Start Navigation",
-                body: "You must be within the pickup area to start navigation"
-            )
-            return
-        }
-        
         isNavigating = true
         isInNavigationMode = true
         currentStepIndex = 0
@@ -393,27 +385,19 @@ class MapViewModel: NSObject, ObservableObject {
             return
         }
         
-        // Show post-trip inspection sheet
-        if let trip = currentTrip {
-            let tripOverviewView = TripOverviewView(
-                task: trip,
-                selectedTab: .constant(1),
-                isInDestinationGeofence: true
-            )
-            cleanupMap()
-            // Present the TripOverviewView
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootViewController = window.rootViewController {
-                let hostingController = UIHostingController(rootView: tripOverviewView)
-                rootViewController.present(hostingController, animated: true)
-            }
-        }
-        
+        // Clean up map and stop navigation
+        cleanupMap()
         isNavigating = false
         isInNavigationMode = false
         navigationUpdateTimer?.invalidate()
         navigationUpdateTimer = nil
+        
+        // Post notification to show post-trip inspection
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ShowPostTripInspection"),
+            object: nil,
+            userInfo: ["trip": currentTrip as Any]
+        )
     }
     
     private func updateNavigationState() {
@@ -714,6 +698,12 @@ class MapViewModel: NSObject, ObservableObject {
         // Invalidate timers
         routeUpdateTimer?.invalidate()
         navigationUpdateTimer?.invalidate()
+        
+        // Post notification to dismiss the navigation info card
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DismissNavigationInfoCard"),
+            object: nil
+        )
     }
 }
 
@@ -841,26 +831,30 @@ extension MapViewModel: CLLocationManagerDelegate {
 
 // MARK: - Map View
 struct MapView: View {
-    @StateObject private var viewModel = MapViewModel()
+    @StateObject var viewModel = MapViewModel()
     @StateObject private var tripViewModel = IFEDataController.shared
     @Binding var selectedTab: Int
-    @State private var cardOffset: CGFloat = 100 // Controls card position
+    @Environment(\.dismiss) private var dismiss
+    @State private var cardOffset: CGFloat = 100
     @State private var cardExpanded: Bool = true
     @State private var preInspectionCompletedTrips: Set<UUID> = []
     @State private var tripsRequiringMaintenance: Set<UUID> = []
     @State private var showingTripOverview = false
     @State private var selectedTrip: Trip?
+    @State private var showingPostTripInspection = false
+    @State private var showNavigationInfoCard = true
+    @State private var hasCompletedPreInspection = false
+    @State private var vehicleStatusTimer: Timer?
+    @State private var vehicle: Vehicle?
     
     // Add constants for card positions
     private let expandedOffset: CGFloat = 90
-    private let minimizedOffset: CGFloat = 200 // Increased to stay above tab bar
-    private let tabBarHeight: CGFloat = 49 // Standard iOS tab bar height
+    private let minimizedOffset: CGFloat = 200
+    private let tabBarHeight: CGFloat = 49
     private let bottomSafeArea: CGFloat = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
     
     var activeTrip: Trip? {
         tripViewModel.tripsForDriver.first { trip in
-            // Include trips that are either in progress or have completed pre-inspection
-            // but exclude trips that require maintenance
             trip.status == .inProgress || 
             (preInspectionCompletedTrips.contains(trip.id) && 
              trip.status == .scheduled && 
@@ -869,7 +863,7 @@ struct MapView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ZStack(alignment: .bottom) {
                 MapViewRepresentable(viewModel: viewModel)
                     .edgesIgnoringSafeArea(.all)
@@ -922,7 +916,7 @@ struct MapView: View {
                 }
                 
                 // Navigation Info Card
-                if let trip = activeTrip {
+                if let trip = activeTrip, showNavigationInfoCard {
                     VStack(spacing: 0) {
                         // Handle bar and controls
                         HStack {
@@ -945,7 +939,12 @@ struct MapView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        NavigationInfoCard(trip: trip, viewModel: viewModel)
+                        NavigationInfoCard(
+                            trip: trip,
+                            viewModel: viewModel,
+                            showingPostTripInspection: $showingPostTripInspection,
+                            hasCompletedPreInspection: $hasCompletedPreInspection
+                        )
                     }
                     .background(Color.white)
                     .cornerRadius(20, corners: [.topLeft, .topRight])
@@ -976,10 +975,28 @@ struct MapView: View {
                 } else {
                     EmptyTripCard(selectedTab: $selectedTab)
                         .padding()
-                        .padding(.bottom, bottomSafeArea) // Add padding for tab bar
+                        .padding(.bottom, bottomSafeArea)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.primaryGradientStart)
+                        }
+                        .font(.subheadline)
+                        .padding(8)
+                        .background(Color.white)
+                        .cornerRadius(16)
+                    }
                 }
             }
         }
+        .navigationViewStyle(.stack)
         .sheet(isPresented: $showingTripOverview) {
             if let trip = selectedTrip {
                 TripOverviewView(
@@ -989,14 +1006,140 @@ struct MapView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingPostTripInspection) {
+            if let trip = activeTrip {
+                PostTripInspectionChecklistView(trip: trip) { inspectionItems, note in
+                    let hasAnyFailure = inspectionItems.values.contains(false)
+                    
+                    // Handle post-trip inspection completion
+                    IFEDataController.shared.addPostTripInspectionForTrip(
+                        by: trip.id,
+                        inspection: inspectionItems,
+                        note: note
+                    )
+                    
+                    if hasAnyFailure {
+                        Task {
+                            // Assign maintenance task
+                            await assignMaintenanceTaskForFailedItems(
+                                inspectionItems: inspectionItems,
+                                note: note,
+                                trip: trip,
+                                isPreTrip: false
+                            )
+                            
+                            // Update vehicle status
+                            if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                                self.vehicle = vehicle
+                            }
+                        }
+                    }
+                    
+                    // Dismiss both sheets
+                    showingPostTripInspection = false
+                    dismiss()
+                }
+            }
+        }
         .onAppear {
             viewModel.setupLocationManager()
             if let trip = activeTrip {
                 viewModel.setCurrentTrip(trip)
+                checkPreInspectionStatus(for: trip)
             }
+            
+            // Start vehicle status monitoring
+            startVehicleStatusMonitoring()
+            
+            // Add notification observer for dismissing navigation info card
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("DismissNavigationInfoCard"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                withAnimation {
+                    showNavigationInfoCard = false
+                }
+            }
+        }
+        .onDisappear {
+            // Stop vehicle status monitoring
+            stopVehicleStatusMonitoring()
+            
+            // Remove notification observer
+            NotificationCenter.default.removeObserver(
+                self,
+                name: NSNotification.Name("DismissNavigationInfoCard"),
+                object: nil
+            )
         }
         .task {
             await checkPreInspections()
+        }
+    }
+    
+    private func startVehicleStatusMonitoring() {
+        // Create a timer that checks vehicle status every 5 seconds
+        vehicleStatusTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            Task {
+                await checkVehicleStatus()
+            }
+        }
+    }
+    
+    private func stopVehicleStatusMonitoring() {
+        vehicleStatusTimer?.invalidate()
+        vehicleStatusTimer = nil
+    }
+    
+    private func checkVehicleStatus() async {
+        guard let trip = activeTrip else { return }
+        
+        if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+            self.vehicle = vehicle
+            
+            if vehicle.status == .assigned {
+                // Vehicle is back to assigned status, remove from maintenance set
+                DispatchQueue.main.async {
+                    tripsRequiringMaintenance.remove(trip.id)
+                    
+                    // Only start navigation if pre-trip inspection is complete and not already navigating
+                    if hasCompletedPreInspection && !viewModel.isNavigating {
+                        viewModel.startNavigation()
+                        if let userLocation = viewModel.userLocation {
+                            viewModel.calculateRouteToDestination(from: userLocation, for: trip)
+                        }
+                    }
+                }
+            } else if vehicle.status == .underMaintenance {
+                // Vehicle is under maintenance, add to maintenance set
+                DispatchQueue.main.async {
+                    tripsRequiringMaintenance.insert(trip.id)
+                }
+            }
+        }
+    }
+    
+    private func checkPreInspectionStatus(for trip: Trip) {
+        Task {
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+                hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                if hasCompletedPreInspection {
+                    // Check if vehicle is under maintenance
+                    if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                        self.vehicle = vehicle
+                        if vehicle.status == .underMaintenance {
+                            tripsRequiringMaintenance.insert(trip.id)
+                        } else {
+                            // Start navigation immediately if pre-inspection is completed and vehicle is not under maintenance
+                            viewModel.startNavigation()
+                            if let userLocation = viewModel.userLocation {
+                                viewModel.calculateRouteToDestination(from: userLocation, for: trip)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -1014,6 +1157,107 @@ struct MapView: View {
                 }
             }
         }
+    }
+    
+    private func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip, isPreTrip: Bool) async {
+        // Filter failed items
+        let failedItems = inspectionItems.filter { !$0.value }
+        guard !failedItems.isEmpty else { return }
+        
+        // Create issue note using TripInspection.issueDescription
+        let issueDescriptions = failedItems.map { item in
+            "\(item.key.rawValue): \(TripInspection.issueDescription[item.key] ?? "Issue detected.")"
+        }.joined(separator: "\n")
+        
+        let inspectionType = isPreTrip ? "Pre-Trip" : "Post-Trip"
+        let fullIssueNote = "\(inspectionType) Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
+        
+        // Get the vehicle's current coordinate
+        guard let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+            print("Failed to fetch vehicle for maintenance task assignment")
+            return
+        }
+        
+        // Find the nearest service center
+        guard let nearestServiceCenter = await findNearestServiceCenter(to: vehicle.currentCoordinate) else {
+            print("No available service center found")
+            return
+        }
+        
+        // Debug: Log service center details
+        print("Nearest Service Center ID: \(nearestServiceCenter.id)")
+        
+        // Fetch the maintenance personnel metadata for this service center
+        guard let personnelMetaData = await IFEDataController.shared.getMaintenancePersonnelMetaData(ofCenter: nearestServiceCenter.id) else {
+            print("No maintenance personnel metadata found for service center \(nearestServiceCenter.id)")
+            return
+        }
+        
+        // Verify active status
+        guard personnelMetaData.activeStatus else {
+            print("Maintenance personnel for service center \(nearestServiceCenter.id) is inactive (ID: \(personnelMetaData.id))")
+            return
+        }
+        
+        // Debug: Log personnel details
+        print("Assigned Personnel: ID: \(personnelMetaData.id), Name: \(personnelMetaData.fullName), Active: \(personnelMetaData.activeStatus)")
+        
+        // Assign the maintenance task
+        let assignedBy = IFEDataController.shared.user?.id ?? trip.assignedByFleetManagerID
+        guard let task = await IFEDataController.shared.assignNewMaintenanceTask(
+            by: assignedBy,
+            to: personnelMetaData.id,
+            for: trip.assignedVehicleID,
+            ofType: isPreTrip ? .preInspectionMaintenance : .postInspectionMaintenance,
+            fullIssueNote
+        ) else {
+            print("Failed to assign maintenance task")
+            return
+        }
+        
+        print("Maintenance task assigned: \(task)")
+    }
+    
+    private func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            print("Invalid vehicle coordinate format")
+            return nil
+        }
+        
+        let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+        let serviceCenters = IFEDataController.shared.serviceCenters
+        
+        var nearestServiceCenter: ServiceCenter?
+        var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
+        
+        for center in serviceCenters {
+            guard let centerCoords = parseCoordinates(center.coordinate) else {
+                continue
+            }
+            
+            let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
+            let distance = vehicleLocation.distance(from: centerLocation)
+            
+            if distance < shortestDistance {
+                shortestDistance = distance
+                nearestServiceCenter = center
+            }
+        }
+        
+        return nearestServiceCenter
+    }
+    
+    private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            return nil
+        }
+        return (latitude, longitude)
     }
 }
 
@@ -1097,7 +1341,7 @@ struct EmptyTripCard: View {
             }
             
             Button(action: {
-                selectedTab = 0 // Switch to Dashboard tab
+                 // Switch to Dashboard tab
             }) {
                 Text("View Dashboard")
                     .font(.headline)
@@ -1308,7 +1552,15 @@ extension UIView {
 struct NavigationInfoCard: View {
     let trip: Trip
     @ObservedObject var viewModel: MapViewModel
-    private let tabBarHeight: CGFloat = 49 // Standard iOS tab bar height
+    @Binding var showingPostTripInspection: Bool
+    @Binding var hasCompletedPreInspection: Bool
+    @State private var showingPreTripInspection = false
+    @State private var vehicle: Vehicle?
+    @State private var requiresMaintenance = false
+    @State private var hasCompletedPostInspection = false
+    @State private var inspectionCheckTimer: Timer?
+    @Environment(\.dismiss) private var dismiss
+    private let tabBarHeight: CGFloat = 49
     private let bottomSafeArea: CGFloat = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
     
     var body: some View {
@@ -1436,7 +1688,17 @@ struct NavigationInfoCard: View {
             HStack(spacing: 12) {
                 if viewModel.isNavigating {
                     Button(action: {
-                        viewModel.stopNavigation()
+                        if viewModel.hasReachedDestination {
+                            // Clean up map and stop navigation
+                            viewModel.cleanupMap()
+                            viewModel.isNavigating = false
+                            viewModel.isInNavigationMode = false
+                            viewModel.navigationUpdateTimer?.invalidate()
+                            viewModel.navigationUpdateTimer = nil
+                            
+                            // Show post-trip inspection
+                            showingPostTripInspection = true
+                        }
                     }) {
                         Text("End Navigation")
                             .font(.headline)
@@ -1446,10 +1708,10 @@ struct NavigationInfoCard: View {
                             .background(viewModel.hasReachedDestination ? Color.red : Color.gray)
                             .cornerRadius(12)
                     }
-                    .disabled(!viewModel.hasReachedDestination)
-                } else {
+                    .disabled(!viewModel.hasReachedDestination || vehicle?.status == .underMaintenance)
+                } else if !hasCompletedPreInspection {
                     Button(action: {
-                        viewModel.startNavigation()
+                        showingPreTripInspection = true
                     }) {
                         Text("Start Navigation")
                             .font(.headline)
@@ -1462,16 +1724,46 @@ struct NavigationInfoCard: View {
                     .disabled(!viewModel.hasReachedPickup)
                 }
                 
-                Button(action: {
-                    viewModel.calculateRouteToPickup(for: trip)
-                }) {
-                    Text("Show Pickup Route")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange)
-                        .cornerRadius(12)
+                if !viewModel.isNavigating && !hasCompletedPreInspection {
+                    Button(action: {
+                        viewModel.calculateRouteToPickup(for: trip)
+                    }) {
+                        Text("Show Pickup Route")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(12)
+                    }
+                }
+            }
+            
+            // Vehicle status and maintenance info
+            if let vehicle = vehicle {
+                if vehicle.status == .underMaintenance {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "wrench.fill")
+                                .foregroundColor(.orange)
+                            Text("Vehicle is under maintenance")
+                                .font(.subheadline)
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                        
+                        Text("Trip will start automatically when maintenance is completed")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 8)
+                }
+                else {
+                    
                 }
             }
             
@@ -1510,7 +1802,186 @@ struct NavigationInfoCard: View {
             }
         }
         .padding(.horizontal)
-        .padding(.bottom, tabBarHeight + bottomSafeArea + 20) // Add padding for tab bar and safe area
+        .padding(.bottom, tabBarHeight + bottomSafeArea + 20)
+        .sheet(isPresented: $showingPreTripInspection) {
+            PreTripInspectionChecklistView(trip: trip) { inspectionItems, note in
+                let hasAnyFailure = inspectionItems.values.contains(false)
+                hasCompletedPreInspection = !inspectionItems.isEmpty
+                requiresMaintenance = hasAnyFailure
+                
+                IFEDataController.shared.addPreTripInspectionForTrip(
+                    by: trip.id,
+                    inspection: inspectionItems,
+                    note: note
+                )
+                
+                if hasAnyFailure {
+                    Task {
+                        // Assign maintenance task
+                        await assignMaintenanceTaskForFailedItems(
+                            inspectionItems: inspectionItems,
+                            note: note,
+                            trip: trip,
+                            isPreTrip: true
+                        )
+                        
+                        // Update vehicle status
+                        if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                            self.vehicle = vehicle
+                        }
+                    }
+                } else {
+                    viewModel.startNavigation()
+                }
+            }
+        }
+        .task {
+            if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                self.vehicle = vehicle
+            }
+            
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+                hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                requiresMaintenance = inspection.preInspection.values.contains(false)
+            }
+        }
+        .onAppear {
+            // Start checking post-trip inspection status
+            startInspectionCheckTimer()
+        }
+        .onDisappear {
+            // Stop checking post-trip inspection status
+            stopInspectionCheckTimer()
+        }
+    }
+    
+    private func startInspectionCheckTimer() {
+        // Invalidate existing timer if any
+        inspectionCheckTimer?.invalidate()
+        
+        // Create a new timer that checks every second
+        inspectionCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task {
+                await checkPostTripInspectionStatus()
+            }
+        }
+    }
+    
+    private func stopInspectionCheckTimer() {
+        inspectionCheckTimer?.invalidate()
+        inspectionCheckTimer = nil
+    }
+    
+    private func checkPostTripInspectionStatus() async {
+        if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+            let hasCompletedPostInspection = !inspection.postInspection.isEmpty
+            if self.hasCompletedPostInspection != hasCompletedPostInspection {
+                DispatchQueue.main.async {
+                    self.hasCompletedPostInspection = hasCompletedPostInspection
+                }
+            }
+        }
+    }
+    
+    private func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip, isPreTrip: Bool) async {
+        // Filter failed items
+        let failedItems = inspectionItems.filter { !$0.value }
+        guard !failedItems.isEmpty else { return }
+        
+        // Create issue note using TripInspection.issueDescription
+        let issueDescriptions = failedItems.map { item in
+            "\(item.key.rawValue): \(TripInspection.issueDescription[item.key] ?? "Issue detected.")"
+        }.joined(separator: "\n")
+        
+        let inspectionType = isPreTrip ? "Pre-Trip" : "Post-Trip"
+        let fullIssueNote = "\(inspectionType) Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
+        
+        // Get the vehicle's current coordinate
+        guard let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+            print("Failed to fetch vehicle for maintenance task assignment")
+            return
+        }
+        
+        // Find the nearest service center
+        guard let nearestServiceCenter = await findNearestServiceCenter(to: vehicle.currentCoordinate) else {
+            print("No available service center found")
+            return
+        }
+        
+        // Debug: Log service center details
+        print("Nearest Service Center ID: \(nearestServiceCenter.id)")
+        
+        // Fetch the maintenance personnel metadata for this service center
+        guard let personnelMetaData = await IFEDataController.shared.getMaintenancePersonnelMetaData(ofCenter: nearestServiceCenter.id) else {
+            print("No maintenance personnel metadata found for service center \(nearestServiceCenter.id)")
+            return
+        }
+        
+        // Verify active status
+        guard personnelMetaData.activeStatus else {
+            print("Maintenance personnel for service center \(nearestServiceCenter.id) is inactive (ID: \(personnelMetaData.id))")
+            return
+        }
+        
+        // Debug: Log personnel details
+        print("Assigned Personnel: ID: \(personnelMetaData.id), Name: \(personnelMetaData.fullName), Active: \(personnelMetaData.activeStatus)")
+        
+        // Assign the maintenance task
+        let assignedBy = IFEDataController.shared.user?.id ?? trip.assignedByFleetManagerID
+        guard let task = await IFEDataController.shared.assignNewMaintenanceTask(
+            by: assignedBy,
+            to: personnelMetaData.id,
+            for: trip.assignedVehicleID,
+            ofType: isPreTrip ? .preInspectionMaintenance : .postInspectionMaintenance,
+            fullIssueNote
+        ) else {
+            print("Failed to assign maintenance task")
+            return
+        }
+        
+        print("Maintenance task assigned: \(task)")
+    }
+    
+    private func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            print("Invalid vehicle coordinate format")
+            return nil
+        }
+        
+        let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+        let serviceCenters = IFEDataController.shared.serviceCenters
+        
+        var nearestServiceCenter: ServiceCenter?
+        var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
+        
+        for center in serviceCenters {
+            guard let centerCoords = parseCoordinates(center.coordinate) else {
+                continue
+            }
+            
+            let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
+            let distance = vehicleLocation.distance(from: centerLocation)
+            
+            if distance < shortestDistance {
+                shortestDistance = distance
+                nearestServiceCenter = center
+            }
+        }
+        
+        return nearestServiceCenter
+    }
+    
+    private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            return nil
+        }
+        return (latitude, longitude)
     }
 }
 
@@ -1563,5 +2034,103 @@ extension MapViewModel: UNUserNotificationCenterDelegate {
         }
         
         completionHandler()
+    }
+}
+
+// Add PreTripInspectionChecklistView back to MapView.swift
+struct PreTripInspectionChecklistView: View {
+    let trip: Trip
+    @Environment(\.dismiss) private var dismiss
+    let onSave: ([TripInspectionItem: Bool], String) -> Void
+
+    @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
+        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
+    )
+    @State private var preTripNote: String = ""
+    
+    private var isAnyItemChecked: Bool {
+        inspectionItems.values.contains(true)
+    }
+    
+    @State private var allGood: Bool = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    CheckboxView(
+                        title: "All Good",
+                        isChecked: Binding(
+                            get: { allGood },
+                            set: { newValue in
+                                allGood = newValue
+                                // Update all items when "All Good" is toggled
+                                for item in TripInspectionItem.allCases {
+                                    inspectionItems[item] = newValue
+                                }
+                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
+                            }
+                        )
+                    )
+                }
+                
+                Section(header: Text("Pre-Trip Inspection Checklist")) {
+                    ForEach(TripInspectionItem.allCases, id: \.self) { item in
+                        CheckboxView(
+                            title: item.rawValue,
+                            isChecked: Binding(
+                                get: { inspectionItems[item] ?? false },
+                                set: { newValue in
+                                    inspectionItems[item] = newValue
+                                    // Recalculate allGood based on all items
+                                    allGood = inspectionItems.values.allSatisfy { $0 }
+                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
+                                }
+                            )
+                        )
+                    }
+                }
+                
+                Section(header: Text("Description (Optional)")) {
+                    TextEditor(text: $preTripNote)
+                        .frame(minHeight: 100)
+                        .overlay(
+                            Group {
+                                if preTripNote.isEmpty {
+                                    Text("Enter the issue in vehicle")
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 8)
+                                }
+                            },
+                            alignment: .topLeading
+                        )
+                        .onChange(of: preTripNote) { newValue in
+                            print("Pre-Trip Note updated: \(newValue)")
+                        }
+                }
+            }
+            .navigationTitle("Pre-Trip Inspection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
+                        onSave([:], "") // Pass empty dictionary to indicate cancellation
+                        dismiss()
+                    }
+                    .foregroundColor(.primaryGradientStart)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(preTripNote)")
+                        
+                        onSave(inspectionItems, preTripNote) // Pass current state
+                        dismiss()
+                    }
+                    .disabled(!isAnyItemChecked)
+                    .foregroundColor(isAnyItemChecked ? .primaryGradientStart : .gray)
+                }
+            }
+        }
     }
 } 

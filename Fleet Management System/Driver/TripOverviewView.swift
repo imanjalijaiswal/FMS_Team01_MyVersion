@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 import Foundation
 
 
@@ -7,13 +8,11 @@ struct TripOverviewView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedTab: Int
     let isInDestinationGeofence: Bool
-    @State private var showingPreTripInspection = false
     @State private var showingPostTripInspection = false
-    @State private var hasCompletedPreInspection = false
     @State private var hasCompletedPostInspection = false
-    @State private var showPreInspectionAlert = false
     @State private var showPostInspectionAlert = false
-    @State private var requiresMaintenance = false
+    @State private var showingMapView = false
+    @State private var showingTripSummary = false
     let dataController = IFEDataController.shared
     
     var body: some View {
@@ -33,13 +32,6 @@ struct TripOverviewView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingPreTripInspection, onDismiss: {
-                if !hasCompletedPreInspection {
-                    showPreInspectionAlert = true
-                }
-            }) {
-                preTripInspectionSheet
-            }
             .sheet(isPresented: $showingPostTripInspection, onDismiss: {
                 if !hasCompletedPostInspection {
                     showPostInspectionAlert = true
@@ -47,23 +39,25 @@ struct TripOverviewView: View {
             }) {
                 postTripInspectionSheet
             }
-            .alert("Inspection Required", isPresented: $showPreInspectionAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("You cannot start journey without filling Pre-Trip Inspection list")
-            }
             .alert("Inspection Required", isPresented: $showPostInspectionAlert) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text("You cannot end journey without filling Post-Trip Inspection list")
             }
+            .fullScreenCover(isPresented: $showingMapView) {
+                MapView(selectedTab: $selectedTab)
+                    .onAppear {
+                        // Set the current trip in the MapViewModel
+                        if let mapViewModel = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.rootViewController?.view.window?.rootViewController?.children.first?.children.first?.children.first as? MapView {
+                            mapViewModel.viewModel.setCurrentTrip(task)
+                        }
+                    }
+            }
         }
+        .navigationViewStyle(.stack)
         .task {
-            // Replace onAppear with task modifier for async operations
             if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id) {
-                hasCompletedPreInspection = !inspection.preInspection.isEmpty
                 hasCompletedPostInspection = !inspection.postInspection.isEmpty
-                requiresMaintenance = inspection.preInspection.values.contains(false)
             }
         }
     }
@@ -76,39 +70,46 @@ struct TripOverviewView: View {
             }
             VehicleDetailsCard(task: task)
             LocationsCard(task: task)
-            StartTripButton(task: task, isInspectionCompleted: hasCompletedPreInspection, requiresMaintenance: requiresMaintenance, showInspection: $showingPreTripInspection, selectedTab: $selectedTab, onStartTrip: {
-                selectedTab = 1
-                // Update trip status to inProgress
+            
+            if task.status == .scheduled {
+                Button(action: {
+                    // Mark trip as active and show map view
+                    dismiss
                     dataController.updateTripStatus(task, to: .inProgress)
-                dismiss()
-            })
+                }) {
+                    Text("Mark as Active")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.primaryGradientStart)
+                        .cornerRadius(12)
+                }
+                .padding(.top)
+            }
+            
+            if task.status == .inProgress && !hasCompletedPostInspection && !isInDestinationGeofence {
+                Button(action: {
+                    showingMapView = true
+                }) {
+                    HStack {
+                        Image(systemName: "map.fill")
+                        Text("Open Navigation")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.primaryGradientStart)
+                    .cornerRadius(12)
+                }
+                .padding(.top)
+            }
+            
+            
             EndTripButton(task: task, isInspectionCompleted: hasCompletedPostInspection, showInspection: $showingPostTripInspection, isInDestinationGeofence: isInDestinationGeofence)
         }
         .padding()
-    }
-    
-    private var leadingToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button(action: { dismiss() }) {
-                Text("Cancel")
-                    .font(.subheadline)
-                    .foregroundColor(.primaryGradientStart)
-            }
-        }
-    }
-    
-    
-    private var preTripInspectionSheet: some View {
-        PreTripInspectionChecklistView(trip: task) { inspectionItems, note in
-            let hasAnyFailure = inspectionItems.values.contains(false)
-            hasCompletedPreInspection = !inspectionItems.isEmpty
-            requiresMaintenance = hasAnyFailure
-            IFEDataController.shared.addPreTripInspectionForTrip(
-                by: task.id,
-                inspection: inspectionItems,
-                note: note
-            )
-        }
     }
     
     private var postTripInspectionSheet: some View {
@@ -117,11 +118,15 @@ struct TripOverviewView: View {
             IFEDataController.shared.addPostTripInspectionForTrip(
                 by: task.id,
                 inspection: inspectionItems,
-                note: note
-            )
+                note: note)
+            
+            Task {
+                if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id) {
+                    hasCompletedPostInspection = !inspection.postInspection.isEmpty
+                }
+            }
         }
     }
-    
 }
 
 // Sub-view for Trip Status
@@ -400,117 +405,72 @@ struct LocationsCard: View {
 
 
 
-struct StartTripButton: View {
-    let task: Trip
-    let isInspectionCompleted: Bool
-    let requiresMaintenance: Bool
-    @Binding var showInspection: Bool
-    @State private var showCancelAlert = false
-    @Binding var selectedTab: Int
-    let onStartTrip: () -> Void
-    let dataController = IFEDataController.shared
-    
-    var body: some View {
-        if task.status == .scheduled {
-            VStack {
-                if requiresMaintenance {
-                    Text("You Cannot Start Trip As Vehicle is Lined Up for Maintenance")
-                        .font(.subheadline)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(12)
-                    /// This is to check the functionality of getPreInspectionFailureDetails() method which converts the inspection checklist into a descriptive string.
-                    /*
-                        .onAppear() {
-                            Task {
-                                do {
-                                    let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id)
-                                    print(inspection?.getPreInspectionFailureDetails() ?? "No inspection found yet.")
-                                }
-                            }
-                        }
-                    */
-                } else {
-                    Button(action: {
-                        if !isInspectionCompleted {
-                            showInspection = true
-                        } else {
-                            // Start trip action and dismiss modal
-                            onStartTrip()
-                        }
-                    }) {
-                        Text(isInspectionCompleted ? "Go to Navigation to Start Trip" : "Pre-Trip Inspection")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isInspectionCompleted ? Color.primaryGradientStart : Color.primaryGradientStart)
-                            .cornerRadius(12)
-                    }
-                    .alert("Inspection Required", isPresented: $showCancelAlert) {
-                        Button("OK", role: .cancel) { }
-                    } message: {
-                        Text("You cannot start journey without filling Pre-Trip Inspection list")
-                    }
-                }
-            }
-            .padding(.top)
-        }
-    }
-}
-
 struct EndTripButton: View {
     let task: Trip
-    let isInspectionCompleted: Bool
+    @State var isInspectionCompleted: Bool = false
     @Binding var showInspection: Bool
     @State private var showCancelAlert = false
-    let isInDestinationGeofence: Bool
+    @State private var timer: Timer?
+    @State private var showingTripSummary = false
     var dataController = IFEDataController.shared
+    let isInDestinationGeofence: Bool
     
     var body: some View {
         if task.status == .inProgress {
             VStack(spacing: 8) {
-                if !isInDestinationGeofence {
-                    Text("You must be at the destination to complete the trip")
-                        .font(.subheadline)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                
-                Button(action: {
-                    if !isInspectionCompleted {
-                        showInspection = true
-                    } else {
-                        // Clean up map before ending trip
+                if isInspectionCompleted {
+                    Button(action: {
                         // End trip action
                         dataController.updateTripStatus(task, to: .completed)
-                        // Dismiss the view after completing the trip
-                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                           let window = windowScene.windows.first,
-                           let rootViewController = window.rootViewController {
-                            rootViewController.dismiss(animated: true)
-                        }
+                        // Show trip summary
+                        showingTripSummary = true
+                    }) {
+                        Text("Mark as Completed")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.primaryGradientStart)
+                            .cornerRadius(12)
                     }
-                }) {
-                    Text(isInspectionCompleted ? "Mark as Completed" : "Post-Trip Inspection")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isInDestinationGeofence ? Color.primaryGradientStart : Color.gray)
-                        .cornerRadius(12)
                 }
-                .disabled(!isInDestinationGeofence)
             }
             .padding(.top)
-            .alert("Inspection Required", isPresented: $showCancelAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("You cannot end journey without filling Post-Trip Inspection list")
+            .onAppear {
+                // Start the timer when the view appears
+                startTimer()
             }
+            .onDisappear {
+                // Stop the timer when the view disappears
+                stopTimer()
+            }
+            .task {
+                // Initial check
+                await checkInspectionStatus()
+            }
+            .sheet(isPresented: $showingTripSummary) {
+                TripSummaryView(trip: task)
+            }
+        }
+    }
+    
+    private func startTimer() {
+        // Create a timer that fires every 10 seconds
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task {
+                await checkInspectionStatus()
+            }
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    private func checkInspectionStatus() async {
+        if let inspection = await dataController.getTripInspectionForTrip(by: task.id) {
+            isInspectionCompleted = !inspection.postInspection.isEmpty
         }
     }
 }
@@ -539,107 +499,6 @@ struct CheckboxView: View {
                   
 
 
-struct PreTripInspectionChecklistView: View {
-    let trip: Trip
-    @Environment(\.dismiss) private var dismiss
-    let onSave: ([TripInspectionItem: Bool], String) -> Void
-
-    @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
-        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
-    )
-    @State private var preTripNote: String = ""
-    
-    private var isAnyItemChecked: Bool {
-        inspectionItems.values.contains(true)
-    }
-    
-    @State private var allGood: Bool = false
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section {
-                    CheckboxView(
-                        title: "All Good",
-                        isChecked: Binding(
-                            get: { allGood },
-                            set: { newValue in
-                                allGood = newValue
-                                // Update all items when "All Good" is toggled
-                                for item in TripInspectionItem.allCases {
-                                    inspectionItems[item] = newValue
-                                }
-                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
-                            }
-                        )
-                    )
-                }
-                
-                Section(header: Text("Pre-Trip Inspection Checklist")) {
-                    ForEach(TripInspectionItem.allCases, id: \.self) { item in
-                        CheckboxView(
-                            title: item.rawValue,
-                            isChecked: Binding(
-                                get: { inspectionItems[item] ?? false },
-                                set: { newValue in
-                                    inspectionItems[item] = newValue
-                                    // Recalculate allGood based on all items
-                                    allGood = inspectionItems.values.allSatisfy { $0 }
-                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
-                                }
-                            )
-                        )
-                    }
-                }
-                
-                Section(header: Text("Description (Optional)")) {
-                    TextEditor(text: $preTripNote)
-                        .frame(minHeight: 100)
-                        .overlay(
-                            Group {
-                                if preTripNote.isEmpty {
-                                    Text("Enter the issue in vehicle")
-                                        .foregroundColor(.gray)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 8)
-                                }
-                            },
-                            alignment: .topLeading
-                        )
-                        .onChange(of: preTripNote) { newValue in
-                            print("Pre-Trip Note updated: \(newValue)")
-                        }
-                }
-            }
-            .navigationTitle("Pre-Trip Inspection")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
-                        onSave([:], "") // Pass empty dictionary to indicate cancellation
-                        dismiss()
-                    }
-                    .foregroundColor(.primaryGradientStart)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(preTripNote)")
-                        
-                        onSave(inspectionItems, preTripNote) // Pass current state
-                        dismiss()
-                    }
-                    .disabled(!isAnyItemChecked)
-                    .foregroundColor(isAnyItemChecked ? .primaryGradientStart : .gray)
-                }
-            }
-        }
-    }
-}
-
-
-
-
-// Update PostTripInspectionChecklistView initialization
 struct PostTripInspectionChecklistView: View {
     let trip: Trip
     @Environment(\.dismiss) private var dismiss
@@ -734,4 +593,105 @@ struct PostTripInspectionChecklistView: View {
             }
         }
     }
+}
+ func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip,isPreTrip: Bool) async {
+    // Filter failed items
+    let failedItems = inspectionItems.filter { !$0.value }
+    guard !failedItems.isEmpty else { return }
+    
+    // Create issue note using TripInspection.issueDescription
+    let issueDescriptions = failedItems.map { item in
+        "\(item.key.rawValue): \(TripInspection.issueDescription[item.key] ?? "Issue detected.")"
+    }.joined(separator: "\n")
+    
+    let inspectionType = isPreTrip ? "Pre-Trip" : "Post-Trip"
+    let fullIssueNote = "\(inspectionType) Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
+   // let fullIssueNote = "Pre-Trip Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
+    
+    // Get the vehicle's current coordinate
+    guard let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+        print("Failed to fetch vehicle for maintenance task assignment")
+        return
+    }
+    
+    // Find the nearest service center
+    guard let nearestServiceCenter = await findNearestServiceCenter(to: vehicle.currentCoordinate) else {
+        print("No available service center found")
+        return
+    }
+    
+    // Debug: Log service center details
+    print("Nearest Service Center ID: \(nearestServiceCenter.id)")
+    
+    // Fetch the maintenance personnel metadata for this service center
+    guard let personnelMetaData = await IFEDataController.shared.getMaintenancePersonnelMetaData(ofCenter: nearestServiceCenter.id) else {
+        print("No maintenance personnel metadata found for service center \(nearestServiceCenter.id)")
+        return
+    }
+    
+    // Verify active status
+    guard personnelMetaData.activeStatus else {
+        print("Maintenance personnel for service center \(nearestServiceCenter.id) is inactive (ID: \(personnelMetaData.id))")
+        return
+    }
+    
+    // Debug: Log personnel details
+    print("Assigned Personnel: ID: \(personnelMetaData.id), Name: \(personnelMetaData.fullName), Active: \(personnelMetaData.activeStatus)")
+    
+    // Assign the maintenance task
+    let assignedBy = IFEDataController.shared.user?.id ?? trip.assignedByFleetManagerID
+    guard let task = await IFEDataController.shared.assignNewMaintenanceTask(
+        by: assignedBy,
+        to: personnelMetaData.id,
+        for: trip.assignedVehicleID,
+        ofType: .preInspectionMaintenance,
+        fullIssueNote
+    ) else {
+        print("Failed to assign maintenance task")
+        return
+    }
+    
+    print("Maintenance task assigned: \(task)")
+}
+
+func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+    let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+    guard components.count == 2,
+          let latitude = Double(components[0]),
+          let longitude = Double(components[1]) else {
+        print("Invalid vehicle coordinate format")
+        return nil
+    }
+    
+    let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+    let serviceCenters = IFEDataController.shared.serviceCenters
+    
+    var nearestServiceCenter: ServiceCenter?
+    var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
+    
+    for center in serviceCenters {
+        guard let centerCoords = parseCoordinates(center.coordinate) else {
+            continue
+        }
+        
+        let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
+        let distance = vehicleLocation.distance(from: centerLocation)
+        
+        if distance < shortestDistance {
+            shortestDistance = distance
+            nearestServiceCenter = center
+        }
+    }
+    
+    return nearestServiceCenter
+}
+
+private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
+    let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+    guard components.count == 2,
+          let latitude = Double(components[0]),
+          let longitude = Double(components[1]) else {
+        return nil
+    }
+    return (latitude, longitude)
 }

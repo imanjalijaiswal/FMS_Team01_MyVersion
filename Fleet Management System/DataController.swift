@@ -966,6 +966,16 @@ class IFEDataController: ObservableObject {
             print("Error while updating service center location of maintenance personnel: \(error.localizedDescription)")
         }
     }
+    
+    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async -> UserMetaData? {
+        do {
+            return try await remoteController.getMaintenancePersonnelMetaData(ofCenter: centerID)
+        } catch {
+            print("Error while fetching personnel meta data of service center (\(centerID)): \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
 }
 
 func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {

@@ -45,7 +45,11 @@ class RemoteController: DatabaseAPIIntegrable {
             .rpc("get_service_center_assigned_status_by_id", params: ["p_id": id])
             .execute().value
     }
-    
+    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async throws -> UserMetaData {
+        return try await client
+            .rpc("get_maintenance_personnel_meta_data_of_service_center_by_id", params: ["p_id": centerID])
+            .execute().value
+    }
     func getRegisteredServiceCenters() async throws -> [ServiceCenter] {
         return try await client
             .rpc("get_registered_vehicle_service_centers")
@@ -57,11 +61,11 @@ class RemoteController: DatabaseAPIIntegrable {
             let p_assigned_by: String
             let p_assigned_to: String
             let p_vehicle_id: Int
-            let p_task_type: MaintenanceTaskType
+            let p_task_type: String
             let p_note: String
         }
         
-        let params = AssignMaintenanceTaskParams(p_assigned_by: id.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type, p_note: issueNote)
+        let params = AssignMaintenanceTaskParams(p_assigned_by: id.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type.rawValue, p_note: issueNote)
         
         return try await client
             .rpc("assign_new_maintenance_task", params: params)
