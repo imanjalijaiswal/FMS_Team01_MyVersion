@@ -239,8 +239,13 @@ struct TaskCard: View {
                         HStack(spacing: 8) {
                             VStack(alignment: .leading, spacing: 4) {
                                 if let vehicle = vehicle {
-                                    Text("\(vehicle.make) \(vehicle.model) \n \(vehicle.licenseNumber)") // Show vehicle name instead of ID
-                                        .foregroundColor(.statusOrange)
+                                    VStack(alignment: .leading){
+                                        Text("\(vehicle.make) \(vehicle.model)")
+                                            .font(.caption)
+                                            .foregroundColor(.textSecondary)// Show vehicle name instead of ID
+                                        Text(vehicle.licenseNumber)
+                                            .foregroundColor(.statusOrange)
+                                    }
                                 } else {
                                     Text("Loading...")
                                         .foregroundColor(.gray)
@@ -261,7 +266,7 @@ struct TaskCard: View {
                 
                 // Task details
                 HStack {
-                    Text("\(task.scheduledDateTime)")
+                    Text("\(task.scheduledDateTime.formatted())")
                         .fontWeight(.medium)
                     if let description = task.description, !description.isEmpty {
                         Text("•")
@@ -270,7 +275,7 @@ struct TaskCard: View {
                 }
                 .font(.subheadline)
                 .foregroundColor(.textSecondary)
-                
+                Divider()
                 // Locations
                 LocationViewWrapper(coordinate: task.pickupLocation, type: .pickup)
                 LocationViewWrapper(coordinate: task.destination, type: .destination)
@@ -280,8 +285,9 @@ struct TaskCard: View {
                     Image(systemName: "arrow.up.right")
                         .foregroundColor(.primaryGradientStart)
                     Text("\(task.totalDistance)")
-                    Text("-")
-                    Text("\(task.totalTripDuration)")
+                    Image(systemName: "clock")
+                        .foregroundColor(.primaryGradientStart)
+                    Text("\(Int(task.totalDistance)/50) hours")
                 }
                 .font(.subheadline)
                 .foregroundColor(.textSecondary)
