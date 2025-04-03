@@ -39,6 +39,7 @@ struct Trip: Identifiable, Codable {
 enum TripStatus: String, Codable {
     case scheduled = "Scheduled"
     case inProgress = "In Progress"
+    case sos = "SOS"
     case completed = "Completed"
 }
 

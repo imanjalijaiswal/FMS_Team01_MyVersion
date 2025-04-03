@@ -124,6 +124,12 @@ protocol DatabaseAPIIntegrable {
     func updateMaintenanceTaskEstimatedDate(by id: UUID, _ date: Date) async throws
     
     func createInvoiceForMaintenanceTask(by id: UUID, expenses: [MaintenanceExpenseType: Double], _ repairNote: String) async throws
+    
+    
+    //MARK: SOS
+    func markTripForSOS(by id: UUID) async throws
+    
+    func markTripSOSResolved(by id: UUID) async throws
 }
 
 protocol IFENotifiable {

@@ -21,6 +21,18 @@ extension Date {
 }
 
 class RemoteController: DatabaseAPIIntegrable {
+    func markTripForSOS(by id: UUID) async throws {
+        try await client
+            .rpc("mark_trip_for_sos_by_id", params: ["p_id": id.uuidString])
+            .execute()
+    }
+    
+    func markTripSOSResolved(by id: UUID) async throws {
+        try await client
+            .rpc("update_trip_sos_to_resolved_by_id", params: ["p_id": id.uuidString])
+            .execute()
+    }
+    
     func updateVehicleCoordinate(by id: Int, latitude: String, longitude: String) async throws -> String {
         struct UpdateVehicleCoordinateParams: Codable {
             let p_id: Int

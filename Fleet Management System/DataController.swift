@@ -1084,4 +1084,94 @@ class IFEDataController: ObservableObject {
         
         await notifier.sendNotification(pushNotification)
     }
+    
+    /// Marks a trip as SOS asynchronously.
+    ///
+    /// This function updates the trip status to SOS in the remote database.
+    /// If the user role is `.driver`, it also updates the local trip status to SOS.
+    /// If the operation fails, an error message is logged.
+    ///
+    /// - Parameter id: The unique identifier of the trip to be marked as SOS.
+    /// - Returns: Void
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// await markTripForSOS(by: tripID)
+    /// ```
+    func markTripForSOS(by id: UUID) async {
+        do {
+            try await remoteController.markTripForSOS(by: id)
+            if user?.role == .driver {
+                updateLocalDriverTripStatus(by: id, to: .sos)
+            }
+        } catch {
+            print("Error while making trip status to SOS: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Marks a trip's SOS status as resolved asynchronously.
+    ///
+    /// This function updates the trip status to indicate that the SOS has been resolved.
+    /// If the operation fails, an error message is logged.
+    ///
+    /// - Parameter id: The unique identifier of the trip whose SOS status needs to be resolved.
+    /// - Returns: Void
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// await markTripSOSResolved(by: tripID)
+    /// ```
+    func markTripSOSResolved(by id: UUID) async {
+        do {
+            try await remoteController.markTripSOSResolved(by: id)
+        } catch {
+            print("Error while resolving the trip SOS: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Updates the status of a local driver trip.
+    ///
+    /// This function searches for the trip with the given ID in the list of driver's trips.
+    /// If found, it updates the trip's status to the new status.
+    /// If the trip is not found, an error message is logged.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the trip to update.
+    ///   - newStatus: The new status to assign to the trip.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// updateLocalDriverTripStatus(by: tripID, to: .sos)
+    /// ```
+    func updateLocalDriverTripStatus(by id: UUID, to newStatus: TripStatus) {
+        let index = tripsForDriver.firstIndex(where: { $0.id == id })
+        
+        if let index { tripsForDriver[index].status = newStatus }
+        else {
+            print("Cannot find any trip with id: \(id)")
+        }
+    }
+    
+    /// Updates the status of a local manager trip.
+    ///
+    /// This function searches for the trip with the given ID in the list of manager's trips.
+    /// If found, it updates the trip's status to the new status.
+    /// If the trip is not found, an error message is logged.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the trip to update.
+    ///   - newStatus: The new status to assign to the trip.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// updateLocalManagerTripStatus(by: tripID, to: .completed)
+    /// ```
+    func updateLocalManagerTripStatus(by id: UUID, to newStatus: TripStatus) {
+        let index = trips.firstIndex(where: { $0.id == id })
+        
+        if let index { trips[index].status = newStatus }
+        else {
+            print("Cannot find any trip with id: \(id)")
+        }
+    }
 }
