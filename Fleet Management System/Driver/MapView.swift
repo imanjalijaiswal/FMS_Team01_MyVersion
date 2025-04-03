@@ -1381,10 +1381,10 @@ func showSOSAlert() {
                         )
                         
                         // Sending message to Maintenance Personnel
-                        await tripViewModel.sendMessage(to: personnel.id, title: "Driver Emergency Alert", message: "Driver reported emergency at location:\n\(viewModel.currentLocationAddress). \nCurrent coordinates:\n\(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)")
+                        await tripViewModel.sendMessage(to: personnel.id, title: "Driver Emergency Alert", message: "Driver reported emergency at location:\n\(viewModel.currentLocationAddress).\nCurrent coordinates:\n\(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)")
                         
                         // Sending message to Fleet Manager
-                        await tripViewModel.sendMessage(to: trip.assignedByFleetManagerID, title: "Driver Emergency Alert", message: "Driver reported emergency at location:\n\(viewModel.currentLocationAddress). \nCurrent coordinates:\n\(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)")
+                        await tripViewModel.sendMessage(to: trip.assignedByFleetManagerID, title: "Driver Emergency Alert", message: "Driver reported emergency at location:\n\(viewModel.currentLocationAddress).\nCurrent coordinates:\n\(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)")
                     } else {
                         print("Failed to create emergency maintenance task")
                         
