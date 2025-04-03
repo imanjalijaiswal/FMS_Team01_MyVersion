@@ -13,12 +13,24 @@ struct SOSTabView: View {
     let onRefresh: () -> Void
     let isRefreshing: Bool
     
+    @State private var refreshTrigger = UUID()
+    
     private var activeTasks: [MaintenanceTask] {
-        filteredSOSTasks.filter { $0.status != .completed }
+        let active = filteredSOSTasks.filter { $0.status != .completed }
+        print("DEBUG: Active tasks for current segment: \(active.count)")
+        for task in active {
+            print("  Active Task ID: \(task.id), Status: \(task.status.rawValue)")
+        }
+        return active
     }
     
     private var completedTasks: [MaintenanceTask] {
-        filteredSOSTasks.filter { $0.status == .completed }
+        let completed = filteredSOSTasks.filter { $0.status == .completed }
+        print("DEBUG: Completed tasks for current segment: \(completed.count)")
+        for task in completed {
+            print("  Completed Task ID: \(task.id), Status: \(task.status.rawValue)")
+        }
+        return completed
     }
     
     var body: some View {
@@ -32,7 +44,11 @@ struct SOSTabView: View {
                 
                 Spacer()
                 
-                Button(action: onRefresh) {
+                Button(action: {
+                    onRefresh()
+                    refreshTrigger = UUID()
+                    print("DEBUG: filteredSOSTasks after refresh: \(filteredSOSTasks)")
+                }) {
                     Image(systemName: "arrow.clockwise")
                         .resizable()
                         .frame(width: 20, height: 22)
@@ -61,7 +77,14 @@ struct SOSTabView: View {
                 
                 HStack(spacing: 0) {
                     // Pre-inspect Tab
-                    Button(action: { sosSelectedSegment = 0 }) {
+                    Button(action: { 
+                        // Force a reload when changing segments
+                        onRefresh()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            sosSelectedSegment = 0 
+                            refreshTrigger = UUID() // Refresh when changing segments
+                        }
+                    }) {
                         VStack {
                             Text("Pre-inspect")
                                 .font(.system(size: 14, weight: sosSelectedSegment == 0 ? .semibold : .regular))
@@ -79,7 +102,14 @@ struct SOSTabView: View {
                     }
                     
                     // Post-inspect Tab
-                    Button(action: { sosSelectedSegment = 1 }) {
+                    Button(action: { 
+                        // Force a reload when changing segments
+                        onRefresh()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            sosSelectedSegment = 1 
+                            refreshTrigger = UUID() // Refresh when changing segments
+                        }
+                    }) {
                         VStack {
                             Text("Post-inspect")
                                 .font(.system(size: 14, weight: sosSelectedSegment == 1 ? .semibold : .regular))
@@ -97,7 +127,14 @@ struct SOSTabView: View {
                     }
                     
                     // Emergency Tab
-                    Button(action: { sosSelectedSegment = 2 }) {
+                    Button(action: { 
+                        // Force a reload when changing segments
+                        onRefresh()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            sosSelectedSegment = 2 
+                            refreshTrigger = UUID() // Refresh when changing segments
+                        }
+                    }) {
                         VStack {
                             Text("Emergency")
                                 .font(.system(size: 14, weight: sosSelectedSegment == 2 ? .semibold : .regular))
@@ -125,7 +162,11 @@ struct SOSTabView: View {
                 Spacer()
             } else {
                 ScrollView {
-                    PullToRefresh(coordinateSpaceName: "sosRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
+                    PullToRefresh(coordinateSpaceName: "sosRefresh", onRefresh: {
+                        onRefresh()
+                        refreshTrigger = UUID()
+                        print("DEBUG: filteredSOSTasks after pull-to-refresh: \(filteredSOSTasks)")
+                    }, isRefreshing: isRefreshing)
                     
                     LazyVStack(spacing: 16) {
                         if filteredSOSTasks.isEmpty {
@@ -170,9 +211,11 @@ struct SOSTabView: View {
                                                 onTrackTask(task)
                                             },
                                             onResolve: {
-                                                // Implementation of onResolve closure
+                                                onRefresh() // Refresh after resolving
+                                                refreshTrigger = UUID()
                                             }
                                         )
+                                        .id("\(task.id)-\(task.status.rawValue)-\(refreshTrigger)")  // Use unique ID with refresh trigger
                                     }
                                 }
                             }
@@ -196,21 +239,40 @@ struct SOSTabView: View {
                                                 onTrackTask(task)
                                             },
                                             onResolve: {
-                                                // Implementation of onResolve closure
+                                                onRefresh() // Refresh after resolving
+                                                refreshTrigger = UUID()
                                             }
                                         )
+                                        .id("\(task.id)-\(task.status.rawValue)-\(refreshTrigger)")  // Use unique ID with refresh trigger
                                     }
                                 }
                             }
                         }
                     }
                     .padding()
+                    .id(refreshTrigger) // Force LazyVStack to refresh
                 }
                 .coordinateSpace(name: "sosRefresh")
-                .id(sosSelectedSegment)
+                .id(refreshTrigger)
+                .onAppear {
+                    // Force refresh when view appears
+                    refreshTrigger = UUID()
+                    print("DEBUG: View appeared, forcing refresh with new trigger: \(refreshTrigger)")
+                    
+                    // Log current task statuses
+                    print("DEBUG: Current task statuses on view appear:")
+                    for task in filteredSOSTasks {
+                        print("  Task \(task.id): Status: \(task.status.rawValue), Type: \(task.type.rawValue)")
+                    }
+                }
             }
         }
         .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+        .onChange(of: sosSelectedSegment) { _ in
+            // Force refresh when segment changes
+            refreshTrigger = UUID()
+            print("DEBUG: Segment changed, forcing refresh with new trigger: \(refreshTrigger)")
+        }
     }
 }
 

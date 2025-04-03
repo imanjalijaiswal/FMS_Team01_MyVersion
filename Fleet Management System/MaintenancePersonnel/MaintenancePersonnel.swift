@@ -147,6 +147,13 @@ struct MaintenanceView: View {
             loadTasks()
             loadSOSTasks()
         }
+        .onChange(of: selectedTab) { newTab in
+            // Force reload when switching to SOS tab
+            if newTab == 1 {
+                loadSOSTasks()
+                print("DEBUG: Forced reload of SOS tasks when switching to SOS tab")
+            }
+        }
         .alert("Start Work", isPresented: $showingStartWorkConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Start Work") {
@@ -313,18 +320,43 @@ struct MaintenanceView: View {
     
     var filteredSOSTasks: [MaintenanceTask] {
         let filtered: [MaintenanceTask]
+        
+        // Print all tasks with their statuses before filtering
+        print("DEBUG: All SOS tasks before filtering:")
+        for task in sosTasks {
+            print("  SOS Task ID: \(task.id), Type: \(task.type.rawValue), Status: \(task.status.rawValue)")
+        }
+        
         switch sosSelectedSegment {
         case 0: // Pre-inspection
             filtered = sosTasks.filter { $0.type == .preInspectionMaintenance }
             print("DEBUG: Found \(filtered.count) pre-inspection tasks out of \(sosTasks.count) total SOS tasks")
+            
+            // Print filtered tasks
+            for task in filtered {
+                print("  Filtered Pre-inspection Task: ID: \(task.id), Status: \(task.status.rawValue)")
+            }
+            
             return filtered
         case 1: // Post-inspection
             filtered = sosTasks.filter { $0.type == .postInspectionMaintenance }
             print("DEBUG: Found \(filtered.count) post-inspection tasks out of \(sosTasks.count) total SOS tasks")
+            
+            // Print filtered tasks
+            for task in filtered {
+                print("  Filtered Post-inspection Task: ID: \(task.id), Status: \(task.status.rawValue)")
+            }
+            
             return filtered
         case 2: // Emergency
             filtered = sosTasks.filter { $0.type == .emergencyMaintenance }
             print("DEBUG: Found \(filtered.count) emergency tasks out of \(sosTasks.count) total SOS tasks")
+            
+            // Print filtered tasks
+            for task in filtered {
+                print("  Filtered Emergency Task: ID: \(task.id), Status: \(task.status.rawValue)")
+            }
+            
             return filtered
         default:
             print("DEBUG: Invalid SOS segment selection: \(sosSelectedSegment)")
@@ -394,12 +426,19 @@ struct MaintenanceView: View {
         
         Task {
             do {
-                print("DEBUG: Making direct API call to get SOS tasks")
-                let directTasks = try await RemoteController.shared.getMaintenancePersonnelTasks(by: user.id)
-                print("DEBUG: Direct API call returned \(directTasks.count) tasks")
+                print("DEBUG: Making direct API call to get SOS tasks from Supabase")
+                
+                // Force reload from Supabase - ensure no cached data is used
+                try await dataController.loadPersonnelTasks()
+                
+                // Get tasks directly from the fresh data in dataController
+                let directTasks = dataController.personnelTasks
+                print("DEBUG: Direct API call returned \(directTasks.count) tasks from Supabase")
                 
                 // Load all vehicle license numbers and user phone numbers
                 for task in directTasks {
+                    print("DEBUG: Task ID: \(task.id), Status: \(task.status.rawValue), Type: \(task.type.rawValue)")
+                    
                     if let vehicle = await dataController.getRegisteredVehicle(by: task.vehicleID) {
                         DispatchQueue.main.async {
                             self.vehicleLicenseMap[task.vehicleID] = vehicle.licenseNumber
@@ -421,23 +460,59 @@ struct MaintenanceView: View {
                 let sosTasks = directTasks.filter { task in
                     sosTaskTypes.contains(task.type)
                 }
-
+                print("DEBUG: Filtered SOS tasks: \(sosTasks.count) out of \(directTasks.count) total tasks")
+                
+                // Print status distribution to help diagnose issues
+                let scheduled = sosTasks.filter { $0.status == .scheduled }.count
+                let inProgress = sosTasks.filter { $0.status == .inProgress }.count
+                let completed = sosTasks.filter { $0.status == .completed }.count
+                print("DEBUG: SOS task status breakdown - Scheduled: \(scheduled), In Progress: \(inProgress), Completed: \(completed)")
                 
                 DispatchQueue.main.async {
+                    // Clear existing tasks before updating to prevent stale data
+                    self.sosTasks.removeAll()
+                    
+                    // Assign the fresh tasks from Supabase
                     self.sosTasks = sosTasks
                     self.isSosLoading = false
+                    print("DEBUG: SOS tasks updated, isSosLoading set to false")
+                    
+                    // Reset the view refresh trigger to force UI update
+                    self.viewRefreshTrigger = UUID()
                 }
             } catch {
                 print("DEBUG ERROR: Failed to load SOS tasks directly: \(error.localizedDescription)")
                 
-                // Try to get SOS tasks from data controller
-                let controllerTasks = dataController.personnelTasks.filter {
-                    $0.type == .preInspectionMaintenance || $0.type == .postInspectionMaintenance || $0.type == .emergencyMaintenance
-                }
-                
-                DispatchQueue.main.async {
-                    self.sosTasks = controllerTasks
-                    self.isSosLoading = false
+                // Try to get fresh tasks again with a different approach
+                Task {
+                    do {
+                        // Try to directly fetch from RemoteController as a backup
+                        print("DEBUG: Attempting direct fetch from RemoteController")
+                        let backupTasks = try await RemoteController.shared.getMaintenancePersonnelTasks(by: user.id)
+                        
+                        let sosTaskTypes: [MaintenanceTaskType] = [.preInspectionMaintenance, .postInspectionMaintenance, .emergencyMaintenance]
+                        let sosTasks = backupTasks.filter { sosTaskTypes.contains($0.type) }
+                        
+                        DispatchQueue.main.async {
+                            self.sosTasks = sosTasks
+                            self.isSosLoading = false
+                            print("DEBUG: SOS tasks updated from direct RemoteController fetch, count: \(sosTasks.count)")
+                            self.viewRefreshTrigger = UUID()
+                        }
+                    } catch {
+                        print("DEBUG: Both fetch methods failed. Using cached data as last resort.")
+                        // Only use cached data as a last resort
+                        let controllerTasks = dataController.personnelTasks.filter {
+                            $0.type == .preInspectionMaintenance || $0.type == .postInspectionMaintenance || $0.type == .emergencyMaintenance
+                        }
+                        
+                        DispatchQueue.main.async {
+                            self.sosTasks = controllerTasks
+                            self.isSosLoading = false
+                            print("DEBUG: SOS tasks updated from cached data, isSosLoading set to false")
+                            self.viewRefreshTrigger = UUID()
+                        }
+                    }
                 }
             }
         }
@@ -627,7 +702,7 @@ struct MaintenanceView: View {
             } catch {
                 DispatchQueue.main.async {
                     self.isLoadingInvoice = false
-                    print("DEBUG ERROR: Error completing task and generating invoice: \(error.localizedDescription)")
+                    print("DEBUG ERROR: Error completing task and generatinxg invoice: \(error.localizedDescription)")
                 }
             }
         }
@@ -639,6 +714,22 @@ struct MaintenanceView: View {
         if !isLoading && !isSosLoading {
             loadTasks()
             loadSOSTasks()
+            
+            // Add a delay to allow the tasks to load before printing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                print("DEBUG: REFRESH RESULTS - SOS Tasks Array Contents: ")
+                for (index, task) in self.sosTasks.enumerated() {
+                    print("  Task[\(index)]: ID: \(task.id), Type: \(task.type.rawValue), Status: \(task.status.rawValue), VehicleID: \(task.vehicleID)")
+                }
+                print("DEBUG: Total SOS Tasks after refresh: \(self.sosTasks.count)")
+                
+                // Print filtered tasks based on current segment
+                let filtered = self.filteredSOSTasks
+                print("DEBUG: Filtered SOS Tasks for segment \(self.sosSelectedSegment): \(filtered.count)")
+                for (index, task) in filtered.enumerated() {
+                    print("  Filtered[\(index)]: ID: \(task.id), Type: \(task.type.rawValue), Status: \(task.status.rawValue)")
+                }
+            }
         }
     }
 }
