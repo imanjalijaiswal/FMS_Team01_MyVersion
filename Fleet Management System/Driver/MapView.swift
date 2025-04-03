@@ -1686,7 +1686,7 @@ struct NavigationInfoCard: View {
             
             // Navigation controls
             HStack(spacing: 12) {
-                if viewModel.isNavigating {
+                if viewModel.isNavigating && vehicle?.status == .assigned{
                     Button(action: {
                         if viewModel.hasReachedDestination {
                             // Clean up map and stop navigation

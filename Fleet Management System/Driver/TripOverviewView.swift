@@ -13,6 +13,7 @@ struct TripOverviewView: View {
     @State private var showPostInspectionAlert = false
     @State private var showingMapView = false
     @State private var showingTripSummary = false
+    @State private var timer: Timer?
     let dataController = IFEDataController.shared
     
     var body: some View {
@@ -54,12 +55,37 @@ struct TripOverviewView: View {
                     }
             }
         }
+        .onAppear {
+            // Start the timer when the view appears
+            startTimer()
+        }
+        .onDisappear {
+            // Stop the timer when the view disappears
+            stopTimer()
+        }
         .navigationViewStyle(.stack)
         .task {
             if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: task.id) {
                 hasCompletedPostInspection = !inspection.postInspection.isEmpty
             }
         }
+    }
+    private func startTimer() {
+        // Create a timer that fires every 10 seconds
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task {
+                await checkInspectionStatus()
+            }
+        }
+    }
+    private func checkInspectionStatus() async {
+        if let inspection = await dataController.getTripInspectionForTrip(by: task.id) {
+            hasCompletedPostInspection = !inspection.postInspection.isEmpty
+        }
+    }
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
     }
     
     private var contentView: some View {
@@ -423,7 +449,6 @@ struct EndTripButton: View {
                         // End trip action
                         dataController.updateTripStatus(task, to: .completed)
                         // Show trip summary
-                        showingTripSummary = true
                     }) {
                         Text("Mark as Completed")
                             .font(.headline)
@@ -594,7 +619,58 @@ struct PostTripInspectionChecklistView: View {
         }
     }
 }
- func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip,isPreTrip: Bool) async {
+
+func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+    let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+    guard components.count == 2,
+          let latitude = Double(components[0]),
+          let longitude = Double(components[1]) else {
+        print("Invalid vehicle coordinate format")
+        return nil
+    }
+    
+    let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+    let serviceCenters = IFEDataController.shared.serviceCenters
+    
+    // Sort service centers by distance
+    var sortedCenters = serviceCenters.map { center -> (ServiceCenter, CLLocationDistance) in
+        guard let centerCoords = parseCoordinates(center.coordinate) else {
+            return (center, .greatestFiniteMagnitude)
+        }
+        let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
+        let distance = vehicleLocation.distance(from: centerLocation)
+        return (center, distance)
+    }.sorted { $0.1 < $1.1 }
+    
+    // Iterate through sorted centers until we find one with active maintenance personnel
+    for (center, distance) in sortedCenters {
+        // *** CHANGE 1: Skip if service center is not assigned (inactive) ***
+        guard center.isAssigned else {
+            print("Service center \(center.id) is not assigned, skipping...")
+            continue
+        }
+        
+        // *** CHANGE 2: Check maintenance personnel availability and activity ***
+        guard let personnelMetaData = await IFEDataController.shared.getMaintenancePersonnelMetaData(ofCenter: center.id) else {
+            print("No maintenance personnel found for service center \(center.id), skipping...")
+            continue
+        }
+        
+        // *** CHANGE 3: Verify personnel active status ***
+        guard personnelMetaData.activeStatus else {
+            print("Maintenance personnel for service center \(center.id) is inactive (ID: \(personnelMetaData.id)), skipping...")
+            continue
+        }
+        
+        print("Found active service center \(center.id) with active personnel \(personnelMetaData.id) at distance: \(distance) meters")
+        return center
+    }
+    
+    print("No active service center with active maintenance personnel found")
+    return nil
+}
+
+func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip, isPreTrip: Bool) async {
     // Filter failed items
     let failedItems = inspectionItems.filter { !$0.value }
     guard !failedItems.isEmpty else { return }
@@ -606,7 +682,6 @@ struct PostTripInspectionChecklistView: View {
     
     let inspectionType = isPreTrip ? "Pre-Trip" : "Post-Trip"
     let fullIssueNote = "\(inspectionType) Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
-   // let fullIssueNote = "Pre-Trip Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
     
     // Get the vehicle's current coordinate
     guard let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
@@ -614,9 +689,9 @@ struct PostTripInspectionChecklistView: View {
         return
     }
     
-    // Find the nearest service center
+    // *** CHANGE 4: Use the updated findNearestServiceCenter function ***
     guard let nearestServiceCenter = await findNearestServiceCenter(to: vehicle.currentCoordinate) else {
-        print("No available service center found")
+        print("No available active service center with active personnel found")
         return
     }
     
@@ -629,11 +704,8 @@ struct PostTripInspectionChecklistView: View {
         return
     }
     
-    // Verify active status
-    guard personnelMetaData.activeStatus else {
-        print("Maintenance personnel for service center \(nearestServiceCenter.id) is inactive (ID: \(personnelMetaData.id))")
-        return
-    }
+    // *** CHANGE 5: Remove redundant active status check since findNearestServiceCenter already ensures this ***
+    // No need to check personnelMetaData.activeStatus here
     
     // Debug: Log personnel details
     print("Assigned Personnel: ID: \(personnelMetaData.id), Name: \(personnelMetaData.fullName), Active: \(personnelMetaData.activeStatus)")
@@ -654,37 +726,6 @@ struct PostTripInspectionChecklistView: View {
     print("Maintenance task assigned: \(task)")
 }
 
-func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
-    let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-    guard components.count == 2,
-          let latitude = Double(components[0]),
-          let longitude = Double(components[1]) else {
-        print("Invalid vehicle coordinate format")
-        return nil
-    }
-    
-    let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
-    let serviceCenters = IFEDataController.shared.serviceCenters
-    
-    var nearestServiceCenter: ServiceCenter?
-    var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
-    
-    for center in serviceCenters {
-        guard let centerCoords = parseCoordinates(center.coordinate) else {
-            continue
-        }
-        
-        let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
-        let distance = vehicleLocation.distance(from: centerLocation)
-        
-        if distance < shortestDistance {
-            shortestDistance = distance
-            nearestServiceCenter = center
-        }
-    }
-    
-    return nearestServiceCenter
-}
 
 private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
     let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
