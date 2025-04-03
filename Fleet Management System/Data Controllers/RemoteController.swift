@@ -73,11 +73,6 @@ class RemoteController: DatabaseAPIIntegrable {
             .rpc("get_service_center_assigned_status_by_id", params: ["p_id": id])
             .execute().value
     }
-    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async throws -> UserMetaData {
-        return try await client
-            .rpc("get_maintenance_personnel_meta_data_of_service_center_by_id", params: ["p_id": centerID])
-            .execute().value
-    }
     func getRegisteredServiceCenters() async throws -> [ServiceCenter] {
         return try await client
             .rpc("get_registered_vehicle_service_centers")
