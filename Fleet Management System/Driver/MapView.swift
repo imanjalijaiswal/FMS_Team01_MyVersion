@@ -958,7 +958,7 @@ struct MapView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        if let trip = activeTrip, trip.status == .inProgress, preInspectionCompletedTrips.contains(trip.id) {
+                        if let trip = activeTrip, trip.status == .inProgress, preInspectionCompletedTrips.contains(trip.id) && vehicle?.status != .underMaintenance {
                                                     Button(action: {
                                                         showSOSAlert()
                                                     }) {
@@ -1040,7 +1040,7 @@ struct MapView: View {
                             showingPostTripInspection: $showingPostTripInspection,
                             hasCompletedPreInspection: $hasCompletedPreInspection,
                             sosHasBeenSent: viewModel.sosHasBeenSent && sosHasBeenSent && trip.status == .inProgress && preInspectionCompletedTrips.contains(trip.id),
-                                                       showSOSDetails: { showingSOSDetails = true }
+                            showSOSDetails: { showingSOSDetails = true }
 
                         )
                     }
@@ -1421,30 +1421,41 @@ func showSOSAlert() {
     
     // Load saved SOS state
     private func loadSavedSOSState() {
-        // Check if there was an active SOS when the app was closed
         let savedState = viewModel.loadSOSState()
         
-        // Only load SOS state if there's an active trip and it matches the saved SOS tripId
-        if savedState.isActive &&
-           savedState.tripId != nil &&
-           activeTrip != nil &&
-           savedState.tripId == activeTrip!.id &&
-           activeTrip!.status == .inProgress &&
-           preInspectionCompletedTrips.contains(activeTrip!.id) {
-            sosHasBeenSent = true
-            viewModel.sosHasBeenSent = true
-            sosTimestamp = savedState.timestamp
-            viewModel.sosTimestamp = savedState.timestamp
-            activeSOSTripId = savedState.tripId
-            viewModel.activeSOSTripId = savedState.tripId
+        // Only restore SOS state if:
+        // 1. There was an active SOS
+        // 2. A trip ID was saved
+        // 3. There is currently an active trip
+        // 4. The saved trip ID matches the current active trip
+        // 5. The current trip is in progress
+        // 6. The trip has completed pre-inspection
+        if savedState.isActive,
+           let savedTripId = savedState.tripId,
+           let activeTrip = activeTrip,
+           savedTripId == activeTrip.id,
+           activeTrip.status == .inProgress,
+           preInspectionCompletedTrips.contains(activeTrip.id) {
             
-            print("Loaded previous SOS state: Active for current trip")
-        } else if savedState.isActive {
-            // Clear any saved SOS state that doesn't match the current active trip
-            viewModel.clearSOSState()
-            print("Cleared invalid SOS state - not matching current active trip")
+            // Restore the SOS state
+            viewModel.sosHasBeenSent = true
+            viewModel.sosTimestamp = savedState.timestamp
+            viewModel.activeSOSTripId = savedTripId
+            
+            // Update local state
+            sosHasBeenSent = true
+            sosTimestamp = savedState.timestamp
+            activeSOSTripId = savedTripId
+            
+            // Show the SOS details view
+            showingSOSDetails = true
+            
+            // Log the restoration
+            print("Restored SOS state for trip \(savedTripId)")
         } else {
-            print("No active SOS found in saved state")
+            // Clear any invalid SOS state
+            viewModel.clearSOSState()
+            print("Cleared invalid SOS state - conditions not met")
         }
     }
 
