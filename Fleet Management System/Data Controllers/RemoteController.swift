@@ -139,13 +139,13 @@ class RemoteController: DatabaseAPIIntegrable {
             }
         }
         
-        let response: [MaintenanceTaskResponse] = try await client
+        let response: [MaintenanceTaskResponse]? = try await client
             .rpc("get_maintenance_task_by_manager_id", params: ["p_id": id.uuidString])
             .execute().value
         
         var tasks: [MaintenanceTask] = []
         
-        response.forEach({ task in
+        response?.forEach({ task in
             tasks.append(MaintenanceTask(
                 id: task.id,
                 taskID: task.taskID,
