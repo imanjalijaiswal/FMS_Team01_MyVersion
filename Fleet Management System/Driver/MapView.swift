@@ -845,6 +845,7 @@ struct MapView: View {
     @State private var showNavigationInfoCard = true
     @State private var hasCompletedPreInspection = false
     @State private var vehicleStatusTimer: Timer?
+    @State private var vehicleLocationTimer: Timer?
     @State private var vehicle: Vehicle?
     
     // Add constants for card positions
@@ -852,6 +853,7 @@ struct MapView: View {
     private let minimizedOffset: CGFloat = 200
     private let tabBarHeight: CGFloat = 49
     private let bottomSafeArea: CGFloat = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
+    private let locationUpdateInterval: TimeInterval = 300 // 5 minutes in seconds
     
     var activeTrip: Trip? {
         tripViewModel.tripsForDriver.first { trip in
@@ -859,6 +861,26 @@ struct MapView: View {
             (preInspectionCompletedTrips.contains(trip.id) && 
              trip.status == .scheduled && 
              !tripsRequiringMaintenance.contains(trip.id))
+        }
+    }
+    
+    private func updateVehicleLocation() async {
+        let remoteController = RemoteController()
+        guard let userLocation = viewModel.userLocation,
+              let trip = activeTrip,
+              let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+            return
+        }
+        
+        do {
+            let location = try await remoteController.updateVehicleCoordinate(
+                by: vehicle.id,
+                latitude: String(userLocation.latitude),
+                longitude: String(userLocation.longitude)
+            )
+            print("Vehicle location updated successfully : \(location)")
+        } catch {
+            print("Failed to update vehicle location: \(error.localizedDescription)")
         }
     }
     
@@ -1061,6 +1083,11 @@ struct MapView: View {
                     showNavigationInfoCard = false
                 }
             }
+            
+            // Update vehicle location when view appears
+            Task {
+                await updateVehicleLocation()
+            }
         }
         .onDisappear {
             // Stop vehicle status monitoring
@@ -1072,6 +1099,11 @@ struct MapView: View {
                 name: NSNotification.Name("DismissNavigationInfoCard"),
                 object: nil
             )
+            
+            // Update vehicle location when view disappears
+            Task {
+                await updateVehicleLocation()
+            }
         }
         .task {
             await checkPreInspections()
@@ -1085,11 +1117,21 @@ struct MapView: View {
                 await checkVehicleStatus()
             }
         }
+        
+        // Create a timer that updates vehicle location every 5 minutes
+        vehicleLocationTimer = Timer.scheduledTimer(withTimeInterval: locationUpdateInterval, repeats: true) { _ in
+            Task {
+                await updateVehicleLocation()
+            }
+        }
     }
     
     private func stopVehicleStatusMonitoring() {
         vehicleStatusTimer?.invalidate()
         vehicleStatusTimer = nil
+        
+        vehicleLocationTimer?.invalidate()
+        vehicleLocationTimer = nil
     }
     
     private func checkVehicleStatus() async {
