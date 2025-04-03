@@ -247,7 +247,7 @@ struct VehicleDetailView: View {
 }
 
 struct VehiclesView: View {
-    @StateObject private var viewModel = IFEDataController.shared
+    @StateObject var viewModel = IFEDataController.shared
     @State private var searchText = ""
     @State private var selectedFilter = ""
     @State private var showingAddVehicle = false
@@ -267,7 +267,7 @@ struct VehiclesView: View {
     }
     
     private var underMaintenanceCount: Int {
-        viewModel.vehicles.filter { $0.status == .underMaintenance}.count
+        viewModel.vehicles.filter { $0.status == .underMaintenance && $0.activeStatus }.count
     }
     
     private var allCount: Int {
@@ -275,26 +275,26 @@ struct VehiclesView: View {
     }
     
     private var filtersWithCount: [String] {
-        [
+        return [
             "All (\(allCount))",
-            "\(VehicleStatus.available.rawValue) (\(availableCount))",
-            "\(VehicleStatus.assigned.rawValue) (\(assignedCount))",
-            "\(VehicleStatus.underMaintenance.rawValue) (\(underMaintenanceCount))",
-            "Inactive (\(inactiveCount))"
+            "Available (\(availableCount))",
+            "Assigned (\(assignedCount))",
+            "Inactive (\(inactiveCount))",
+            "\(VehicleStatus.underMaintenance.rawValue) (\(underMaintenanceCount))"
         ]
     }
     
     var filteredVehicles: [Vehicle] {
         let searchResults = viewModel.vehicles.filter { vehicle in
             searchText.isEmpty ||
-            vehicle.licenseNumber.localizedCaseInsensitiveContains(searchText) ||
-            vehicle.model.localizedCaseInsensitiveContains(searchText)
+            vehicle.model.localizedCaseInsensitiveContains(searchText) ||
+            vehicle.licenseNumber.localizedCaseInsensitiveContains(searchText)
         }
         
         switch selectedFilter {
-        case _ where selectedFilter.contains(VehicleStatus.available.rawValue):
+        case _ where selectedFilter.contains("Available"):
             return searchResults.filter { $0.status == .available && $0.activeStatus }
-        case _ where selectedFilter.contains(VehicleStatus.assigned.rawValue):
+        case _ where selectedFilter.contains("Assigned"):
             return searchResults.filter { $0.status == .assigned }
         case _ where selectedFilter.contains("Inactive"):
             return searchResults.filter { !$0.activeStatus }
@@ -330,32 +330,116 @@ struct VehiclesView: View {
         }
     }
     
+    // Skeleton filter view
+    var skeletonFilterView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.4))
+                        .frame(height: 32)
+                        .frame(width: 120)
+                        .cornerRadius(16)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.top, 8)
+    }
+    
+    // Skeleton vehicle row view
+    var skeletonVehicleView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle()
+                    .fill(Color.gray.opacity(0.4))
+                    .frame(width: 40, height: 40)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.4))
+                        .frame(width: 150, height: 16)
+                        .cornerRadius(8)
+                    
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.4))
+                        .frame(width: 100, height: 12)
+                        .cornerRadius(6)
+                    
+                    HStack {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.4))
+                            .frame(width: 150, height: 12)
+                            .cornerRadius(6)
+                        
+                        Spacer()
+                        
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.4))
+                            .frame(width: 80, height: 20)
+                            .cornerRadius(10)
+                    }
+                }
+                
+                Spacer()
+                
+                Rectangle()
+                    .fill(Color.gray.opacity(0.4))
+                    .frame(width: 8, height: 16)
+                    .cornerRadius(4)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(Color.white)
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             SearchBar(text: $searchText)
                 .padding(.top, 8)
             
-            FilterSection(
-                title: "",
-                filters: filtersWithCount,
-                selectedFilter: $selectedFilter
-            )
-            .id(viewRefreshTrigger)
+            if isRefreshing {
+                // Skeleton filters during loading
+                skeletonFilterView
+            } else {
+                // Real filters when not loading
+                FilterSection(
+                    title: "",
+                    filters: filtersWithCount,
+                    selectedFilter: $selectedFilter
+                )
+                .id(viewRefreshTrigger)
+            }
             
             ScrollView {
                 PullToRefresh(coordinateSpaceName: "vehiclesPullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
                 
-                VStack(spacing: 12) {
-                    ForEach(filteredVehicles) { vehicle in
-                        VehicleRowView(vehicle: vehicle, viewModel: viewModel)
-                        if vehicle != filteredVehicles.last {
+                if isRefreshing {
+                    // Skeleton View for vehicles
+                    VStack(spacing: 12) {
+                        ForEach(0..<6, id: \.self) { _ in
+                            skeletonVehicleView
                             Divider()
                                 .padding(.horizontal)
                         }
                     }
+                } else {
+                    // Regular content view
+                    VStack(spacing: 12) {
+                        ForEach(filteredVehicles) { vehicle in
+                            VehicleRowView(vehicle: vehicle, viewModel: viewModel)
+                            if vehicle != filteredVehicles.last {
+                                Divider()
+                                    .padding(.horizontal)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .id(viewRefreshTrigger)
                 }
-                .padding(.horizontal)
-                .id(viewRefreshTrigger)
             }
             .coordinateSpace(name: "vehiclesPullToRefresh")
         }
@@ -368,13 +452,6 @@ struct VehiclesView: View {
                         .foregroundColor(.primaryGradientEnd)
                 }
             }
-            
-//            ToolbarItem(placement: .topBarLeading) {
-//                Button(action: refreshData) {
-//                    Image(systemName: "arrow.clockwise")
-//                        .foregroundColor(.primaryGradientEnd)
-//                }
-//            }
         }
         .sheet(isPresented: $showingAddVehicle) {
             VehicleDetailsView(viewModel: viewModel)

@@ -288,6 +288,23 @@ struct StaffView: View {
         }
     }
     
+    // Skeleton filter view
+    var skeletonFilterView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.4))
+                        .frame(height: 32)
+                        .frame(width: 100)
+                        .cornerRadius(16)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.top, 8)
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             Picker("Staff Type", selection: $selectedRole) {
@@ -303,37 +320,56 @@ struct StaffView: View {
             
             SearchBar(text: $searchText)
             
-            FilterSection(
-                title: "",
-                filters: filtersWithCount,
-                selectedFilter: $selectedFilter
-            )
-            .id(viewRefreshTrigger)
+            if isRefreshing {
+                // Skeleton filters during loading
+                skeletonFilterView
+            } else {
+                // Real filters when not loading
+                FilterSection(
+                    title: "",
+                    filters: filtersWithCount,
+                    selectedFilter: $selectedFilter
+                )
+                .id(viewRefreshTrigger)
+            }
             
             ScrollView {
                 PullToRefresh(coordinateSpaceName: "staffPullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
                 
-                VStack(spacing: 12) {
-                    if selectedRole == 0 {
-                        ForEach(filteredStaff) { staff in
-                            DriverRowView(driver: staff, viewModel: viewModel)
-                            if staff != filteredStaff.last {
-                                Divider()
-                                    .padding(.horizontal)
-                            }
+                if isRefreshing {
+                    // Skeleton View
+                    VStack(spacing: 12) {
+                        ForEach(0..<10, id: \.self) { _ in
+                            contentInsideView()
+                            Divider()
+                                .padding(.horizontal)
                         }
-                    } else {
-                        ForEach(filteredMaintenancePersonnel) { personnel in
-                            MaintenancePersonnelRowView(personnel: personnel, viewModel: viewModel)
-                            if personnel != filteredMaintenancePersonnel.last {
-                                Divider()
-                                    .padding(.horizontal)
+                    }
+                    .padding(.horizontal)
+                } else {
+                    // Regular content view
+                    VStack(spacing: 12) {
+                        if selectedRole == 0 {
+                            ForEach(filteredStaff) { staff in
+                                DriverRowView(driver: staff, viewModel: viewModel)
+                                if staff != filteredStaff.last {
+                                    Divider()
+                                        .padding(.horizontal)
+                                }
+                            }
+                        } else {
+                            ForEach(filteredMaintenancePersonnel) { personnel in
+                                MaintenancePersonnelRowView(personnel: personnel, viewModel: viewModel)
+                                if personnel != filteredMaintenancePersonnel.last {
+                                    Divider()
+                                        .padding(.horizontal)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal)
+                    .id(viewRefreshTrigger)
                 }
-                .padding(.horizontal)
-                .id(viewRefreshTrigger)
             }
             .coordinateSpace(name: "staffPullToRefresh")
         }
@@ -346,13 +382,6 @@ struct StaffView: View {
                         .foregroundColor(.primaryGradientEnd)
                 }
             }
-            
-//            ToolbarItem(placement: .topBarLeading) {
-//                Button(action: refreshData) {
-//                    Image(systemName: "arrow.clockwise")
-//                        .foregroundColor(.primaryGradientEnd)
-//                }
-//            }
         }
         .sheet(isPresented: $showingAddStaff) {
             if selectedRole == 0 {
