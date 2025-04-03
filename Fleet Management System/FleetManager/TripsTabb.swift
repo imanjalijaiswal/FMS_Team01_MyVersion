@@ -990,6 +990,8 @@ struct StatusBadge: View {
             return .green
         case .scheduled:
             return .orange
+        case .sos:
+            return .red
         }
     }
     

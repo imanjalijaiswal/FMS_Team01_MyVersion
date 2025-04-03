@@ -220,6 +220,8 @@ struct TaskCard: View {
             return .green
         case .scheduled:
             return .orange
+        case .sos:
+            return .red
         }
     }
     var body: some View {
