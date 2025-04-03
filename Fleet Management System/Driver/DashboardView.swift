@@ -131,6 +131,10 @@ struct DashboardView: View {
                 .padding()
             }
             .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+            .refreshable {
+                await viewModel.loadTripsForDriver()
+                await checkPreInspections()
+            }
             .navigationTitle("Driver")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -145,9 +149,6 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showingProfile) {
                 ProfileView(user: $user, role: $role)
-            }
-            .task {
-                await checkPreInspections()
             }
         }
     }
