@@ -31,25 +31,37 @@ class IFEDataController: ObservableObject {
         Task { @MainActor in
             await fetchUser()
             if let user = user {
-                if user.role == .driver {
-                    await loadTripsForDriver()
-                    await loadServiceCenters()
-                } else if user.role == .maintenancePersonnel {
-                    await loadPersonnelTasks()
-                } else {
-                    await loadDrivers()
-                    await loadVehicles()
-                    await loadMaintenancePersonnels()
-                    await loadTrips()
-                    await loadManagerAssignedMaintenanceTasks()
-                    await loadVehicleCompanies()
-                    await loadServiceCenters()
-                    await loadServiceCenterLocations()
-                }
+                await loadDataForUser(user)
             }
         }
     }
     
+    @MainActor
+    func reloadData() async {
+        await fetchUser()
+        if let user = user {
+            await loadDataForUser(user)
+        }
+    }
+    
+    @MainActor
+    private func loadDataForUser(_ user: AppUser) async {
+        if user.role == .driver {
+            await loadTripsForDriver()
+            await loadServiceCenters()
+        } else if user.role == .maintenancePersonnel {
+            await loadPersonnelTasks()
+        } else {
+            await loadDrivers()
+            await loadVehicles()
+            await loadMaintenancePersonnels()
+            await loadTrips()
+            await loadManagerAssignedMaintenanceTasks()
+            await loadVehicleCompanies()
+            await loadServiceCenters()
+            await loadServiceCenterLocations()
+        }
+    }
     
     @MainActor
     private func fetchUser() async {
