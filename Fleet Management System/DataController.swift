@@ -958,19 +958,7 @@ class IFEDataController: ObservableObject {
         }
     }
     
-    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async -> UserMetaData? {
-        do {
-            return try await remoteController.getMaintenancePersonnelMetaData(ofCenter: centerID)
-        } catch {
-            print("Error while fetching personnel meta data of service center (\(centerID)): \(error.localizedDescription)")
-            return nil
-        }
-    }
-    
-}
 
-func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {
-    let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
 
     
     /// Retrieves the maintenance personnel associated with a specific service center asynchronously.
