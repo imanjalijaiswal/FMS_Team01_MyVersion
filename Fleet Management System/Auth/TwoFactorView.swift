@@ -170,6 +170,10 @@ struct TwoFactorView: View {
                 if isVerified {
                     // Set the authenticated user
                     user = viewModel.getAuthenticatedUser()
+                    // Reload data after successful 2FA verification
+                    Task {
+                        await IFEDataController.shared.reloadData()
+                    }
                     dismiss() // Dismiss the sheet after successful verification
                 }
                 
