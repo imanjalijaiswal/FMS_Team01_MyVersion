@@ -53,6 +53,7 @@ class IFERemoteNotificationController: NSObject, IFENotifiable {
             try await client
                 .rpc("notify_user", params: params)
                 .execute()
+            print("Message sent successfully.")
         } catch {
             print("Error sending the notification:\n\(notification)\n\(error.localizedDescription)")
         }
