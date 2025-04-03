@@ -11,6 +11,7 @@ import Auth
 
 class IFEDataController: ObservableObject {
     static let shared = IFEDataController() // Singleton instance
+    
     var user: AppUser?
     
     @Published var drivers: [Driver] = []
@@ -26,11 +27,22 @@ class IFEDataController: ObservableObject {
     
     
     let remoteController = RemoteController.shared
+    var notifier: IFERemoteNotificationController?
     
     init() {
         Task { @MainActor in
             await fetchUser()
+            
+            if notifier != nil {
+                await notifier?.subscribe()
+            } else {
+                print("Cannot subscribe to notification as notifer is not initialized.")
+            }
+            
             if let user = user {
+                await sendSOSAlert(to: UUID(uuidString: "7bc308d2-c197-4c13-87a9-ec3c93cd81ae")!,
+                                             title: "SOS Alert",
+                                             message: "Testing notification sending feature.")
                 if user.role == .driver {
                     await loadTripsForDriver()
                     await loadServiceCenters()
@@ -55,6 +67,7 @@ class IFEDataController: ObservableObject {
     private func fetchUser() async {
         do {
             user = try await AuthManager.shared.getCurrentSession()
+            notifier = .init(RemoteController.shared.client, table: "Notifications", userID: user?.id)
         } catch {
             print("Error while fetching user: \(error.localizedDescription)")
         }
@@ -1035,5 +1048,35 @@ class IFEDataController: ObservableObject {
             print("Error while updating vehicle coordinate: \(error.localizedDescription)")
             return nil
         }
+    }
+    
+    /// Sends an SOS alert notification asynchronously to a specified recipient.
+    ///
+    /// This function creates an `IFEPushNotification` object containing the SOS alert details, including the sender and recipient IDs, title, message, and the current timestamp.
+    /// The notification is then sent using the `notifier` service.
+    ///
+    /// - Parameters:
+    ///   - recipientID: The unique identifier of the recipient who will receive the SOS alert.
+    ///   - title: The title of the SOS alert message.
+    ///   - message: The content of the SOS alert message.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// await sendSOSAlert(to: UUID(), title: "Emergency!", message: "Vehicle breakdown at location X.")
+    /// ```
+    func sendSOSAlert(to recipientID: UUID, title: String, message: String) async {
+        guard let notifier else {
+            print("Can't send SOS Alert as notifier is not initialzied.")
+            return
+        }
+        
+        let pushNotification = IFEPushNotification(id: UUID(),
+                                                   senderID: user!.id,
+                                                   recipientID: recipientID,
+                                                   title: title,
+                                                   message: message,
+                                                   sentAt: .now)
+        
+        await notifier.sendNotification(pushNotification)
     }
 }

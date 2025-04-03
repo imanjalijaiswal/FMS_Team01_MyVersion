@@ -85,11 +85,11 @@ class RemoteController: DatabaseAPIIntegrable {
             let p_assigned_by: String
             let p_assigned_to: String
             let p_vehicle_id: Int
-            let p_task_type: MaintenanceTaskType
+            let p_task_type: String
             let p_note: String
         }
         
-        let params = AssignMaintenanceTaskParams(p_assigned_by: id.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type, p_note: issueNote)
+        let params = AssignMaintenanceTaskParams(p_assigned_by: id.uuidString, p_assigned_to: personnelID.uuidString, p_vehicle_id: vehicleID, p_task_type: type.rawValue, p_note: issueNote)
         
         return try await client
             .rpc("assign_new_maintenance_task", params: params)
@@ -730,6 +730,6 @@ class RemoteController: DatabaseAPIIntegrable {
         }
     }
    
-    private let client = AuthManager.shared.client
+    let client = AuthManager.shared.client
     static let shared = RemoteController()
 }

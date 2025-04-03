@@ -357,6 +357,7 @@ struct FleetManagerDashboardView: View {
             }
             .padding(.vertical)
         }
+
         .background(Color(red: 242/255, green: 242/255, blue: 247/255))
         .navigationTitle("Fleet Manager")
         .toolbar {
