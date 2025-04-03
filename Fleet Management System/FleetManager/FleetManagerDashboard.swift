@@ -357,6 +357,18 @@ struct FleetManagerDashboardView: View {
             }
             .padding(.vertical)
         }
+        .refreshable {
+            Task {
+                await viewModel.loadDrivers()
+                await viewModel.loadVehicles()
+                await viewModel.loadMaintenancePersonnels()
+                await viewModel.loadTrips()
+                await viewModel.loadManagerAssignedMaintenanceTasks()
+                await viewModel.loadVehicleCompanies()
+                await viewModel.loadServiceCenters()
+                await viewModel.loadServiceCenterLocations()
+            }
+        }
         .background(Color(red: 242/255, green: 242/255, blue: 247/255))
         .navigationTitle("Fleet Manager")
         .toolbar {

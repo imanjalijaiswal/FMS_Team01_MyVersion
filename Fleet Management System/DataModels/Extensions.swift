@@ -10,6 +10,33 @@ import SwiftUICore
 import CoreLocation
 import MapKit
 
+struct IFEPushNotification: Codable, Identifiable, Equatable, CustomStringConvertible {
+    var description: String {
+        return """
+        IFE Push Notification:
+        Title: \(title)
+        Message: \(message)
+        Sent At: \(sentAt.description)
+        """
+    }
+    
+    func getRecipientMetaData() async -> UserMetaData? {
+        return await IFEDataController.shared
+            .getUserMetaData(by: recipientID)
+    }
+    
+    func getSenderMetaData() async -> UserMetaData? {
+        return await IFEDataController.shared.getUserMetaData(by: senderID)
+    }
+    
+    var id: UUID
+    var senderID: UUID
+    var recipientID: UUID
+    var title: String
+    var message: String
+    var sentAt: Date
+}
+
 extension Color {
     static let primaryGradientStart = Color(red: 0/255, green: 128/255, blue: 128/255)
     static let primaryGradientEnd = Color(red: 0/255, green: 105/255, blue: 105/255)

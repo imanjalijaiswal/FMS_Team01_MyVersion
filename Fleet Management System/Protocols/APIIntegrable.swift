@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Supabase
+import UserNotifications
 
 protocol DatabaseAPIIntegrable {
     //MARK: User APIs
@@ -122,4 +124,20 @@ protocol DatabaseAPIIntegrable {
     func updateMaintenanceTaskEstimatedDate(by id: UUID, _ date: Date) async throws
     
     func createInvoiceForMaintenanceTask(by id: UUID, expenses: [MaintenanceExpenseType: Double], _ repairNote: String) async throws
+}
+
+protocol IFENotifiable {
+    init(_ client: SupabaseClient, schema: String, table: String, userID: UUID?)
+    
+    func sendNotification(_ notification: IFEPushNotification) async
+    
+    func handlePayload(_ payload: [String: Any])
+    
+    func subscribe() async
+    
+    func unsubscribe() async
+    
+    func showPushNotification(_ notification: IFEPushNotification, sound: UNNotificationSound?)
+    
+    func registerPersistentNotificationCategory()
 }

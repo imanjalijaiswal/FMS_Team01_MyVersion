@@ -11,9 +11,14 @@ class MapViewModel: NSObject, ObservableObject {
     private let routeOverviewAltitude: Double = 2000  // Route overview - see the whole route
     let defaultPitch: Double = 0
     
+    private static let sosEnabledKey = "driver_sos_enabled"
+        private static let sosTimestampKey = "driver_sos_timestamp"
+        private static let sosTripIdKey = "driver_sos_trip_id"
+
+    
     // Timers
     private var routeUpdateTimer: Timer?
-    private var navigationUpdateTimer: Timer?
+    var navigationUpdateTimer: Timer?
     
     @Published var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 28.6139, longitude: 77.2090),
@@ -42,6 +47,11 @@ class MapViewModel: NSObject, ObservableObject {
     @Published var currentStepIndex: Int = 0
     @Published var navigationAnnouncements: String = ""
     
+    @Published var sosHasBeenSent: Bool = false
+        @Published var sosTimestamp: Date? = nil
+        @Published var activeSOSTripId: UUID? = nil
+        @Published var showingSOSDetails: Bool = false
+
     // Geofencing overlays
     @Published var pickupGeofenceOverlay: MKCircle?
     @Published var destinationGeofenceOverlay: MKCircle?
@@ -327,14 +337,6 @@ class MapViewModel: NSObject, ObservableObject {
     }
     
     func startNavigation() {
-        guard hasReachedPickup else {
-            scheduleNotification(
-                title: "Cannot Start Navigation",
-                body: "You must be within the pickup area to start navigation"
-            )
-            return
-        }
-        
         isNavigating = true
         isInNavigationMode = true
         currentStepIndex = 0
@@ -393,27 +395,19 @@ class MapViewModel: NSObject, ObservableObject {
             return
         }
         
-        // Show post-trip inspection sheet
-        if let trip = currentTrip {
-            let tripOverviewView = TripOverviewView(
-                task: trip,
-                selectedTab: .constant(1),
-                isInDestinationGeofence: true
-            )
-            cleanupMap()
-            // Present the TripOverviewView
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootViewController = window.rootViewController {
-                let hostingController = UIHostingController(rootView: tripOverviewView)
-                rootViewController.present(hostingController, animated: true)
-            }
-        }
-        
+        // Clean up map and stop navigation
+        cleanupMap()
         isNavigating = false
         isInNavigationMode = false
         navigationUpdateTimer?.invalidate()
         navigationUpdateTimer = nil
+        
+        // Post notification to show post-trip inspection
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ShowPostTripInspection"),
+            object: nil,
+            userInfo: ["trip": currentTrip as Any]
+        )
     }
     
     private func updateNavigationState() {
@@ -714,7 +708,56 @@ class MapViewModel: NSObject, ObservableObject {
         // Invalidate timers
         routeUpdateTimer?.invalidate()
         navigationUpdateTimer?.invalidate()
+        
+        // Post notification to dismiss the navigation info card
+        NotificationCenter.default.post(
+            name: NSNotification.Name("DismissNavigationInfoCard"),
+            object: nil
+        )
     }
+    // MARK: - SOS Persistence Methods
+        
+        func saveSOSState(isActive: Bool, timestamp: Date?, tripId: UUID?) {
+            // Save to UserDefaults for persistence across app restarts
+            UserDefaults.standard.set(isActive, forKey: Self.sosEnabledKey)
+            
+            if let timestamp = timestamp {
+                UserDefaults.standard.set(timestamp.timeIntervalSince1970, forKey: Self.sosTimestampKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.sosTimestampKey)
+            }
+            
+            if let tripId = tripId {
+                UserDefaults.standard.set(tripId.uuidString, forKey: Self.sosTripIdKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.sosTripIdKey)
+            }
+        }
+        
+        func clearSOSState() {
+            // Remove from UserDefaults
+            UserDefaults.standard.removeObject(forKey: Self.sosEnabledKey)
+            UserDefaults.standard.removeObject(forKey: Self.sosTimestampKey)
+            UserDefaults.standard.removeObject(forKey: Self.sosTripIdKey)
+        }
+        
+        func loadSOSState() -> (isActive: Bool, timestamp: Date?, tripId: UUID?) {
+            let isActive = UserDefaults.standard.bool(forKey: Self.sosEnabledKey)
+            
+            var timestamp: Date?
+            if let timeInterval = UserDefaults.standard.object(forKey: Self.sosTimestampKey) as? TimeInterval {
+                timestamp = Date(timeIntervalSince1970: timeInterval)
+            }
+            
+            var tripId: UUID?
+            if let tripIdString = UserDefaults.standard.string(forKey: Self.sosTripIdKey),
+               let uuid = UUID(uuidString: tripIdString) {
+                tripId = uuid
+            }
+            
+            return (isActive, timestamp, tripId)
+        }
+
 }
 
 // MARK: - Location Manager Delegate
@@ -841,26 +884,38 @@ extension MapViewModel: CLLocationManagerDelegate {
 
 // MARK: - Map View
 struct MapView: View {
-    @StateObject private var viewModel = MapViewModel()
+    @StateObject var viewModel = MapViewModel()
     @StateObject private var tripViewModel = IFEDataController.shared
     @Binding var selectedTab: Int
-    @State private var cardOffset: CGFloat = 100 // Controls card position
+    @Environment(\.dismiss) private var dismiss
+    @State private var cardOffset: CGFloat = 100
     @State private var cardExpanded: Bool = true
     @State private var preInspectionCompletedTrips: Set<UUID> = []
     @State private var tripsRequiringMaintenance: Set<UUID> = []
     @State private var showingTripOverview = false
     @State private var selectedTrip: Trip?
+    @State private var showingPostTripInspection = false
+    @State private var showNavigationInfoCard = true
+    @State private var hasCompletedPreInspection = false
+    @State private var vehicleStatusTimer: Timer?
+    @State private var vehicleLocationTimer: Timer?
+    @State private var vehicle: Vehicle?
+    @State private var showingSOSConfirmation = false
+        @State private var sosHasBeenSent = false
+        @State private var showingSOSDetails = false
+        @State private var sosTimestamp: Date?
+        @State private var activeSOSTripId: UUID?
+
     
     // Add constants for card positions
     private let expandedOffset: CGFloat = 90
-    private let minimizedOffset: CGFloat = 200 // Increased to stay above tab bar
-    private let tabBarHeight: CGFloat = 49 // Standard iOS tab bar height
+    private let minimizedOffset: CGFloat = 200
+    private let tabBarHeight: CGFloat = 49
     private let bottomSafeArea: CGFloat = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
+    private let locationUpdateInterval: TimeInterval = 300 // 5 minutes in seconds
     
     var activeTrip: Trip? {
         tripViewModel.tripsForDriver.first { trip in
-            // Include trips that are either in progress or have completed pre-inspection
-            // but exclude trips that require maintenance
             trip.status == .inProgress || 
             (preInspectionCompletedTrips.contains(trip.id) && 
              trip.status == .scheduled && 
@@ -868,8 +923,28 @@ struct MapView: View {
         }
     }
     
+    private func updateVehicleLocation() async {
+        let remoteController = RemoteController()
+        guard let userLocation = viewModel.userLocation,
+              let trip = activeTrip,
+              let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+            return
+        }
+        
+        do {
+            let location = try await remoteController.updateVehicleCoordinate(
+                by: vehicle.id,
+                latitude: String(userLocation.latitude),
+                longitude: String(userLocation.longitude)
+            )
+            print("Vehicle location updated successfully : \(location)")
+        } catch {
+            print("Failed to update vehicle location: \(error.localizedDescription)")
+        }
+    }
+    
     var body: some View {
-        NavigationStack {
+        NavigationView {
             ZStack(alignment: .bottom) {
                 MapViewRepresentable(viewModel: viewModel)
                     .edgesIgnoringSafeArea(.all)
@@ -883,6 +958,20 @@ struct MapView: View {
                 VStack {
                     HStack {
                         Spacer()
+                        if let trip = activeTrip, trip.status == .inProgress, preInspectionCompletedTrips.contains(trip.id) && vehicle?.status != .underMaintenance {
+                                                    Button(action: {
+                                                        showSOSAlert()
+                                                    }) {
+                                                        Image(systemName: "exclamationmark.triangle.fill")
+                                                            .font(.title)
+                                                            .foregroundColor(.white)
+                                                            .padding()
+                                                            .background(sosHasBeenSent ? Color.gray : Color.red)
+                                                            .clipShape(Circle())
+                                                            .shadow(radius: 3)
+                                                    }
+                                                    .disabled(sosHasBeenSent)
+                                                }
                         Button(action: {
                             viewModel.centerOnUserLocation()
                         }) {
@@ -922,7 +1011,7 @@ struct MapView: View {
                 }
                 
                 // Navigation Info Card
-                if let trip = activeTrip {
+                if let trip = activeTrip, showNavigationInfoCard {
                     VStack(spacing: 0) {
                         // Handle bar and controls
                         HStack {
@@ -945,7 +1034,15 @@ struct MapView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        NavigationInfoCard(trip: trip, viewModel: viewModel)
+                        NavigationInfoCard(
+                            trip: trip,
+                            viewModel: viewModel,
+                            showingPostTripInspection: $showingPostTripInspection,
+                            hasCompletedPreInspection: $hasCompletedPreInspection,
+                            sosHasBeenSent: viewModel.sosHasBeenSent && sosHasBeenSent && trip.status == .inProgress && preInspectionCompletedTrips.contains(trip.id),
+                            showSOSDetails: { showingSOSDetails = true }
+
+                        )
                     }
                     .background(Color.white)
                     .cornerRadius(20, corners: [.topLeft, .topRight])
@@ -976,10 +1073,28 @@ struct MapView: View {
                 } else {
                     EmptyTripCard(selectedTab: $selectedTab)
                         .padding()
-                        .padding(.bottom, bottomSafeArea) // Add padding for tab bar
+                        .padding(.bottom, bottomSafeArea)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.primaryGradientStart)
+                        }
+                        .font(.subheadline)
+                        .padding(8)
+                        .background(Color.white)
+                        .cornerRadius(16)
+                    }
                 }
             }
         }
+        .navigationViewStyle(.stack)
         .sheet(isPresented: $showingTripOverview) {
             if let trip = selectedTrip {
                 TripOverviewView(
@@ -989,14 +1104,181 @@ struct MapView: View {
                 )
             }
         }
+        .sheet(isPresented: $showingSOSDetails) {
+                    SOSDetailsView(
+                        address: viewModel.currentLocationAddress,
+                        coordinates: viewModel.userLocation,
+                        onClose: { showingSOSDetails = false },
+                        timestamp: sosTimestamp,
+                        onCancelSOS: { cancelSOS() },
+                        activeTrip: activeTrip
+                    )
+                }
+        .sheet(isPresented: $showingPostTripInspection) {
+            if let trip = activeTrip {
+                PostTripInspectionChecklistView(trip: trip) { inspectionItems, note in
+                    let hasAnyFailure = inspectionItems.values.contains(false)
+                    
+                    // Handle post-trip inspection completion
+                    IFEDataController.shared.addPostTripInspectionForTrip(
+                        by: trip.id,
+                        inspection: inspectionItems,
+                        note: note
+                    )
+                    
+                    if hasAnyFailure {
+                        Task {
+                            // Assign maintenance task
+                            await assignMaintenanceTaskForFailedItems(
+                                inspectionItems: inspectionItems,
+                                note: note,
+                                trip: trip,
+                                isPreTrip: false
+                            )
+                            
+                            // Update vehicle status
+                            if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                                self.vehicle = vehicle
+                            }
+                        }
+                    }
+                    
+                    // Dismiss both sheets
+                    showingPostTripInspection = false
+                    dismiss()
+                }
+            }
+        }
         .onAppear {
             viewModel.setupLocationManager()
             if let trip = activeTrip {
                 viewModel.setCurrentTrip(trip)
+                checkPreInspectionStatus(for: trip)
+            }
+            
+            // Start vehicle status monitoring
+            startVehicleStatusMonitoring()
+            
+            // Add notification observer for dismissing navigation info card
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("DismissNavigationInfoCard"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                withAnimation {
+                    showNavigationInfoCard = false
+                }
+            }
+            
+            // Update vehicle location when view appears
+            Task {
+                await updateVehicleLocation()
+                DispatchQueue.main.async {
+                    loadSavedSOSState()
+                }
+            }
+        }
+        .alert("Emergency SOS", isPresented: $showingSOSConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Confirm SOS", role: .destructive) {
+                        sendEmergencyAlert()
+                    }
+                } message: {
+                    Text("Are you in an emergency situation and need immediate assistance? Confirming will alert the fleet management team and emergency services. Note: You can only send one emergency alert per trip.")
+                }
+        .onDisappear {
+            // Stop vehicle status monitoring
+            stopVehicleStatusMonitoring()
+            
+            // Remove notification observer
+            NotificationCenter.default.removeObserver(
+                self,
+                name: NSNotification.Name("DismissNavigationInfoCard"),
+                object: nil
+            )
+            
+            // Update vehicle location when view disappears
+            Task {
+                await updateVehicleLocation()
             }
         }
         .task {
             await checkPreInspections()
+        }
+    }
+    
+    private func startVehicleStatusMonitoring() {
+        // Create a timer that checks vehicle status every 5 seconds
+        vehicleStatusTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            Task {
+                await checkVehicleStatus()
+            }
+        }
+        
+        // Create a timer that updates vehicle location every 5 minutes
+        vehicleLocationTimer = Timer.scheduledTimer(withTimeInterval: locationUpdateInterval, repeats: true) { _ in
+            Task {
+                await updateVehicleLocation()
+            }
+        }
+    }
+    
+    private func stopVehicleStatusMonitoring() {
+        vehicleStatusTimer?.invalidate()
+        vehicleStatusTimer = nil
+        
+        vehicleLocationTimer?.invalidate()
+        vehicleLocationTimer = nil
+    }
+    
+    private func checkVehicleStatus() async {
+        guard let trip = activeTrip else { return }
+        
+        if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+            self.vehicle = vehicle
+            
+            if vehicle.status == .assigned {
+                // Vehicle is back to assigned status, remove from maintenance set
+                DispatchQueue.main.async {
+                    tripsRequiringMaintenance.remove(trip.id)
+                    
+                    // Only start navigation if pre-trip inspection is complete and not already navigating
+                    if hasCompletedPreInspection && !viewModel.isNavigating {
+                        viewModel.startNavigation()
+                        if let userLocation = viewModel.userLocation {
+                            viewModel.calculateRouteToDestination(from: userLocation, for: trip)
+                        }
+                    }
+                }
+            } else if vehicle.status == .underMaintenance {
+                // Vehicle is under maintenance, add to maintenance set
+                DispatchQueue.main.async {
+                    tripsRequiringMaintenance.insert(trip.id)
+                }
+            }
+        }
+    }
+    
+    private func checkPreInspectionStatus(for trip: Trip) {
+        Task {
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+                hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                if hasCompletedPreInspection {
+                    // Check if vehicle is under maintenance
+                    if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                        self.vehicle = vehicle
+                        if vehicle.status == .underMaintenance {
+                            tripsRequiringMaintenance.insert(trip.id)
+                        } else {
+                            // Start navigation immediately if pre-inspection is completed and vehicle is not under maintenance
+                            viewModel.startNavigation()
+                            if let userLocation = viewModel.userLocation {
+                                viewModel.calculateRouteToDestination(from: userLocation, for: trip)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -1014,6 +1296,274 @@ struct MapView: View {
                 }
             }
         }
+    }
+func showSOSAlert() {
+        showingSOSConfirmation = true
+    }
+    
+    // Send emergency alert
+    func sendEmergencyAlert() {
+        // Store the current time
+        sosTimestamp = Date()
+        
+        // Send notification to user confirming SOS was sent
+        viewModel.scheduleNotification(
+            title: "Emergency Alert Sent",
+            body: "Your SOS has been received. Help is on the way. Stay calm and wait for assistance. You can only send one SOS per trip.",
+            sound: true
+        )
+        
+        // Log the emergency details
+        let emergencyMessage = "DRIVER EMERGENCY ALERT: Driver reported emergency at location: \(viewModel.currentLocationAddress). Current coordinates: \(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)"
+        print(emergencyMessage)
+        
+        // Save SOS state to persistent storage
+        sosHasBeenSent = true
+        viewModel.sosHasBeenSent = true
+        
+        if let trip = activeTrip {
+            activeSOSTripId = trip.id
+            viewModel.activeSOSTripId = trip.id
+            viewModel.sosTimestamp = sosTimestamp
+            viewModel.saveSOSState(isActive: true, timestamp: sosTimestamp, tripId: trip.id)
+            
+            // Create emergency maintenance task in database
+            Task {
+                guard let userCoordinates = viewModel.userLocation else {
+                    print("Cannot create emergency task: User location not available")
+                    return
+                }
+                
+                // Find the nearest service center
+                let coordinateString = "\(userCoordinates.latitude), \(userCoordinates.longitude)"
+                let nearestCenter = await findNearestServiceCenter(to: coordinateString)
+                
+                guard let serviceCenter = nearestCenter else {
+                    print("Cannot create emergency task: No service center found")
+                    return
+                }
+                
+                // Get maintenance personnel assigned to this service center
+                guard let personnel = await IFEDataController.shared.getMaintenancePersonnel(ofCenter: serviceCenter.id) else {
+                    print("Cannot create emergency task: No maintenance personnel found for service center ID \(serviceCenter.id)")
+                    return
+                }
+                
+                // Create issue note with all relevant information
+                let issueNote = """
+                EMERGENCY SOS ALERT
+                Vehicle requires emergency assistance
+                Driver reported emergency at: \(viewModel.currentLocationAddress)
+                Coordinates: \(userCoordinates.latitude), \(userCoordinates.longitude)
+                Trip ID: \(trip.id)
+                Vehicle ID: \(trip.assignedVehicleID)
+                Timestamp: \(sosTimestamp?.formatted(date: .abbreviated, time: .shortened) ?? "Unknown")
+                """
+                
+                // Directly call the assignNewMaintenanceTask function
+                if let userId = IFEDataController.shared.user?.id {
+                    let maintenanceTask = await IFEDataController.shared.assignNewMaintenanceTask(
+                        by: userId,
+                        to: personnel.id,
+                        for: trip.assignedVehicleID,
+                        ofType: .emergencyMaintenance,
+                        issueNote
+                    )
+                    
+                    if let task = maintenanceTask {
+                        print("Emergency maintenance task created successfully: ID \(task.taskID)")
+                        
+                        // Schedule a notification to inform the user that maintenance personnel has been assigned
+                        viewModel.scheduleNotification(
+                            title: "Maintenance Personnel Assigned",
+                            body: "Maintenance personnel \(personnel.meta_data.fullName) has been assigned to your emergency. They will contact you shortly.",
+                            sound: true
+                        )
+                        
+                        // Sending message to Maintenance Personnel
+                        await tripViewModel.sendMessage(to: personnel.id, title: "Driver Emergency Alert", message: "Driver reported emergency at location:\n\(viewModel.currentLocationAddress).\nCurrent coordinates:\n\(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)")
+                        
+                        // Sending message to Fleet Manager
+                        await tripViewModel.sendMessage(to: trip.assignedByFleetManagerID, title: "Driver Emergency Alert", message: "Driver reported emergency at location:\n\(viewModel.currentLocationAddress).\nCurrent coordinates:\n\(viewModel.userLocation?.latitude ?? 0), \(viewModel.userLocation?.longitude ?? 0)")
+                    } else {
+                        print("Failed to create emergency maintenance task")
+                        
+                        // Notify the user about the failure
+                        viewModel.scheduleNotification(
+                            title: "Maintenance Assignment Failed",
+                            body: "We couldn't assign maintenance personnel automatically. Please call fleet management directly.",
+                            sound: true
+                        )
+                    }
+                } else {
+                    print("Cannot create emergency task: User ID not available")
+                }
+            }
+        }
+    }
+    
+    // Clear SOS alert
+    func cancelSOS() {
+        // Clear SOS state
+        sosHasBeenSent = false
+        viewModel.sosHasBeenSent = false
+        sosTimestamp = nil
+        viewModel.sosTimestamp = nil
+        activeSOSTripId = nil
+        viewModel.activeSOSTripId = nil
+        
+        // Remove from UserDefaults
+        viewModel.clearSOSState()
+        
+        // Log the cancellation
+        print("SOS has been cleared")
+        
+        // Optionally notify the user
+        viewModel.scheduleNotification(
+            title: "SOS Cleared",
+            body: "Your emergency status has been cleared."
+        )
+    }
+    
+    // Load saved SOS state
+    private func loadSavedSOSState() {
+        let savedState = viewModel.loadSOSState()
+        
+        // Only restore SOS state if:
+        // 1. There was an active SOS
+        // 2. A trip ID was saved
+        // 3. There is currently an active trip
+        // 4. The saved trip ID matches the current active trip
+        // 5. The current trip is in progress
+        // 6. The trip has completed pre-inspection
+        if savedState.isActive,
+           let savedTripId = savedState.tripId,
+           let activeTrip = activeTrip,
+           savedTripId == activeTrip.id,
+           activeTrip.status == .inProgress,
+           preInspectionCompletedTrips.contains(activeTrip.id) {
+            
+            // Restore the SOS state
+            viewModel.sosHasBeenSent = true
+            viewModel.sosTimestamp = savedState.timestamp
+            viewModel.activeSOSTripId = savedTripId
+            
+            // Update local state
+            sosHasBeenSent = true
+            sosTimestamp = savedState.timestamp
+            activeSOSTripId = savedTripId
+            
+            // Show the SOS details view
+            showingSOSDetails = true
+            
+            // Log the restoration
+            print("Restored SOS state for trip \(savedTripId)")
+        } else {
+            // Clear any invalid SOS state
+            viewModel.clearSOSState()
+            print("Cleared invalid SOS state - conditions not met")
+        }
+    }
+
+    private func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip, isPreTrip: Bool) async {
+        // Filter failed items
+        let failedItems = inspectionItems.filter { !$0.value }
+        guard !failedItems.isEmpty else { return }
+        
+        // Create issue note using TripInspection.issueDescription
+        let issueDescriptions = failedItems.map { item in
+            "\(item.key.rawValue): \(TripInspection.issueDescription[item.key] ?? "Issue detected.")"
+        }.joined(separator: "\n")
+        
+        let inspectionType = isPreTrip ? "Pre-Trip" : "Post-Trip"
+        let fullIssueNote = "\(inspectionType) Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
+        
+        // Get the vehicle's current coordinate
+        guard let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+            print("Failed to fetch vehicle for maintenance task assignment")
+            return
+        }
+        
+        // Find the nearest service center
+        guard let nearestServiceCenter = await findNearestServiceCenter(to: vehicle.currentCoordinate) else {
+            print("No available service center found")
+            return
+        }
+        
+        // Debug: Log service center details
+        print("Nearest Service Center ID: \(nearestServiceCenter.id)")
+        
+        // Fetch the maintenance personnel metadata for this service center
+        guard let personnelMetaData = await IFEDataController.shared.getMaintenancePersonnelMetaData(ofCenter: nearestServiceCenter.id) else {
+            print("No maintenance personnel metadata found for service center \(nearestServiceCenter.id)")
+            return
+        }
+        
+        // Verify active status
+        guard personnelMetaData.activeStatus else {
+            print("Maintenance personnel for service center \(nearestServiceCenter.id) is inactive (ID: \(personnelMetaData.id))")
+            return
+        }
+        
+        // Debug: Log personnel details
+        print("Assigned Personnel: ID: \(personnelMetaData.id), Name: \(personnelMetaData.fullName), Active: \(personnelMetaData.activeStatus)")
+        
+        // Assign the maintenance task
+        let assignedBy = IFEDataController.shared.user?.id ?? trip.assignedByFleetManagerID
+        guard let task = await IFEDataController.shared.assignNewMaintenanceTask(
+            by: assignedBy,
+            to: personnelMetaData.id,
+            for: trip.assignedVehicleID,
+            ofType: isPreTrip ? .preInspectionMaintenance : .postInspectionMaintenance,
+            fullIssueNote
+        ) else {
+            print("Failed to assign maintenance task")
+            return
+        }
+        
+        print("Maintenance task assigned: \(task)")
+    }
+    
+    private func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            print("Invalid vehicle coordinate format")
+            return nil
+        }
+        
+        let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+        let serviceCenters = IFEDataController.shared.serviceCenters
+        
+        var nearestServiceCenter: ServiceCenter?
+        var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
+        
+        for center in serviceCenters {
+            guard let centerCoords = parseCoordinates(center.coordinate) else {
+                continue
+            }
+            
+            let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
+            let distance = vehicleLocation.distance(from: centerLocation)
+            
+            if distance < shortestDistance {
+                shortestDistance = distance
+                nearestServiceCenter = center
+            }
+        }
+        
+        return nearestServiceCenter
+    }
+    
+    private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            return nil
+        }
+        return (latitude, longitude)
     }
 }
 
@@ -1097,7 +1647,7 @@ struct EmptyTripCard: View {
             }
             
             Button(action: {
-                selectedTab = 0 // Switch to Dashboard tab
+                 // Switch to Dashboard tab
             }) {
                 Text("View Dashboard")
                     .font(.headline)
@@ -1112,6 +1662,458 @@ struct EmptyTripCard: View {
         .background(Color.white)
         .cornerRadius(16)
         .shadow(radius: 5)
+    }
+}
+// MARK: - SOS Details View
+struct SOSDetailsView: View {
+    let address: String
+    let coordinates: CLLocationCoordinate2D?
+    let onClose: () -> Void
+    let timestamp: Date?
+    var onCancelSOS: (() -> Void)? = nil
+    let activeTrip: Trip?
+    @State private var fleetManagerPhone: String = "5551234567" // Default fallback
+    @State private var fleetManagerName: String = "Fleet Manager"
+    @State private var isLoadingManagerInfo: Bool = true
+    @State private var nearestServiceCenter: ServiceCenter? = nil
+    @State private var serviceCenterAddress: String = "Searching for nearest service center..."
+    @State private var distance: CLLocationDistance? = nil
+    @State private var maintenancePersonnelName: String = "Maintenance Personnel"
+    @State private var maintenancePersonnelPhone: String = "5551234567" // Default fallback
+    @State private var isLoadingPersonnelInfo: Bool = true
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Emergency Status
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.red)
+                            
+                            Text("Emergency SOS Active")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                        }
+                        
+                        Text("Help is on the way. Stay calm and remain at your current location if safe to do so.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(12)
+                    
+                    // Location Information
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Your Current Location")
+                            .font(.headline)
+                        
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "location.fill")
+                                .foregroundColor(.primary)
+                                .frame(width: 24)
+                            
+                            Text(address)
+                                .font(.subheadline)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .lineLimit(nil)
+                        }
+                        
+                        if let coordinates = coordinates {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .foregroundColor(.primary)
+                                    .frame(width: 24)
+                                
+                                Text("Coordinates: \(String(format: "%.6f", coordinates.latitude)), \(String(format: "%.6f", coordinates.longitude))")
+                                    .font(.subheadline)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(12)
+                    
+                    // Emergency Status
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Emergency Status")
+                            .font(.headline)
+                        
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Alert Sent")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(timestamp?.formatted(date: .abbreviated, time: .shortened) ?? "Unknown")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Divider()
+                                .frame(height: 40)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Status")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("Assistance Dispatched")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.green)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        
+                        // Placeholder for additional status information
+                        Text("Your emergency has been reported to fleet management. They will contact you shortly.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(12)
+                    
+                    // Nearest Service Center
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Nearest Service Center")
+                            .font(.headline)
+                        
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "wrench.and.screwdriver.fill")
+                                .foregroundColor(.primary)
+                                .frame(width: 24)
+                            
+                            Text(serviceCenterAddress)
+                                .font(.subheadline)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .lineLimit(nil)
+                        }
+                        
+                        if let distance = distance {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: "arrow.triangle.swap")
+                                    .foregroundColor(.primary)
+                                    .frame(width: 24)
+                                
+                                Text("Distance: \(formatDistance(distance))")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(12)
+                    
+                    Spacer(minLength: 20)
+                    
+                    // Emergency Contact Buttons
+                    VStack(spacing: 16) {
+                        Button(action: {
+                            // Call the maintenance personnel of the nearest service center
+                            print("Calling Maintenance Personnel: \(maintenancePersonnelName), Phone: \(maintenancePersonnelPhone)")
+                            if let url = URL(string: "tel:\(maintenancePersonnelPhone)") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack {
+                                if isLoadingPersonnelInfo {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .padding(.trailing, 4)
+                                } else {
+                                    Image(systemName: "wrench.fill")
+                                        .font(.system(size: 16))
+                                }
+                                Text(isLoadingPersonnelInfo ? "Loading Maintenance Personnel Info..." : "Call \(maintenancePersonnelName) (Maintenance)")
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 2)
+                        }
+                        .buttonStyle(PressableButtonStyle())
+                        .disabled(isLoadingPersonnelInfo)
+                        
+                        Button(action: {
+                            // Call the fleet manager who assigned the trip
+                            print("Calling Fleet Manager: \(fleetManagerName), Phone: \(fleetManagerPhone)")
+                            if let url = URL(string: "tel:\(fleetManagerPhone)") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            HStack {
+                                if isLoadingManagerInfo {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .padding(.trailing, 4)
+                                } else {
+                                    Image(systemName: "phone.fill")
+                                        .font(.system(size: 16))
+                                }
+                                Text(isLoadingManagerInfo ? "Loading Manager Info..." : "Call \(fleetManagerName) (Fleet Manager)")
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 2)
+                        }
+                        .buttonStyle(PressableButtonStyle())
+                        .disabled(isLoadingManagerInfo)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+            .navigationTitle("Emergency SOS")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: onClose) {
+                        Text("Close")
+                            .foregroundColor(.primary)
+                    }
+                }
+            }
+            .onAppear {
+                loadFleetManagerInfo()
+            }
+        }
+    }
+    
+    private func loadFleetManagerInfo() {
+        guard let trip = activeTrip else {
+            isLoadingManagerInfo = false
+            isLoadingPersonnelInfo = false
+            return
+        }
+        
+        // Get the assigned fleet manager's info
+        let fleetManagerID = trip.assignedByFleetManagerID
+        
+        Task {
+            isLoadingManagerInfo = true
+            isLoadingPersonnelInfo = true
+            
+            do {
+                // Get fleet manager data using the data controller
+                if let fleetManager = try await IFEDataController.shared.getFleetManager(by: fleetManagerID) {
+                    DispatchQueue.main.async {
+                        self.fleetManagerName = fleetManager.meta_data.fullName
+                        self.fleetManagerPhone = fleetManager.meta_data.phone.filter { $0.isNumber }
+                        self.isLoadingManagerInfo = false
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.fleetManagerName = "Fleet Manager"
+                        self.fleetManagerPhone = "5551234567" // Default fallback
+                        self.isLoadingManagerInfo = false
+                    }
+                }
+            } catch {
+                print("Error fetching fleet manager info: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.fleetManagerName = "Fleet Manager"
+                    self.fleetManagerPhone = "5551234567" // Default fallback
+                    self.isLoadingManagerInfo = false
+                }
+            }
+            
+            // Find the nearest service center
+            if let coordinates = coordinates {
+                let coordString = "\(coordinates.latitude), \(coordinates.longitude)"
+                if let center = await findNearestServiceCenter(to: coordString) {
+                    self.nearestServiceCenter = center
+                    
+                    // Get the service center address
+                    getAddress(from: center.coordinate) { address in
+                        DispatchQueue.main.async {
+                            if let address = address {
+                                self.serviceCenterAddress = address
+                            } else {
+                                self.serviceCenterAddress = "Address information unavailable"
+                            }
+                        }
+                    }
+                    
+                    // Get the maintenance personnel of this service center
+                    if let personnel = await IFEDataController.shared.getMaintenancePersonnel(ofCenter: center.id) {
+                        DispatchQueue.main.async {
+                            self.maintenancePersonnelName = personnel.meta_data.fullName
+                            self.maintenancePersonnelPhone = personnel.meta_data.phone.filter { $0.isNumber }
+                            self.isLoadingPersonnelInfo = false
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.maintenancePersonnelName = "Maintenance Personnel"
+                            self.maintenancePersonnelPhone = "5551234567" // Default fallback
+                            self.isLoadingPersonnelInfo = false
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.serviceCenterAddress = "No service centers found nearby"
+                        self.isLoadingPersonnelInfo = false
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingPersonnelInfo = false
+                }
+            }
+        }
+    }
+    
+    private func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            print("Invalid vehicle coordinate format")
+            return nil
+        }
+        
+        let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+        let serviceCenters = IFEDataController.shared.serviceCenters
+        
+        var nearestServiceCenter: ServiceCenter?
+        var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
+        
+        for center in serviceCenters {
+            let centerComponents = center.coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            guard centerComponents.count == 2,
+                  let centerLatitude = Double(centerComponents[0]),
+                  let centerLongitude = Double(centerComponents[1]) else {
+                continue
+            }
+            
+            let centerLocation = CLLocation(latitude: centerLatitude, longitude: centerLongitude)
+            let distance = vehicleLocation.distance(from: centerLocation)
+            
+            if distance < shortestDistance {
+                shortestDistance = distance
+                nearestServiceCenter = center
+            }
+        }
+        
+        return nearestServiceCenter
+    }
+    
+    private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            return nil
+        }
+        return (latitude, longitude)
+    }
+    
+    private func formatDistance(_ meters: CLLocationDistance) -> String {
+        if meters >= 1000 {
+            let kilometers = meters / 1000
+            return String(format: "%.1f km", kilometers)
+        } else {
+            return String(format: "%.0f m", meters)
+        }
+    }
+    
+    private func openMapsForDirections(to coordinate: String) {
+        guard let coords = parseCoordinates(coordinate) else { return }
+        
+        let destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(
+            latitude: coords.latitude,
+            longitude: coords.longitude
+        )))
+        destination.name = "Service Center"
+        
+        MKMapItem.openMaps(
+            with: [destination],
+            launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
+        )
+    }
+    
+    private func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            completion(nil)
+            return
+        }
+        
+        let location = CLLocation(latitude: latitude, longitude: longitude)
+        let geocoder = CLGeocoder()
+        
+        geocoder.reverseGeocodeLocation(location) { placemarks, error in
+            if let error = error {
+                print("Reverse geocoding error: \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+            
+            if let placemark = placemarks?.first {
+                let address = [
+                    placemark.name,
+                    placemark.thoroughfare,
+                    placemark.subThoroughfare,
+                    placemark.locality,
+                    placemark.subLocality,
+                    placemark.administrativeArea,
+                    placemark.postalCode,
+                    placemark.country
+                ]
+                    .compactMap { $0 }
+                    .joined(separator: ", ")
+                completion(address)
+            } else {
+                completion("\(latitude), \(longitude)")
+            }
+        }
+    }
+}
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
@@ -1308,16 +2310,61 @@ extension UIView {
 struct NavigationInfoCard: View {
     let trip: Trip
     @ObservedObject var viewModel: MapViewModel
-    private let tabBarHeight: CGFloat = 49 // Standard iOS tab bar height
+    @Binding var showingPostTripInspection: Bool
+    @Binding var hasCompletedPreInspection: Bool
+    let sosHasBeenSent: Bool
+    let showSOSDetails: () -> Void
+    @State private var showingPreTripInspection = false
+    @State private var vehicle: Vehicle?
+    @State private var requiresMaintenance = false
+    @State private var hasCompletedPostInspection = false
+    @State private var inspectionCheckTimer: Timer?
+    @Environment(\.dismiss) private var dismiss
+    private let tabBarHeight: CGFloat = 49
     private let bottomSafeArea: CGFloat = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
     
     var body: some View {
         VStack(spacing: 16) {
             // Route information
             VStack(alignment: .leading, spacing: 8) {
-                Text("Active Trip #\(trip.tripID)")
-                    .font(.headline)
-                    .foregroundColor(.primaryGradientStart)
+                HStack {
+                    Text("Active Trip #\(trip.tripID)")
+                        .font(.headline)
+                        .foregroundColor(.primaryGradientStart)
+                    
+                    Spacer()
+                    
+                    // SOS Status Button - only appears after SOS is triggered
+                    if sosHasBeenSent {
+                        Button(action: {
+                            showSOSDetails()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white)
+                                
+                                Text("SOS Active")
+                                    .font(.callout)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.red)
+                                    .shadow(color: Color.black.opacity(0.2), radius: 3, x: 0, y: 2)
+                            )
+                        }
+                        .buttonStyle(PressableButtonStyle())
+                    }
+                }
+
                 
                 // Route addresses
                 VStack(alignment: .leading, spacing: 4) {
@@ -1434,9 +2481,19 @@ struct NavigationInfoCard: View {
             
             // Navigation controls
             HStack(spacing: 12) {
-                if viewModel.isNavigating {
+                if viewModel.isNavigating && vehicle?.status == .assigned{
                     Button(action: {
-                        viewModel.stopNavigation()
+                        if viewModel.hasReachedDestination {
+                            // Clean up map and stop navigation
+                            viewModel.cleanupMap()
+                            viewModel.isNavigating = false
+                            viewModel.isInNavigationMode = false
+                            viewModel.navigationUpdateTimer?.invalidate()
+                            viewModel.navigationUpdateTimer = nil
+                            
+                            // Show post-trip inspection
+                            showingPostTripInspection = true
+                        }
                     }) {
                         Text("End Navigation")
                             .font(.headline)
@@ -1446,10 +2503,10 @@ struct NavigationInfoCard: View {
                             .background(viewModel.hasReachedDestination ? Color.red : Color.gray)
                             .cornerRadius(12)
                     }
-                    .disabled(!viewModel.hasReachedDestination)
-                } else {
+                    .disabled(!viewModel.hasReachedDestination || vehicle?.status == .underMaintenance)
+                } else if !hasCompletedPreInspection {
                     Button(action: {
-                        viewModel.startNavigation()
+                        showingPreTripInspection = true
                     }) {
                         Text("Start Navigation")
                             .font(.headline)
@@ -1462,16 +2519,46 @@ struct NavigationInfoCard: View {
                     .disabled(!viewModel.hasReachedPickup)
                 }
                 
-                Button(action: {
-                    viewModel.calculateRouteToPickup(for: trip)
-                }) {
-                    Text("Show Pickup Route")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange)
-                        .cornerRadius(12)
+                if !viewModel.isNavigating && !hasCompletedPreInspection {
+                    Button(action: {
+                        viewModel.calculateRouteToPickup(for: trip)
+                    }) {
+                        Text("Show Pickup Route")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(12)
+                    }
+                }
+            }
+            
+            // Vehicle status and maintenance info
+            if let vehicle = vehicle {
+                if vehicle.status == .underMaintenance {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "wrench.fill")
+                                .foregroundColor(.orange)
+                            Text("Vehicle is under maintenance")
+                                .font(.subheadline)
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                        
+                        Text("Trip will start automatically when maintenance is completed")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 8)
+                }
+                else {
+                    
                 }
             }
             
@@ -1510,7 +2597,186 @@ struct NavigationInfoCard: View {
             }
         }
         .padding(.horizontal)
-        .padding(.bottom, tabBarHeight + bottomSafeArea + 20) // Add padding for tab bar and safe area
+        .padding(.bottom, tabBarHeight + bottomSafeArea + 20)
+        .sheet(isPresented: $showingPreTripInspection) {
+            PreTripInspectionChecklistView(trip: trip) { inspectionItems, note in
+                let hasAnyFailure = inspectionItems.values.contains(false)
+                hasCompletedPreInspection = !inspectionItems.isEmpty
+                requiresMaintenance = hasAnyFailure
+                
+                IFEDataController.shared.addPreTripInspectionForTrip(
+                    by: trip.id,
+                    inspection: inspectionItems,
+                    note: note
+                )
+                
+                if hasAnyFailure {
+                    Task {
+                        // Assign maintenance task
+                        await assignMaintenanceTaskForFailedItems(
+                            inspectionItems: inspectionItems,
+                            note: note,
+                            trip: trip,
+                            isPreTrip: true
+                        )
+                        
+                        // Update vehicle status
+                        if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                            self.vehicle = vehicle
+                        }
+                    }
+                } else {
+                    viewModel.startNavigation()
+                }
+            }
+        }
+        .task {
+            if let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) {
+                self.vehicle = vehicle
+            }
+            
+            if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+                hasCompletedPreInspection = !inspection.preInspection.isEmpty
+                requiresMaintenance = inspection.preInspection.values.contains(false)
+            }
+        }
+        .onAppear {
+            // Start checking post-trip inspection status
+            startInspectionCheckTimer()
+        }
+        .onDisappear {
+            // Stop checking post-trip inspection status
+            stopInspectionCheckTimer()
+        }
+    }
+    
+    private func startInspectionCheckTimer() {
+        // Invalidate existing timer if any
+        inspectionCheckTimer?.invalidate()
+        
+        // Create a new timer that checks every second
+        inspectionCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task {
+                await checkPostTripInspectionStatus()
+            }
+        }
+    }
+    
+    private func stopInspectionCheckTimer() {
+        inspectionCheckTimer?.invalidate()
+        inspectionCheckTimer = nil
+    }
+    
+    private func checkPostTripInspectionStatus() async {
+        if let inspection = await IFEDataController.shared.getTripInspectionForTrip(by: trip.id) {
+            let hasCompletedPostInspection = !inspection.postInspection.isEmpty
+            if self.hasCompletedPostInspection != hasCompletedPostInspection {
+                DispatchQueue.main.async {
+                    self.hasCompletedPostInspection = hasCompletedPostInspection
+                }
+            }
+        }
+    }
+    
+    private func assignMaintenanceTaskForFailedItems(inspectionItems: [TripInspectionItem: Bool], note: String, trip: Trip, isPreTrip: Bool) async {
+        // Filter failed items
+        let failedItems = inspectionItems.filter { !$0.value }
+        guard !failedItems.isEmpty else { return }
+        
+        // Create issue note using TripInspection.issueDescription
+        let issueDescriptions = failedItems.map { item in
+            "\(item.key.rawValue): \(TripInspection.issueDescription[item.key] ?? "Issue detected.")"
+        }.joined(separator: "\n")
+        
+        let inspectionType = isPreTrip ? "Pre-Trip" : "Post-Trip"
+        let fullIssueNote = "\(inspectionType) Inspection Failures:\n\(issueDescriptions)\n\nAdditional Note: \(note)"
+        
+        // Get the vehicle's current coordinate
+        guard let vehicle = await IFEDataController.shared.getRegisteredVehicle(by: trip.assignedVehicleID) else {
+            print("Failed to fetch vehicle for maintenance task assignment")
+            return
+        }
+        
+        // Find the nearest service center
+        guard let nearestServiceCenter = await findNearestServiceCenter(to: vehicle.currentCoordinate) else {
+            print("No available service center found")
+            return
+        }
+        
+        // Debug: Log service center details
+        print("Nearest Service Center ID: \(nearestServiceCenter.id)")
+        
+        // Fetch the maintenance personnel metadata for this service center
+        guard let personnelMetaData = await IFEDataController.shared.getMaintenancePersonnelMetaData(ofCenter: nearestServiceCenter.id) else {
+            print("No maintenance personnel metadata found for service center \(nearestServiceCenter.id)")
+            return
+        }
+        
+        // Verify active status
+        guard personnelMetaData.activeStatus else {
+            print("Maintenance personnel for service center \(nearestServiceCenter.id) is inactive (ID: \(personnelMetaData.id))")
+            return
+        }
+        
+        // Debug: Log personnel details
+        print("Assigned Personnel: ID: \(personnelMetaData.id), Name: \(personnelMetaData.fullName), Active: \(personnelMetaData.activeStatus)")
+        
+        // Assign the maintenance task
+        let assignedBy = IFEDataController.shared.user?.id ?? trip.assignedByFleetManagerID
+        guard let task = await IFEDataController.shared.assignNewMaintenanceTask(
+            by: assignedBy,
+            to: personnelMetaData.id,
+            for: trip.assignedVehicleID,
+            ofType: isPreTrip ? .preInspectionMaintenance : .postInspectionMaintenance,
+            fullIssueNote
+        ) else {
+            print("Failed to assign maintenance task")
+            return
+        }
+        
+        print("Maintenance task assigned: \(task)")
+    }
+    
+    private func findNearestServiceCenter(to coordinate: String) async -> ServiceCenter? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            print("Invalid vehicle coordinate format")
+            return nil
+        }
+        
+        let vehicleLocation = CLLocation(latitude: latitude, longitude: longitude)
+        let serviceCenters = IFEDataController.shared.serviceCenters
+        
+        var nearestServiceCenter: ServiceCenter?
+        var shortestDistance: CLLocationDistance = .greatestFiniteMagnitude
+        
+        for center in serviceCenters {
+            guard let centerCoords = parseCoordinates(center.coordinate) else {
+                continue
+            }
+            
+            let centerLocation = CLLocation(latitude: centerCoords.latitude, longitude: centerCoords.longitude)
+            let distance = vehicleLocation.distance(from: centerLocation)
+            
+            if distance < shortestDistance {
+                shortestDistance = distance
+                nearestServiceCenter = center
+            }
+        }
+        
+        return nearestServiceCenter
+    }
+    
+    private func parseCoordinates(_ coordinate: String) -> (latitude: Double, longitude: Double)? {
+        let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        guard components.count == 2,
+              let latitude = Double(components[0]),
+              let longitude = Double(components[1]) else {
+            return nil
+        }
+        return (latitude, longitude)
     }
 }
 
@@ -1563,5 +2829,103 @@ extension MapViewModel: UNUserNotificationCenterDelegate {
         }
         
         completionHandler()
+    }
+}
+
+// Add PreTripInspectionChecklistView back to MapView.swift
+struct PreTripInspectionChecklistView: View {
+    let trip: Trip
+    @Environment(\.dismiss) private var dismiss
+    let onSave: ([TripInspectionItem: Bool], String) -> Void
+
+    @State private var inspectionItems: [TripInspectionItem: Bool] = Dictionary(
+        uniqueKeysWithValues: TripInspectionItem.allCases.map { ($0, false) }
+    )
+    @State private var preTripNote: String = ""
+    
+    private var isAnyItemChecked: Bool {
+        inspectionItems.values.contains(true)
+    }
+    
+    @State private var allGood: Bool = false
+    
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    CheckboxView(
+                        title: "All Good",
+                        isChecked: Binding(
+                            get: { allGood },
+                            set: { newValue in
+                                allGood = newValue
+                                // Update all items when "All Good" is toggled
+                                for item in TripInspectionItem.allCases {
+                                    inspectionItems[item] = newValue
+                                }
+                                print("All Good toggled: \(allGood), inspectionItems: \(inspectionItems)")
+                            }
+                        )
+                    )
+                }
+                
+                Section(header: Text("Pre-Trip Inspection Checklist")) {
+                    ForEach(TripInspectionItem.allCases, id: \.self) { item in
+                        CheckboxView(
+                            title: item.rawValue,
+                            isChecked: Binding(
+                                get: { inspectionItems[item] ?? false },
+                                set: { newValue in
+                                    inspectionItems[item] = newValue
+                                    // Recalculate allGood based on all items
+                                    allGood = inspectionItems.values.allSatisfy { $0 }
+                                    print("Item \(item.rawValue) toggled: \(newValue), inspectionItems: \(inspectionItems)")
+                                }
+                            )
+                        )
+                    }
+                }
+                
+                Section(header: Text("Description (Optional)")) {
+                    TextEditor(text: $preTripNote)
+                        .frame(minHeight: 100)
+                        .overlay(
+                            Group {
+                                if preTripNote.isEmpty {
+                                    Text("Enter the issue in vehicle")
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 8)
+                                }
+                            },
+                            alignment: .topLeading
+                        )
+                        .onChange(of: preTripNote) { newValue in
+                            print("Pre-Trip Note updated: \(newValue)")
+                        }
+                }
+            }
+            .navigationTitle("Pre-Trip Inspection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        print("Cancel pressed, passing: inspectionItems: [:], note: ''")
+                        onSave([:], "") // Pass empty dictionary to indicate cancellation
+                        dismiss()
+                    }
+                    .foregroundColor(.primaryGradientStart)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        print("Save pressed, passing: inspectionItems: \(inspectionItems), note: \(preTripNote)")
+                        
+                        onSave(inspectionItems, preTripNote) // Pass current state
+                        dismiss()
+                    }
+                    .disabled(!isAnyItemChecked)
+                    .foregroundColor(isAnyItemChecked ? .primaryGradientStart : .gray)
+                }
+            }
+        }
     }
 } 

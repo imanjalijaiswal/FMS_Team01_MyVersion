@@ -11,6 +11,7 @@ import Auth
 
 class IFEDataController: ObservableObject {
     static let shared = IFEDataController() // Singleton instance
+    
     var user: AppUser?
     
     @Published var drivers: [Driver] = []
@@ -26,10 +27,18 @@ class IFEDataController: ObservableObject {
     
     
     let remoteController = RemoteController.shared
+    var notifier: IFERemoteNotificationController?
     
     init() {
         Task { @MainActor in
             await fetchUser()
+            
+            if notifier != nil {
+                await notifier?.subscribe()
+            } else {
+                print("Cannot subscribe to notification as notifer is not initialized.")
+            }
+            
             if let user = user {
                 if user.role == .driver {
                     await loadTripsForDriver()
@@ -55,6 +64,10 @@ class IFEDataController: ObservableObject {
     private func fetchUser() async {
         do {
             user = try await AuthManager.shared.getCurrentSession()
+            notifier = .init(RemoteController.shared.client, table: "Notifications", userID: user?.id)
+            notifier?.notificationCenter.delegate = notifier
+            notifier?.requestNotificationPermission()
+            notifier?.registerPersistentNotificationCategory()
         } catch {
             print("Error while fetching user: \(error.localizedDescription)")
         }
@@ -215,6 +228,14 @@ class IFEDataController: ObservableObject {
             print("Error adding driver: \(error.localizedDescription)")
         }
     }
+    func getFleetManager(by id: UUID) async throws -> FleetManager? {
+            do {
+                return try await remoteController.getFleetManager(by: id)
+            } catch {
+                print("Error while fetching fleet manager: \(error.localizedDescription)")
+                return nil
+            }
+        }
     
     func removeDriver(_ driver: Driver) {
         Task {
@@ -958,6 +979,9 @@ class IFEDataController: ObservableObject {
         }
     }
     
+
+
+    
     /// Retrieves the maintenance personnel associated with a specific service center asynchronously.
     ///
     /// This function fetches the `MaintenancePersonnel` object linked to a given service center (identified by its `centerID`).
@@ -1035,5 +1059,38 @@ class IFEDataController: ObservableObject {
             print("Error while updating vehicle coordinate: \(error.localizedDescription)")
             return nil
         }
+    }
+    
+    /// Sends a push notification message to a specified recipient asynchronously.
+    ///
+    /// This function creates a push notification object and sends it using the notifier.
+    /// If the notifier is not initialized, it logs an error message and exits.
+    ///
+    /// - Parameters:
+    ///   - recipientID: The unique identifier of the message recipient.
+    ///   - title: The title of the message to be sent.
+    ///   - message: The content of the message.
+    /// - Returns: Void
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// await sendMessage(to: recipientID, title: "Emergency", message: "SOS! Please help.")
+    /// ```
+    ///
+    /// - Note: This function requires the notifier to be initialized before calling.
+    func sendMessage(to recipientID: UUID, title: String, message: String) async {
+        guard let notifier else {
+            print("Can't send message notifier is not initialzied.")
+            return
+        }
+        
+        let pushNotification = IFEPushNotification(id: UUID(),
+                                                   senderID: user!.id,
+                                                   recipientID: recipientID,
+                                                   title: title,
+                                                   message: message,
+                                                   sentAt: .now)
+        
+        await notifier.sendNotification(pushNotification)
     }
 }

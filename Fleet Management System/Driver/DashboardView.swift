@@ -243,6 +243,10 @@ struct DashboardView: View {
                 await refreshData()
             }
             .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+            .refreshable {
+                await viewModel.loadTripsForDriver()
+                await checkPreInspections()
+            }
             .navigationTitle("Driver")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -338,6 +342,7 @@ struct FilterButton: View {
 struct TaskCard: View {
     let task: Trip
     @State private var showingTripOverview = false
+    @State private var showingTripSummary = false
     @State private var vehicle: Vehicle?
     @Binding var selectedTab: Int
     var remoteController = RemoteController()
@@ -352,7 +357,13 @@ struct TaskCard: View {
         }
     }
     var body: some View {
-        Button(action: { showingTripOverview = true }) {
+        Button(action: {
+            if task.status == .completed {
+                showingTripSummary = true
+            } else {
+                showingTripOverview = true
+            }
+        }) {
             VStack(alignment: .leading, spacing: 16) {
                 // Task header
                 HStack {
@@ -429,6 +440,9 @@ struct TaskCard: View {
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingTripOverview) {
             TripOverviewView(task: task, selectedTab: $selectedTab, isInDestinationGeofence: MapViewModel().hasReachedDestination)
+        }
+        .sheet(isPresented: $showingTripSummary) {
+            TripSummaryView(trip: task)
         }
         .task {
             await fetchVehicle() // Fetch vehicle data when TaskCard appears
