@@ -239,6 +239,10 @@ struct LoginFormView: View {
                         // If no 2FA required, set the user directly
                         self.user = signedInUser
                         self.errorMessage = nil
+                        // Reload data after successful login
+                        Task {
+                            await IFEDataController.shared.reloadData()
+                        }
                     }
                     self.isLoading = false
                 }
