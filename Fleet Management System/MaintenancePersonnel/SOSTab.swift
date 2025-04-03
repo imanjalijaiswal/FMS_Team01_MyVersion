@@ -654,7 +654,7 @@ struct SOSTaskCard: View {
                             .font(.headline)
                             .foregroundColor(.primaryGradientStart)
                         
-                        Text(resolutionNotes.isEmpty ? "No repair notes provided" : resolutionNotes)
+                        Text(task.repairNote.isEmpty ? "No repair notes provided" : task.repairNote)
                             .font(.body)
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
