@@ -2,13 +2,11 @@
 //  DataController.swift
 //  Fleet Management System
 //
-//  Created by Aakash Singh on 23/03/25.
+//  Created by Devansh Seth on 23/03/25.
 //
 import SwiftUI
-import CoreLocation
 import SwiftSMTP
 import Auth
-import MapKit
 
 
 class IFEDataController: ObservableObject {
@@ -26,13 +24,6 @@ class IFEDataController: ObservableObject {
     @Published var serviceCenters: [ServiceCenter] = []
     @Published var serviceCenterLocations: [Int: String] = [:]
     
-//    var availableServiceCenterLocations: [String] {
-//        let availableServiceCenters = serviceCenters.filter { !$0.isAssigned }
-//        
-//        return availableServiceCenters.compactMap { center in
-//            serviceCenterLocations[center.id]
-//        }
-//    }
     
     let remoteController = RemoteController.shared
     
@@ -70,7 +61,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadDrivers() async {
+     func loadDrivers() async {
         do {
             drivers = try await remoteController.getRegisteredDrivers()
         } catch {
@@ -79,7 +70,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadVehicles() async {
+    func loadVehicles() async {
         do {
             vehicles = try await remoteController.getRegisteredVehicles()
         } catch {
@@ -88,7 +79,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadMaintenancePersonnels() async {
+     func loadMaintenancePersonnels() async {
         do {
             maintenancePersonnels = try await remoteController.getRegisteredMaintenancePersonnels()
         } catch {
@@ -97,7 +88,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadTrips() async {
+     func loadTrips() async {
         do {
             if let user = user {
                 if user.role == .fleetManager {
@@ -110,7 +101,7 @@ class IFEDataController: ObservableObject {
     }
     
     @MainActor
-    private func loadVehicleCompanies() async {
+     func loadVehicleCompanies() async {
         do {
             vehicleCompanies = try await remoteController.getRegisteredVehicleCompanies()
         } catch {
@@ -980,101 +971,84 @@ class IFEDataController: ObservableObject {
 
 func getAddress(from coordinate: String, completion: @escaping (String?) -> Void) {
     let components = coordinate.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+
     
-    guard components.count == 2,
-          let latitude = Double(components[0]),
-          let longitude = Double(components[1]) else {
-        print("Invalid coordinate format")
-        completion(nil)
-        return
+    /// Retrieves the maintenance personnel associated with a specific service center asynchronously.
+    ///
+    /// This function fetches the `MaintenancePersonnel` object linked to a given service center (identified by its `centerID`).
+    /// If the operation fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameter centerID: The unique identifier of the service center whose maintenance personnel is being retrieved.
+    /// - Returns: An optional `MaintenancePersonnel` object representing the personnel associated with the given service center. Returns `nil` if the fetch operation fails.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// if let personnel = await getMaintenancePersonnel(ofCenter: centerID) {
+    ///     print("Maintenance Personnel Name: \(personnel.meta_data.fullName)")
+    /// } else {
+    ///     print("Failed to fetch maintenance personnel for the given service center.")
+    /// }
+    /// ```
+    func getMaintenancePersonnel(ofCenter centerID: Int) async -> MaintenancePersonnel? {
+        do {
+            return try await remoteController.getMaintenancePersonnel(ofCenter: centerID)
+        } catch {
+            print("Error while fetching maintenance personnel of service center(\(centerID)): \(error.localizedDescription)")
+            return nil
+        }
     }
-
-    let location = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-    let searchRequest = MKLocalSearch.Request()
-    searchRequest.naturalLanguageQuery = "\(latitude), \(longitude)"
-    searchRequest.resultTypes = [.pointOfInterest, .address]
-    searchRequest.region = MKCoordinateRegion(
-        center: location,
-        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-    )
     
-    let search = MKLocalSearch(request: searchRequest)
-    search.start { response, error in
-        if let error = error {
-            print("Search failed: \(error.localizedDescription)")
-            completion(nil)
-            return
-        }
-        
-        if let items = response?.mapItems {
-            // Try to find the most relevant result
-            if let poi = items.first(where: { $0.pointOfInterestCategory != nil }) {
-                // If we found a point of interest, use its full address
-                let address = [
-                    poi.name,
-                    poi.placemark.thoroughfare,
-                    poi.placemark.locality,
-                    poi.placemark.administrativeArea,
-                    poi.placemark.country
-                ].compactMap { $0 }.joined(separator: ", ")
-                completion(address)
-            } else if let firstItem = items.first {
-                // If no POI, use the first result's full address
-                let address = [
-                    firstItem.name,
-                    firstItem.placemark.thoroughfare,
-                    firstItem.placemark.locality,
-                    firstItem.placemark.administrativeArea,
-                    firstItem.placemark.country
-                ].compactMap { $0 }.joined(separator: ", ")
-                completion(address)
-            } else {
-                // Fallback to reverse geocoding
-                let geocoder = CLGeocoder()
-                let location = CLLocation(latitude: latitude, longitude: longitude)
-                
-                geocoder.reverseGeocodeLocation(location) { (placemarks, error) in
-                    if let error = error {
-                        print("Reverse geocoding failed: \(error.localizedDescription)")
-                        completion(nil)
-                        return
-                    }
-
-                    if let placemark = placemarks?.first {
-                        let address = [
-                            placemark.name,
-                            placemark.thoroughfare,
-                            placemark.locality,
-                            placemark.administrativeArea,
-                            placemark.country
-                        ].compactMap { $0 }.joined(separator: ", ")
-                        
-                        completion(address.isEmpty ? nil : address)
-                    } else {
-                        completion(nil)
-                    }
-                }
-            }
-        } else {
-            completion(nil)
+    /// Retrieves the metadata of maintenance personnel associated with a specific service center asynchronously.
+    ///
+    /// This function fetches the `UserMetaData` object linked to a given service center (identified by its `centerID`).
+    /// If the operation fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameter centerID: The unique identifier of the service center whose maintenance personnel metadata is being retrieved.
+    /// - Returns: An optional `UserMetaData` object containing metadata of the personnel associated with the given service center. Returns `nil` if the fetch operation fails.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// if let metaData = await getMaintenancePersonnelMetaData(ofCenter: centerID) {
+    ///     print("Personnel Employee ID: \(metaData.employeeID)")
+    /// } else {
+    ///     print("Failed to fetch maintenance personnel metadata for the given service center.")
+    /// }
+    /// ```
+    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async -> UserMetaData? {
+        do {
+            return try await remoteController.getMaintenancePersonnelMetaData(ofCenter: centerID)
+        } catch {
+            print("Error while fetching personnel meta data of service center (\(centerID)): \(error.localizedDescription)")
+            return nil
         }
     }
-}
-
-func getCoordinates(from address: String) async -> String? {
-    let geocoder = CLGeocoder()
-    do {
-        let placemarks = try await geocoder.geocodeAddressString(address)
-        if let location = placemarks.first?.location {
-            return "\(location.coordinate.latitude), \(location.coordinate.longitude)"
+    
+    /// Updates the coordinates of a vehicle asynchronously and returns the updated coordinate as a string.
+    ///
+    /// This function updates the geographical coordinates (latitude and longitude) of a vehicle identified by its `id`.
+    /// If the update operation is successful, it returns the new coordinates as a formatted string `"latitude, longitude"`.
+    /// If the operation fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameters:
+    ///   - id: The unique identifier of the vehicle whose coordinates are being updated.
+    ///   - latitude: The new latitude of the vehicle as a `String`.
+    ///   - longitude: The new longitude of the vehicle as a `String`.
+    /// - Returns: An optional `String` representing the updated coordinates in the format `"latitude, longitude"`. Returns `nil` if the update operation fails.
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// if let updatedCoordinate = await updateVehicleCoordinate(by: vehicleID, latitude: "28.7041", longitude: "77.1025") {
+    ///     print("Vehicle coordinates updated to: \(updatedCoordinate)")
+    /// } else {
+    ///     print("Failed to update vehicle coordinates.")
+    /// }
+    /// ```
+    func updateVehicleCoordinate(by id: Int, latitude: String, longitude: String) async -> String? {
+        do {
+            return try await remoteController.updateVehicleCoordinate(by: id, latitude: latitude, longitude: longitude)
+        } catch {
+            print("Error while updating vehicle coordinate: \(error.localizedDescription)")
+            return nil
         }
-    } catch {
-        print("Geocoding failed: \(error.localizedDescription)")
     }
-    return nil
-}
-
-func estimatedDate(from startDate: Date, hours: Float) -> Date {
-    let secondsToAdd = Int(hours * 3600)// Convert hours to seconds
-    return Calendar.current.date(byAdding: .second, value: secondsToAdd, to: startDate) ?? startDate
 }

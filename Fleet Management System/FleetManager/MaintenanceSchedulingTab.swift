@@ -5,6 +5,8 @@ struct MaintenanceSchedulingView: View {
     @State private var searchText = ""
     @State private var selectedFilter = ""
     @StateObject private var viewModel = IFEDataController.shared
+    @State private var isRefreshing = false
+    @State private var viewRefreshTrigger = UUID()
     
     private var scheduledCount: Int {
             viewModel.managerAssignedMaintenanceTasks.filter { $0.status == .scheduled }.count
@@ -36,19 +38,24 @@ struct MaintenanceSchedulingView: View {
         let searchResults = viewModel.managerAssignedMaintenanceTasks.filter { task in
             if searchText.isEmpty { return true }
             
-            return task.assignedTo.uuidString.localizedCaseInsensitiveContains(searchText) ||
-                   String(task.vehicleID).localizedCaseInsensitiveContains(searchText)
+            // Get vehicle details if available
+            let vehicleDetails = viewModel.vehicles.first(where: { $0.id == task.vehicleID })
+            let vehicleInfo = vehicleDetails.map { "\($0.make) \($0.model) \($0.licenseNumber)" } ?? ""
+            
+            // Search in task ID, vehicle details, and assigned personnel
+            return String(task.taskID).localizedCaseInsensitiveContains(searchText) ||
+                   vehicleInfo.localizedCaseInsensitiveContains(searchText) ||
+                   task.assignedTo.uuidString.localizedCaseInsensitiveContains(searchText)
         }
         
-        switch selectedFilter {
-        case "In Progress":
-            return searchResults.filter { $0.status == .inProgress }
-        case "Scheduled":
-            return searchResults.filter { $0.status == .scheduled }
-        case "Completed":
+        if selectedFilter.contains("Completed") {
             return searchResults.filter { $0.status == .completed }
-        default:
-            return searchResults.filter { _ in true }
+        } else if selectedFilter.contains("In Progress") {
+            return searchResults.filter { $0.status == .inProgress }
+        } else if selectedFilter.contains("Scheduled") {
+            return searchResults.filter { $0.status == .scheduled }
+        } else {
+            return searchResults
         }
     }
 
@@ -63,8 +70,11 @@ struct MaintenanceSchedulingView: View {
                     filters: filters,
                     selectedFilter: $selectedFilter
                 )
+                .id(viewRefreshTrigger)
                 
                 ScrollView {
+                    PullToRefresh(coordinateSpaceName: "maintenancePullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
+                    
                     VStack(spacing: 16) {
                         if filteredTasks.isEmpty {
                             Text("No maintenance tasks available")
@@ -78,21 +88,37 @@ struct MaintenanceSchedulingView: View {
                     }
                     .padding()
                 }
+                .coordinateSpace(name: "maintenancePullToRefresh")
             }
+            .id(viewRefreshTrigger)
             .navigationTitle("Maintenance")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        showScheduleForm = true
-                    }) {
-                        Image(systemName: "plus")
-                            .foregroundColor(.primaryGradientEnd)
+                    HStack {
+//                        Button(action: refreshData) {
+//                            Image(systemName: "arrow.clockwise")
+//                                .foregroundColor(.primaryGradientEnd)
+//                        }
+                        
+                        Button(action: {
+                            showScheduleForm = true
+                        }) {
+                            Image(systemName: "plus")
+                                .foregroundColor(.primaryGradientEnd)
+                        }
                     }
                 }
             }
             .background(Color.white)
             .sheet(isPresented: $showScheduleForm) {
                 MaintenanceScheduleFormView(viewModel: viewModel) { _ in
+                    Task {
+                        await viewModel.loadManagerAssignedMaintenanceTasks()
+                        
+                        DispatchQueue.main.async {
+                            self.viewRefreshTrigger = UUID()
+                        }
+                    }
                 }
                 .background(Color(.systemGray6))
             }
@@ -101,6 +127,22 @@ struct MaintenanceSchedulingView: View {
             if selectedFilter.isEmpty {
                 selectedFilter = filters[0]
             }
+            
+            // Initial data load removed
+        }
+    }
+    
+    func refreshData() {
+        self.isRefreshing = true
+        
+        Task {
+            await viewModel.loadManagerAssignedMaintenanceTasks()
+            await viewModel.loadVehicles()
+            
+            DispatchQueue.main.async {
+                self.isRefreshing = false
+                self.viewRefreshTrigger = UUID()
+            }
         }
     }
 }
@@ -108,6 +150,9 @@ struct MaintenanceSchedulingView: View {
 struct MaintenanceTaskCard: View {
     let task: MaintenanceTask
     @StateObject private var viewModel = IFEDataController.shared
+    @State private var showInvoice = false
+    @State private var currentInvoice: Invoice?
+    @State private var isLoadingInvoice = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -140,7 +185,6 @@ struct MaintenanceTaskCard: View {
                     .cornerRadius(15)
             }
 
-            // Vehicle Details section
             VStack(alignment: .leading, spacing: 4) {
                 Text("Vehicle Details:")
                     .font(.subheadline)
@@ -161,7 +205,6 @@ struct MaintenanceTaskCard: View {
                 }
             }
 
-            // Add created date section
             HStack(spacing: 8) {
                 Image(systemName: "calendar")
                     .foregroundColor(.gray)
@@ -169,11 +212,55 @@ struct MaintenanceTaskCard: View {
                     .font(.subheadline)
                     .foregroundColor(.gray)
             }
+
+            if task.status == .completed {
+                Button(action: {
+                    isLoadingInvoice = true
+                    Task {
+                        if let invoice = await task.generateInvoice() {
+                            DispatchQueue.main.async {
+                                currentInvoice = invoice
+                                isLoadingInvoice = false
+                                showInvoice = true
+                            }
+                        } else {
+                            DispatchQueue.main.async {
+                                isLoadingInvoice = false
+                            }
+                        }
+                    }
+                }) {
+                    HStack {
+                        if isLoadingInvoice {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            Text("Loading...")
+                        } else {
+                            Image(systemName: "doc.text")
+                            Text("View Invoice")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.accentColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(isLoadingInvoice)
+            }
         }
         .padding()
         .background(Color.white)
         .cornerRadius(10)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .sheet(isPresented: $showInvoice) {
+            if let invoice = currentInvoice {
+                InvoicePreviewView(invoice: invoice)
+            } else {
+                Text("Could not load invoice")
+                    .padding()
+            }
+        }
     }
 }
 
@@ -250,14 +337,6 @@ struct MaintenanceScheduleFormView: View {
                     }
                     
                     // Notes Card
-//<<<<<<< HEAD
-//                    TextField("Maintenance Description", text: $notes)
-//                        .textFieldStyle(RoundedBorderTextFieldStyle())
-//                        .padding()
-//                        .background(Color.white)
-//                        .cornerRadius(10)
-//                
-//=======
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Maintenance Description")
                             .font(.headline)
@@ -281,8 +360,6 @@ struct MaintenanceScheduleFormView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
                         
-                        
-//>>>>>>> Arnav_Screen
                 }
                 .padding()
             }
@@ -340,6 +417,7 @@ struct MaintenanceScheduleFormView: View {
                 ) {
                     onScheduleComplete?(newTask)
                     await viewModel.loadManagerAssignedMaintenanceTasks()
+                    await viewModel.loadVehicles()
                     showSuccessAlert = true
                 }
             }

@@ -2,7 +2,7 @@
 //  ServerControllerProtocol.swift
 //  Fleet Management System
 //
-//  Created by Abcom on 20/03/25.
+//  Created by Devansh Seth on 20/03/25.
 //
 
 import Foundation
@@ -48,6 +48,9 @@ protocol DatabaseAPIIntegrable {
     
     func getMaxEmployeeID(ofType type: Role) async throws -> Int
     
+    func getMaintenancePersonnel(ofCenter centerID: Int) async throws -> MaintenancePersonnel
+    
+    func getMaintenancePersonnelMetaData(ofCenter centerID: Int) async throws -> UserMetaData
     
     
     //MARK: Vehicle APIs
@@ -63,6 +66,8 @@ protocol DatabaseAPIIntegrable {
     
     func updateVehicleStatus(by id: Int, with status: VehicleStatus) async throws
     
+    func updateVehicleCoordinate(by id: Int, latitude: String, longitude: String) async throws -> String
+    
     func updateVehicleActiveStatus(by id: Int, with status: Bool) async throws
     
     func getRegisteredServiceCenters() async throws -> [ServiceCenter]
@@ -70,6 +75,7 @@ protocol DatabaseAPIIntegrable {
     func getVehicleServiceCenterAssignedStatus(by id: Int) async throws -> Bool
     
     func getVehicleServiceCenter(by id: Int) async throws -> ServiceCenter
+    
     
     func updateMaintenancePersonnelServiceCenter(by id: UUID, with newCenterID: Int) async throws
     

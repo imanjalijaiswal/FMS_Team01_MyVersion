@@ -39,6 +39,10 @@ struct MaintenanceView: View {
     @State private var generatedInvoice: Invoice?
     @State private var showLocationTracking = false
     @State private var isLoadingInvoice = false
+    @State private var viewRefreshTrigger = UUID() // Add refresh trigger for views
+    @State private var isInvoiceFormLoading = false // New state for invoice form loading
+    @State private var isInvoiceGenerating = false // Add new state
+    @State private var isRefreshing = false // Add state for pull-to-refresh
     
     // Reference to data controllers
     private let dataController = IFEDataController.shared
@@ -49,6 +53,14 @@ struct MaintenanceView: View {
         let partsAmount = Double(partsCost) ?? 0
         let otherAmount = Double(otherCost) ?? 0
         return laborAmount + partsAmount + otherAmount
+    }
+    
+    // Check if any cost has been entered
+    private var hasAnyCostEntered: Bool {
+        let laborAmount = Double(laborCost) ?? 0
+        let partsAmount = Double(partsCost) ?? 0
+        let otherAmount = Double(otherCost) ?? 0
+        return laborAmount > 0 || partsAmount > 0 || otherAmount > 0
     }
     
     var body: some View {
@@ -72,9 +84,22 @@ struct MaintenanceView: View {
                     updateCompletionDays(days: days)
                 },
                 onCreateInvoice: { task in
-                    selectedTask = task
-                    showingInvoiceSheet = true
-                }
+                    self.isInvoiceFormLoading = true
+                    self.selectedTask = task
+                    self.showingInvoiceSheet = true
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.isInvoiceFormLoading = false
+                    }
+                },
+                onRefresh: {
+                    self.isRefreshing = true
+                    self.refreshAllTasks()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.isRefreshing = false
+                    }
+                },
+                isRefreshing: isRefreshing
             )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
@@ -95,7 +120,15 @@ struct MaintenanceView: View {
                 onTrackTask: { task in
                     selectedTask = task
                     showLocationTracking = true
-                }
+                },
+                onRefresh: {
+                    self.isRefreshing = true
+                    self.refreshAllTasks()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.isRefreshing = false
+                    }
+                },
+                isRefreshing: isRefreshing
             )
             .edgesIgnoringSafeArea(.top)
             .tabItem {
@@ -103,8 +136,8 @@ struct MaintenanceView: View {
                 Text("SOS")
             }
             .tag(1)
-//            .badge(5)
         }
+        .accentColor(.primaryGradientEnd)
         .onAppear {
             // Set the TabView appearance to match iOS design
             UITabBar.appearance().backgroundColor = .systemBackground
@@ -126,8 +159,21 @@ struct MaintenanceView: View {
             Text("Are you sure you want to start work on this task?")
         }
         .sheet(isPresented: $showingInvoiceSheet) {
-            if let task = selectedTask {
-                NavigationView {
+            NavigationView {
+                if isInvoiceFormLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(1.5)
+                        Text("Loading...")
+                            .font(.headline)
+                            .padding(.top, 20)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+                } else if let task = selectedTask {
                     Form {
                         Section(header: Text("Vehicle Information")) {
                             if let license = vehicleLicenseMap[task.vehicleID] {
@@ -182,28 +228,44 @@ struct MaintenanceView: View {
                         }
                         
                         Section {
-                            Button("Complete Task & Generate Invoice") {
+                            Button(action: {
                                 completeTaskAndGenerateInvoice(task: task)
+                            }) {
+                                if isLoadingInvoice {
+                                    HStack {
+                                        Spacer()
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        Text("Generating Invoice...")
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                    }
+                                } else {
+                                    Text("Complete Task & Generate Invoice")
+                                        .foregroundColor(.white)
+                                }
                             }
                             .frame(maxWidth: .infinity)
-                            .foregroundColor(.white)
                             .padding()
-                            .background(Color.blue)
+                            .background(hasAnyCostEntered ? Color.primaryGradientStart : Color.primaryGradientStart.opacity(0.5))
                             .cornerRadius(8)
+                            .disabled(!hasAnyCostEntered || isLoadingInvoice)
                         }
                     }
                     .navigationTitle("Create Invoice")
                     .navigationBarItems(trailing: Button("Cancel") {
                         showingInvoiceSheet = false
-                    })
+                    }
+                    .foregroundColor(.primaryGradientStart))
+                    .disabled(isLoadingInvoice)
+                } else {
+                    Text("No task selected")
                 }
-            } else {
-                Text("No task selected")
             }
         }
         .sheet(isPresented: $showingInvoicePreview) {
             if let invoice = generatedInvoice {
-                InvoicePreviewView(invoice: invoice)
+                LoadingInvoicePreview(invoice: invoice)
             }
         }
         .sheet(isPresented: $showingProfile) {
@@ -226,9 +288,6 @@ struct MaintenanceView: View {
                 }
             }
         }
-
-
-        .accentColor(.blue)
     }
     
     var filteredTasks: [MaintenanceTask] {
@@ -387,57 +446,88 @@ struct MaintenanceView: View {
     
     func startWork(task: MaintenanceTask) {
         print("DEBUG: Starting work on task #\(task.taskID)")
-        Task {
-            // Use dataController.makeMaintenanceTaskInProgress for updating task status
-            await dataController.makeMaintenanceTaskInProgress(by: task.id)
-            print("DEBUG: Made task in-progress, now reloading tasks")
-            await dataController.loadPersonnelTasks() // Reload tasks from data controller
+        
+        // Modify task status directly on main thread to ensure UI updates
+        DispatchQueue.main.async {
+            // 1. First create a modified task with the new status and estimated completion date
+            var updatedTask = task
+            updatedTask.status = .inProgress
+            updatedTask.estimatedCompletionDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
             
-            let updatedTasksFromController = dataController.personnelTasks
+            // 2. Find and replace the existing task in the array
+            var newTasks = self.tasks.filter { $0.id != task.id }
+            newTasks.append(updatedTask)
             
-            // Create a mutable copy of the current tasks
-            var updatedTasks = self.tasks
+            // 3. Update the tasks array with the new collection
+            self.tasks = newTasks
             
-            // Find and update the specific task in our local array
-            if let index = updatedTasks.firstIndex(where: { $0.id == task.id }) {
-                updatedTasks[index].status = .inProgress
-                print("DEBUG: Updated task status locally")
+            // 4. Generate a new refresh trigger to force UI updates
+            self.viewRefreshTrigger = UUID()
+            
+            print("DEBUG: Local task status updated to .inProgress. Task count: \(self.tasks.count)")
+            
+            // 5. Log the status of all tasks to verify
+            for t in self.tasks {
+                print("DEBUG: Task #\(t.taskID) status: \(t.status.rawValue)")
             }
             
-            // Try to get the latest tasks from API
+            // 6. Immediately switch to In Progress tab to show the updated task
+            self.selectedSegment = 1
+            
+            // 7. Log filtered tasks to verify they're being updated correctly
+            let inProgressTasks = self.tasks.filter { $0.status == .inProgress && $0.type == .regularMaintenance }
+            print("DEBUG: Number of tasks with .inProgress status: \(inProgressTasks.count)")
+            
+            // 8. Force a UI update after a short delay to ensure everything is processed
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.viewRefreshTrigger = UUID()
+            }
+        }
+        
+        // Update the server in the background
+        Task {
             do {
-                let apiTasks = try await RemoteController.shared.getMaintenancePersonnelTasks(by: user?.id ?? UUID())
-                print("DEBUG: Reloaded \(apiTasks.count) tasks from API after starting work")
+                // Update both status and estimated completion date
+                await dataController.makeMaintenanceTaskInProgress(by: task.id)
+                if let date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+                    await dataController.updateMaintenanceTaskEstimatedDate(by: task.id, date)
+                }
+                print("DEBUG: Task status and estimated date updated on server")
                 
+                // Refresh data from server
+                await dataController.loadPersonnelTasks()
+                
+                // Update UI on main thread
                 DispatchQueue.main.async {
-                    self.tasks = apiTasks
+                    // Create a new array with server data but ensure our task is properly updated
+                    var refreshedTasks = dataController.personnelTasks
                     
-                    // Verify the task status was updated properly in the fetched data
-                    if let index = self.tasks.firstIndex(where: { $0.id == task.id }) {
-                        if self.tasks[index].status != .inProgress {
-                            print("DEBUG: API returned task with incorrect status, fixing locally")
-                            self.tasks[index].status = .inProgress
+                    // Double-check that our task has the correct status and estimated date
+                    if let idx = refreshedTasks.firstIndex(where: { $0.id == task.id }) {
+                        if refreshedTasks[idx].status != .inProgress {
+                            print("DEBUG: Fixing task status from server data")
+                            refreshedTasks[idx].status = .inProgress
+                            refreshedTasks[idx].estimatedCompletionDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
                         }
                     } else {
-                        print("DEBUG: Task not found in API response, using local update")
-                        self.tasks = updatedTasks
+                        // If task isn't in refreshed data, keep our modified version
+                        print("DEBUG: Task not found in server data, preserving local change")
+                        let updatedTask = task
+                        var localCopy = updatedTask
+                        localCopy.status = .inProgress
+                        localCopy.estimatedCompletionDate = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+                        refreshedTasks.append(localCopy)
                     }
                     
-                    // Immediately switch to the In Progress tab
+                    // Update tasks and force refresh
+                    self.tasks = refreshedTasks
+                    self.viewRefreshTrigger = UUID()
+                    
+                    // Keep the In Progress tab selected
                     self.selectedSegment = 1
-                    print("DEBUG: Switched to In Progress tab. Tasks count: \(self.tasks.count), Filtered tasks: \(self.filteredTasks.count)")
                 }
             } catch {
-                print("DEBUG ERROR: Failed to reload tasks from API: \(error.localizedDescription)")
-                
-                DispatchQueue.main.async {
-                    // Use our already updated tasks array
-                    self.tasks = updatedTasks
-                    
-                    // Immediately switch to the In Progress tab
-                    self.selectedSegment = 1
-                    print("DEBUG: Switched to In Progress tab (after API error). Tasks count: \(self.tasks.count), Filtered tasks: \(self.filteredTasks.count)")
-                }
+                print("DEBUG ERROR: Failed to update task status on server: \(error.localizedDescription)")
             }
         }
     }
@@ -465,6 +555,9 @@ struct MaintenanceView: View {
     }
     
     func completeTaskAndGenerateInvoice(task: MaintenanceTask) {
+        // Set loading state
+        isLoadingInvoice = true
+        
         // Create expense dictionary
         var expenses: [MaintenanceExpenseType: Double] = [:]
         expenses[.laborsCost] = Double(laborCost) ?? 0
@@ -472,413 +565,124 @@ struct MaintenanceView: View {
         expenses[.otherCost] = Double(otherCost) ?? 0
         
         Task {
-            // 1. Update task with expenses and repair note
-            await dataController.createInvoiceForMaintenanceTask(by: task.id, expenses: expenses, repairNote)
-            
-            await dataController.loadPersonnelTasks()
-            
-            // 4. Try to generate invoice
             do {
-                if let updatedTask = dataController.personnelTasks.first(where: { $0.id == task.id }),
-                   let invoice = await updatedTask.generateInvoice() {
-                    DispatchQueue.main.async {
-                        self.generatedInvoice = invoice
-                        self.showingInvoiceSheet = false
-                        self.showingInvoicePreview = true
-                    }
-                } else {
-                    print("DEBUG: Failed to generate invoice")
-                }
-            } catch {
-                print("DEBUG ERROR: Error generating invoice: \(error.localizedDescription)")
-            }
-            
-            // 5. Update local tasks list
-            DispatchQueue.main.async {
-                self.tasks = dataController.personnelTasks
-            }
-        }
-    }
-}
-
-struct MaintenanceTaskCardV: View {
-    let task: MaintenanceTask
-    let vehicleLicense: String?
-    let onStartWork: () -> Void
-    let onDaysSelected: (Int) -> Void
-    let onCreateInvoice: () -> Void
-    @State private var completionDays = 1
-    @State private var showingInvoicePreview = false
-    @State private var generatedInvoice: Invoice?
-    @State private var isLoadingInvoice = false  // Add loading state
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Common header for all card types
-            HStack {
-                if let license = vehicleLicense {
-                    Text("Vehicle: \(license)")
-                        .font(.headline)
-                } else {
-                    Text("Vehicle ID: \(task.vehicleID)")
-                        .font(.headline)
-                }
+                // 1. Update task with expenses and repair note
+                await dataController.createInvoiceForMaintenanceTask(by: task.id, expenses: expenses, repairNote)
                 
-                Spacer()
+                // 2. Reload tasks to get updated data
+                await dataController.loadPersonnelTasks()
                 
-                // Status indicator
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 10, height: 10)
-                    
-                    Text(task.status.rawValue)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(statusColor)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(statusColor.opacity(0.1))
-                .cornerRadius(12)
-            }
-            .padding(.top, 5)
-            
-            Text("Task ID: \(task.taskID)")
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 5) {
-                Image(systemName: "wrench.fill")
-                    .foregroundColor(.blue)
-                Text(task.type.rawValue)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Content specific to status
-            if task.status == .scheduled {
-                scheduledTaskContent
-            } else if task.status == .inProgress {
-                inProgressTaskContent
-            } else if task.status == .completed {
-                completedTaskContent
-            }
-        }
-        .padding()
-        .background(Color(UIColor.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(statusColor.opacity(0.3), lineWidth: 1)
-        )
-    }
-    
-    // UI for scheduled tasks
-    private var scheduledTaskContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 5) {
-                Image(systemName: "clock")
-                    .foregroundColor(.blue)
-                Text("Estimated Date: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack {
-                Text("Complete in:")
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                Menu {
-                    ForEach(1...7, id: \.self) { day in
-                        Button(action: {
-                            completionDays = day
-                            onDaysSelected(day)
-                        }) {
-                            HStack {
-                                Text("\(day) day\(day > 1 ? "s" : "")")
-                                
-                                Spacer()
-                                
-                                if day == completionDays {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-                label: {
-                    HStack {
-                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
-                            .foregroundColor(.primary)
-                        
-                        Spacer(minLength: 8)
-                        
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Color(UIColor.systemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(.vertical, 5)
-            
-            Button(action: onStartWork) {
-                Text("Start Work")
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .cornerRadius(8)
-            }
-            .padding(.top, 5)
-        }
-    }
-    
-    // UI for in-progress tasks
-    private var inProgressTaskContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 5) {
-                Image(systemName: "clock")
-                    .foregroundColor(.blue)
-                Text("Due: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack {
-                Button(action: onCreateInvoice) {
-                    Text("Create Invoice")
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.orange)
-                        .cornerRadius(8)
-                }
-            }
-            .padding(.top, 5)
-        }
-    }
-    
-    // UI for completed tasks
-    private var completedTaskContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let completionDate = task.completionDate {
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Completed: \(completionDate.formatted(.dateTime.day().month(.abbreviated).year()))")
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Button(action: {
-                // Set loading state to true before starting the task
-                isLoadingInvoice = true
-                
-                Task {
-                    do {
-                        if let invoice = await task.generateInvoice() {
-                            // Update UI state on main thread
-                            DispatchQueue.main.async {
-                                self.generatedInvoice = invoice
+                // 3. Find the updated task
+                if let updatedTask = dataController.personnelTasks.first(where: { $0.id == task.id }) {
+                    // 4. Generate invoice
+                    if let invoice = await updatedTask.generateInvoice() {
+                        DispatchQueue.main.async {
+                            self.generatedInvoice = invoice
+                            self.showingInvoiceSheet = false
+                            
+                            // Small delay before showing preview
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 self.isLoadingInvoice = false
                                 self.showingInvoicePreview = true
                             }
-                        } else {
-                            print("DEBUG: Failed to generate invoice for task ID: \(task.taskID)")
-                            DispatchQueue.main.async {
-                                self.isLoadingInvoice = false
-                            }
                         }
-                    } catch {
-                        print("DEBUG: Error generating invoice: \(error)")
+                    } else {
                         DispatchQueue.main.async {
                             self.isLoadingInvoice = false
+                            print("DEBUG: Failed to generate invoice - invoice generation returned nil")
                         }
                     }
-                }
-            }) {
-                HStack {
-                    if isLoadingInvoice {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
-                            .padding(.trailing, 5)
-                    } else {
-                        Image(systemName: "doc.text.fill")
+                    
+                    // 5. Update local task status
+                    DispatchQueue.main.async {
+                        // Update the status of the task in our local array
+                        if let index = self.tasks.firstIndex(where: { $0.id == task.id }) {
+                            var updatedLocalTask = self.tasks[index]
+                            updatedLocalTask.status = .completed
+                            updatedLocalTask.completionDate = Date()
+                            
+                            // Replace the task in the array
+                            self.tasks.remove(at: index)
+                            self.tasks.append(updatedLocalTask)
+                            
+                            // Update view to reflect changes
+                            self.viewRefreshTrigger = UUID()
+                            
+                            // Switch to Completed segment after a small delay
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                self.selectedSegment = 2 // Switch to Completed segment
+                            }
+                        }
                     }
-                    Text(isLoadingInvoice ? "Loading..." : "View Invoice")
-                }
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .cornerRadius(8)
-            }
-            .disabled(isLoadingInvoice)
-            .padding(.top, 5)
-            .sheet(isPresented: $showingInvoicePreview) {
-                if let invoice = generatedInvoice {
-                    InvoicePreviewView(invoice: invoice)
                 } else {
-                    // Fallback view if invoice is nil
-                    Text("Could not load invoice")
-                        .padding()
+                    DispatchQueue.main.async {
+                        self.isLoadingInvoice = false
+                        print("DEBUG: Failed to find updated task after completion")
+                    }
+                }
+                
+                // 6. Update local tasks list with data from server
+                DispatchQueue.main.async {
+                    self.tasks = dataController.personnelTasks
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isLoadingInvoice = false
+                    print("DEBUG ERROR: Error completing task and generating invoice: \(error.localizedDescription)")
                 }
             }
         }
     }
     
-    // Helper computed properties
-    private var statusColor: Color {
-        switch task.status {
-        case .scheduled:
-            return .blue
-        case .inProgress:
-            return .orange
-        case .completed:
-            return .green
+    // Add a new method for refreshing all tasks
+    func refreshAllTasks() {
+        // Only refresh if we're not already loading
+        if !isLoading && !isSosLoading {
+            loadTasks()
+            loadSOSTasks()
         }
-    }
-    
-    private var totalExpense: Double {
-        guard let expenses = task.expenses else { return 0 }
-        return expenses.values.reduce(0, +)
     }
 }
 
-struct SOSTaskCard: View {
-    let task: MaintenanceTask
-    let vehicleLicense: String?
-    let assignerPhone: String?
-    let assignerName: String?
-    let onTrack: () -> Void
+// New loading wrapper view for invoice preview
+struct LoadingInvoicePreview: View {
+    let invoice: Invoice
+    @State private var isLoading = true
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Common header for all card types
-            HStack {
-                if let license = vehicleLicense {
-                    Text("Vehicle: \(license)")
-                        .font(.headline)
-                } else {
-                    Text("Vehicle ID: \(task.vehicleID)")
-                        .font(.headline)
+        ZStack {
+            if isLoading {
+                NavigationView {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(2)
+                        Text("Preparing Invoice...")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Invoice Preview")
+                    .navigationBarTitleDisplayMode(.inline)
                 }
-                
-                Spacer()
-                
-                // Status indicator
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(typeColor)
-                        .frame(width: 10, height: 10)
-                    
-                    Text(task.type.rawValue)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(typeColor)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(typeColor.opacity(0.1))
-                .cornerRadius(12)
+            } else {
+                InvoicePreviewView(invoice: invoice)
             }
-            .padding(.top, 5)
-            
-            Text("Task ID: \(task.taskID)")
-                .foregroundColor(.secondary)
-            
-            if let name = assignerName {
-                HStack(spacing: 5) {
-                    Image(systemName: "person.fill")
-                        .foregroundColor(.blue)
-                    Text("Driver: \(name)")
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            if let phone = assignerPhone {
-                HStack(spacing: 5) {
-                    Image(systemName: "phone.fill")
-                        .foregroundColor(.green)
-                    Text("Contact: \(phone)")
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            if let date = task.estimatedCompletionDate {
-                HStack(spacing: 5) {
-                    Image(systemName: "clock")
-                        .foregroundColor(.blue)
-                    Text("Due: \(date.formatted(.dateTime.day().month(.abbreviated).year()))")
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            // Action buttons
-            HStack(spacing: 10) {
-                Button(action: {
-                    // Connect functionality would go here
-                }) {
-                    Text("Connect")
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.green)
-                        .cornerRadius(8)
-                }
-                
-                Button(action: onTrack) {
-                    Text("Track")
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.blue)
-                        .cornerRadius(8)
-                }
-            }
-            .padding(.top, 5)
         }
-        .padding()
-        .background(Color(UIColor.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(typeColor.opacity(0.3), lineWidth: 1)
-        )
-    }
-    
-    private var typeColor: Color {
-        switch task.type {
-        case .preInspectionMaintenance:
-            return .blue
-        case .postInspectionMaintenance:
-            return .orange
-        case .emergencyMaintenance:
-            return .red
-        default:
-            return .gray
+        .onAppear {
+            // Add a delay to ensure proper loading state is shown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation {
+                    isLoading = false
+                }
+            }
         }
     }
 }
 
+// Update InvoicePreviewView to remove loading state
 struct InvoicePreviewView: View {
     let invoice: Invoice
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     
     var body: some View {
         NavigationView {
@@ -887,7 +691,7 @@ struct InvoicePreviewView: View {
                     // Header
                     HStack {
                         Text("INVOICE")
-                            .font(.largeTitle)
+                            .font(.title2)
                             .fontWeight(.bold)
                         
                         Spacer()
@@ -947,8 +751,7 @@ struct InvoicePreviewView: View {
                                 Text("Total")
                                     .fontWeight(.bold)
                                 Spacer()
-                                let finalAmount = invoice.totalExpense
-                                Text("₹\(finalAmount, specifier: "%.2f")")
+                                Text("₹\(invoice.totalExpense, specifier: "%.2f")")
                                     .fontWeight(.bold)
                             }
                         }
@@ -982,10 +785,10 @@ struct InvoicePreviewView: View {
                     VStack(alignment: .center, spacing: 5) {
                         Text("Thank you for your business")
                             .font(.headline)
-                        Text("Fleet Management System")
-                            .font(.subheadline)
-                        Text("Contact: vk092731@gmail.com")
-                            .font(.caption)
+//                        Text("Fleet Management System")
+//                            .font(.subheadline)
+//                        Text("Contact: vk092731@gmail.com")
+//                            .font(.caption)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top)
@@ -995,8 +798,424 @@ struct InvoicePreviewView: View {
             .navigationTitle("Invoice Preview")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarItems(trailing: Button("Close") {
-                presentationMode.wrappedValue.dismiss()
-            })
+                dismiss()
+            }
+            .foregroundColor(.primaryGradientStart))
+        }
+    }
+}
+
+struct MaintenanceTaskCardV: View {
+    let task: MaintenanceTask
+    let vehicleLicense: String?
+    let onStartWork: () -> Void
+    let onDaysSelected: (Int) -> Void
+    let onCreateInvoice: () -> Void
+    @State private var completionDays = 1
+    @State private var showingInvoicePreview = false
+    @State private var generatedInvoice: Invoice?
+    @State private var isLoadingInvoice = false  // Add loading state
+    @State private var refreshID = UUID() // Add for immediate UI refresh
+    @State private var temporaryEstimatedDate: Date? = nil // For immediate UI update
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Common header for all card types
+            HStack {
+                if let license = vehicleLicense {
+                    Text("\(license)")
+                        .font(.subheadline)
+                        .foregroundColor(.statusOrange)
+                } else {
+                    Text("Vehicle ID: \(task.vehicleID)")
+                        .font(.subheadline)
+                        .foregroundColor(.primaryGradientStart)
+                }
+                
+                Spacer()
+                
+                // Status indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 10, height: 10)
+                    
+                    Text(task.status.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(statusColor)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(statusColor.opacity(0.1))
+                .cornerRadius(12)
+            }
+            .padding(.top, 5)
+            
+            Text("Task ID: \(task.taskID)")
+                .font(.subheadline)
+                .foregroundColor(.textSecondary)
+            
+            HStack(spacing: 5) {
+                Image(systemName: "wrench.fill")
+                    .foregroundColor(.primaryGradientStart)
+                Text(task.type.rawValue)
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+            }
+            
+            // Content specific to status
+            if task.status == .scheduled {
+                scheduledTaskContent
+            } else if task.status == .inProgress {
+                inProgressTaskContent
+            } else if task.status == .completed {
+                completedTaskContent
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+//        .overlay(
+//            RoundedRectangle(cornerRadius: 12)
+//                .stroke(statusColor.opacity(0.3), lineWidth: 1)
+//        )
+        .id(refreshID) // Force refresh when refreshID changes
+        .onAppear {
+            // Calculate completionDays from task.estimatedCompletionDate when the view appears
+            if let estimatedDate = task.estimatedCompletionDate {
+                let calendar = Calendar.current
+                let today = calendar.startOfDay(for: Date())
+                let estimatedDay = calendar.startOfDay(for: estimatedDate)
+                
+                if let days = calendar.dateComponents([.day], from: today, to: estimatedDay).day {
+                    // Clamp between 1-7 days
+                    let clampedDays = max(1, min(7, days))
+                    if clampedDays != completionDays {
+                        self.completionDays = clampedDays
+                        print("DEBUG: Set completionDays to \(clampedDays) based on estimated date \(estimatedDate)")
+                    }
+                }
+            }
+        }
+    }
+    
+    // UI for scheduled tasks
+    private var scheduledTaskContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 5) {
+                Image(systemName: "clock")
+                    .foregroundColor(.primaryGradientStart)
+                
+                let displayDate = temporaryEstimatedDate ?? task.estimatedCompletionDate
+                Text("Estimated Date: \(displayDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+                    .id("est-date-\(displayDate?.timeIntervalSince1970 ?? 0)")
+            }
+            
+            HStack {
+                Text("Complete in:")
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+                
+                Spacer()
+                
+                Menu {
+                    ForEach(1...7, id: \.self) { day in
+                        Button(action: {
+                            completionDays = day
+                            temporaryEstimatedDate = Calendar.current.date(byAdding: .day, value: day, to: Date())
+                            refreshID = UUID()
+                            onDaysSelected(day)
+                        }) {
+                            HStack {
+                                Text("\(day) day\(day > 1 ? "s" : "")")
+                                Spacer()
+                                if day == completionDays {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+                label: {
+                    HStack {
+                        Text("\(completionDays) day\(completionDays > 1 ? "s" : "")")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        
+                        Spacer(minLength: 8)
+                        
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding(.vertical, 5)
+            
+            Button(action: onStartWork) {
+                Text("Start Work")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.primaryGradientStart)
+                    .cornerRadius(8)
+            }
+            .padding(.top, 5)
+        }
+    }
+    
+    // UI for in-progress tasks
+    private var inProgressTaskContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 5) {
+                Image(systemName: "clock")
+                    .foregroundColor(.primaryGradientStart)
+                Text("Due: \(task.estimatedCompletionDate?.formatted(.dateTime.day().month(.abbreviated).year()) ?? "Not Set")")
+                    .font(.subheadline)
+                    .foregroundColor(.textSecondary)
+            }
+            
+            HStack {
+                Button(action: onCreateInvoice) {
+                    Text("Create Invoice")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.primaryGradientStart)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.top, 5)
+        }
+    }
+    
+    // UI for completed tasks
+    private var completedTaskContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let completionDate = task.completionDate {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.statusGreen)
+                    Text("Completed: \(completionDate.formatted(.dateTime.day().month(.abbreviated).year()))")
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+            
+            Button(action: {
+                isLoadingInvoice = true
+                Task {
+                    do {
+                        if let invoice = await task.generateInvoice() {
+                            DispatchQueue.main.async {
+                                self.generatedInvoice = invoice
+                                self.isLoadingInvoice = false
+                                self.showingInvoicePreview = true
+                            }
+                        } else {
+                            print("DEBUG: Failed to generate invoice for task ID: \(task.taskID)")
+                            DispatchQueue.main.async {
+                                self.isLoadingInvoice = false
+                            }
+                        }
+                    } catch {
+                        print("DEBUG: Error generating invoice: \(error)")
+                        DispatchQueue.main.async {
+                            self.isLoadingInvoice = false
+                        }
+                    }
+                }
+            }) {
+                HStack {
+                    if isLoadingInvoice {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                            .padding(.trailing, 5)
+                    } else {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(.white)
+                    }
+                    Text(isLoadingInvoice ? "Loading..." : "View Invoice")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.primaryGradientStart)
+                .cornerRadius(8)
+            }
+            .disabled(isLoadingInvoice)
+            .padding(.top, 5)
+            .sheet(isPresented: $showingInvoicePreview) {
+                if let invoice = generatedInvoice {
+                    InvoicePreviewView(invoice: invoice)
+                } else {
+                    Text("Could not load invoice")
+                        .padding()
+                }
+            }
+        }
+    }
+    
+    // Helper computed properties
+    private var statusColor: Color {
+        switch task.status {
+        case .scheduled:
+            return .statusOrange
+        case .inProgress:
+            return .primaryGradientStart
+        case .completed:
+            return .statusGreen
+        }
+    }
+    
+    private var totalExpense: Double {
+        guard let expenses = task.expenses else { return 0 }
+        return expenses.values.reduce(0, +)
+    }
+}
+
+struct SOSTaskCard: View {
+    let task: MaintenanceTask
+    let vehicleLicense: String?
+    let assignerPhone: String?
+    let assignerName: String?
+    let onTrack: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Common header for all card types
+            HStack {
+                if let license = vehicleLicense {
+                    Text("Vehicle: \(license)")
+                        .font(.subheadline)
+                        .foregroundColor(.primaryGradientStart)
+                } else {
+                    Text("Vehicle ID: \(task.vehicleID)")
+                        .font(.subheadline)
+                        .foregroundColor(.primaryGradientStart)
+                }
+                
+                Spacer()
+                
+                // Status indicator
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(typeColor)
+                        .frame(width: 10, height: 10)
+                    
+                    Text(task.type.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(typeColor)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(typeColor.opacity(0.1))
+                .cornerRadius(12)
+            }
+            .padding(.top, 5)
+            
+            Text("Task ID: \(task.taskID)")
+                .font(.subheadline)
+                .foregroundColor(.textSecondary)
+            
+            if let name = assignerName {
+                HStack(spacing: 5) {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.primaryGradientStart)
+                    Text("Driver: \(name)")
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+            
+            if let phone = assignerPhone {
+                HStack(spacing: 5) {
+                    Image(systemName: "phone.fill")
+                        .foregroundColor(.primaryGradientStart)
+                    Text("Contact: \(phone)")
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+            
+            if let date = task.estimatedCompletionDate {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock")
+                        .foregroundColor(.primaryGradientStart)
+                    Text("Due: \(date.formatted(.dateTime.day().month(.abbreviated).year()))")
+                        .font(.subheadline)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+            
+            // Action buttons
+            HStack(spacing: 10) {
+                Button(action: {
+                    // Connect functionality would go here
+                }) {
+                    Text("Connect")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.statusGreen)
+                        .cornerRadius(8)
+                }
+                
+                Button(action: onTrack) {
+                    Text("Track")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.primaryGradientStart)
+                        .cornerRadius(8)
+                }
+            }
+            .padding(.top, 5)
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(typeColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private var typeColor: Color {
+        switch task.type {
+        case .preInspectionMaintenance:
+            return .primaryGradientStart
+        case .postInspectionMaintenance:
+            return .statusOrange
+        case .emergencyMaintenance:
+            return .statusRed
+        default:
+            return .gray
         }
     }
 }
@@ -1011,77 +1230,141 @@ struct MaintenanceTabView: View {
     let onStartWork: (MaintenanceTask) -> Void
     let onUpdateCompletionDays: (MaintenanceTask, Int) -> Void
     let onCreateInvoice: (MaintenanceTask) -> Void
-
-    //  Computed property for categoryName
-    var categoryName: String {
-        switch selectedSegment {
-        case 0: return "Assigned"
-        case 1: return "In Progress"
-        default: return "Completed"
-        }
-    }
-
+    let onRefresh: () -> Void
+    let isRefreshing: Bool
+    
     var body: some View {
         VStack(spacing: 0) {
-            // Fixed header layout to prevent text wrapping
-            HStack(alignment: .center) {
+            // Header with fixed size and constrained font size
+            HStack {
                 Text("Maintenance")
-                    .font(.largeTitle)
+                    .font(.title3)
                     .fontWeight(.bold)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .padding(.leading)
+                    .foregroundColor(.primaryGradientStart)
                 
                 Spacer()
+                
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                        .resizable()
+                        .frame(width: 20, height: 22)
+                        .foregroundColor(.primaryGradientStart)
+                }
+                .padding(.trailing, 10)
                 
                 Button(action: onShowProfile) {
                     Image(systemName: "person.circle.fill")
                         .resizable()
                         .frame(width: 35, height: 35)
-                        .foregroundColor(.blue)
-                        .padding(.trailing)
-                }
-            }
-            .padding(.bottom, 10)
-            .padding(.top, 70)
-            
-            // Improved segment control with fixed height and better spacing
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(UIColor.systemGray5))
-                    .frame(height: 50)
-                
-                HStack(spacing: 2) {
-                    SegmentButton(text: "Assigned", isSelected: selectedSegment == 0) {
-                        selectedSegment = 0
-                    }
-                    
-                    SegmentButton(text: "In Progress", isSelected: selectedSegment == 1) {
-                        selectedSegment = 1
-                    }
-                    
-                    SegmentButton(text: "Completed", isSelected: selectedSegment == 2) {
-                        selectedSegment = 2
-                    }
+                        .foregroundColor(.primaryGradientStart)
                 }
             }
             .padding(.horizontal)
+            .padding(.top, 50)
+            .padding(.bottom, 15)
+            
+            // Segment control styled to match the reference image
+            ZStack(alignment: .top) {
+                // Background pill
+                RoundedRectangle(cornerRadius: 30)
+                    .fill(Color(.systemGray6))
+                    .frame(height: 48) // Reduced height from 56
+                    .padding(.horizontal)
+                
+                HStack(spacing: 0) {
+                    // Assigned Tab
+                    Button(action: { selectedSegment = 0 }) {
+                        VStack {
+                            Text("Assigned")
+                                .font(.system(size: 14, weight: selectedSegment == 0 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(selectedSegment == 0 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selectedSegment == 0 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                        }
+                    }
+                    
+                    // In Progress Tab
+                    Button(action: { selectedSegment = 1 }) {
+                        VStack {
+                            Text("In Progress")
+                                .font(.system(size: 14, weight: selectedSegment == 1 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(selectedSegment == 1 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selectedSegment == 1 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                        }
+                    }
+                    
+                    // Completed Tab
+                    Button(action: { selectedSegment = 2 }) {
+                        VStack {
+                            Text("Completed")
+                                .font(.system(size: 14, weight: selectedSegment == 2 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(selectedSegment == 2 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selectedSegment == 2 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
             .padding(.bottom, 10)
             
             if isLoading {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .padding()
+                Spacer()
             } else {
                 ScrollView {
+                    PullToRefresh(coordinateSpaceName: "pullToRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
+                    
                     LazyVStack(spacing: 16) {
                         if filteredTasks.isEmpty {
-                            Text("No tasks available")
-                                .font(.title2)
-                                .foregroundColor(.gray)
-                                .padding(.top, 40)
+                            VStack(spacing: 16) {
+                                Image(systemName: "wrench.and.screwdriver")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.6))
+                                
+                                Text("No tasks available")
+                                    .font(.headline)
+                                    .foregroundColor(.primaryGradientStart)
+                                
+                                Text("You don't have any tasks at the moment")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.8))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .background(Color.white.opacity(0.7))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
                         } else {
-                            ForEach(filteredTasks) { task in
+                            ForEach(filteredTasks, id: \.id) { task in
                                 MaintenanceTaskCardV(
                                     task: task,
                                     vehicleLicense: vehicleLicenseMap[task.vehicleID],
@@ -1095,13 +1378,51 @@ struct MaintenanceTabView: View {
                                         onCreateInvoice(task)
                                     }
                                 )
+                                .id("\(task.id)-\(task.status.rawValue)")
                             }
                         }
                     }
                     .padding()
                 }
+                .coordinateSpace(name: "pullToRefresh")
+                .id(selectedSegment)
             }
         }
+        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
+    }
+}
+
+// Add PullToRefresh view for the pull-to-refresh functionality
+struct PullToRefresh: View {
+    var coordinateSpaceName: String
+    var onRefresh: () -> Void
+    var isRefreshing: Bool
+    
+    @State private var refresh: CGFloat = 0
+    
+    var body: some View {
+        GeometryReader { geo in
+            if geo.frame(in: .named(coordinateSpaceName)).minY > 50 && !isRefreshing {
+                Spacer()
+                    .onAppear {
+                        onRefresh()
+                    }
+            } else if isRefreshing {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            }
+            ZStack(alignment: .center) {
+                if geo.frame(in: .named(coordinateSpaceName)).minY > 0 && !isRefreshing {
+                    ProgressView()
+                        .offset(y: -25)
+                }
+            }
+            .frame(width: geo.size.width)
+        }
+        .padding(.top, -50)
     }
 }
 
@@ -1114,66 +1435,139 @@ struct SOSTabView: View {
     let userNameMap: [UUID: String]
     let onShowProfile: () -> Void
     let onTrackTask: (MaintenanceTask) -> Void
+    let onRefresh: () -> Void // Remove default value to match actual usage
+    let isRefreshing: Bool // Remove default value to match actual usage
     
     var body: some View {
         VStack(spacing: 0) {
-            // Updated Navigation Title with same layout improvements
-            HStack(alignment: .center) {
+            // Header with fixed size and constrained font size
+            HStack {
                 Text("SOS")
-                    .font(.largeTitle)
+                    .font(.title3)
                     .fontWeight(.bold)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .padding(.leading)
+                    .foregroundColor(.primaryGradientStart)
                 
                 Spacer()
+                
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                        .resizable()
+                        .frame(width: 20, height: 22)
+                        .foregroundColor(.primaryGradientStart)
+                }
+                .padding(.trailing, 10)
                 
                 Button(action: onShowProfile) {
                     Image(systemName: "person.circle.fill")
                         .resizable()
                         .frame(width: 35, height: 35)
-                        .foregroundColor(.blue)
-                        .padding(.trailing)
-                }
-            }
-            .padding(.bottom, 10)
-            .padding(.top, 70)
-            
-            // Updated Segment Controller for SOS with consistent height and spacing
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(UIColor.systemGray5))
-                    .frame(height: 50)
-                
-                HStack(spacing: 2) {
-                    SegmentButton(text: "Pre-inspect", isSelected: sosSelectedSegment == 0) {
-                        sosSelectedSegment = 0
-                    }
-                    
-                    SegmentButton(text: "Post-inspect", isSelected: sosSelectedSegment == 1) {
-                        sosSelectedSegment = 1
-                    }
-                    
-                    SegmentButton(text: "Emergency", isSelected: sosSelectedSegment == 2) {
-                        sosSelectedSegment = 2
-                    }
+                        .foregroundColor(.primaryGradientStart)
                 }
             }
             .padding(.horizontal)
+            .padding(.top, 50)
+            .padding(.bottom, 15)
+            
+            // Segment control styled to match the reference image
+            ZStack(alignment: .top) {
+                // Background pill
+                RoundedRectangle(cornerRadius: 30)
+                    .fill(Color(.systemGray6))
+                    .frame(height: 48) // Reduced height from 56
+                    .padding(.horizontal)
+                
+                HStack(spacing: 0) {
+                    // Pre-inspect Tab
+                    Button(action: { sosSelectedSegment = 0 }) {
+                        VStack {
+                            Text("Pre-inspect")
+                                .font(.system(size: 14, weight: sosSelectedSegment == 0 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(sosSelectedSegment == 0 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    sosSelectedSegment == 0 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                        }
+                    }
+                    
+                    // Post-inspect Tab
+                    Button(action: { sosSelectedSegment = 1 }) {
+                        VStack {
+                            Text("Post-inspect")
+                                .font(.system(size: 14, weight: sosSelectedSegment == 1 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(sosSelectedSegment == 1 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    sosSelectedSegment == 1 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                        }
+                    }
+                    
+                    // Emergency Tab
+                    Button(action: { sosSelectedSegment = 2 }) {
+                        VStack {
+                            Text("Emergency")
+                                .font(.system(size: 14, weight: sosSelectedSegment == 2 ? .semibold : .regular)) // Reduced font size
+                                .foregroundColor(sosSelectedSegment == 2 ? .white : .black)
+                                .padding(.vertical, 12) // Reduced padding
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    sosSelectedSegment == 2 ?
+                                        RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.primaryGradientStart)
+                                        : RoundedRectangle(cornerRadius: 30)
+                                        .fill(Color.gray.opacity(0.1))
+                                )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
             .padding(.bottom, 10)
             
             if isSosLoading {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .padding()
+                Spacer()
             } else {
                 ScrollView {
+                    PullToRefresh(coordinateSpaceName: "sosRefresh", onRefresh: onRefresh, isRefreshing: isRefreshing)
+                    
                     LazyVStack(spacing: 16) {
                         if filteredSOSTasks.isEmpty {
-                            Text("No tasks available")
-                                .font(.title2)
-                                .foregroundColor(.gray)
-                                .padding(.top, 40)
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 60, height: 60)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.6))
+                                
+                                Text("No SOS tasks available")
+                                    .font(.headline)
+                                    .foregroundColor(.primaryGradientStart)
+                                
+                                Text("You don't have any SOS tasks at the moment")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primaryGradientStart.opacity(0.8))
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .background(Color.white.opacity(0.7))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
                         } else {
                             ForEach(filteredSOSTasks) { task in
                                 SOSTaskCard(
@@ -1190,34 +1584,11 @@ struct SOSTabView: View {
                     }
                     .padding()
                 }
+                .coordinateSpace(name: "sosRefresh")
+                .id(sosSelectedSegment)
             }
         }
-    }
-}
-
-struct SegmentButton: View {
-    let text: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? .black : .gray)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background(
-                    Group {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white)
-                                .padding(4)
-                        }
-                    }
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
+        .background(Color(red: 242/255, green: 242/255, blue: 247/255))
     }
 }
 
@@ -1359,7 +1730,8 @@ struct LocationTrackingView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarItems(trailing: Button("Close") {
             dismiss()
-        })
+        }
+        .foregroundColor(.primaryGradientStart))
         .onAppear {
             fetchVehicleLocation()
             getUserLocation()
