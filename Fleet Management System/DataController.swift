@@ -239,6 +239,14 @@ class IFEDataController: ObservableObject {
             print("Error adding driver: \(error.localizedDescription)")
         }
     }
+    func getFleetManager(by id: UUID) async throws -> FleetManager? {
+            do {
+                return try await remoteController.getFleetManager(by: id)
+            } catch {
+                print("Error while fetching fleet manager: \(error.localizedDescription)")
+                return nil
+            }
+        }
     
     func removeDriver(_ driver: Driver) {
         Task {
