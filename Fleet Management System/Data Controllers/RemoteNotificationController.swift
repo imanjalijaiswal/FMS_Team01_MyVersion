@@ -8,14 +8,16 @@
 import UserNotifications
 import Supabase
 
-class IFERemoteNotificationController: IFENotifiable {
+class IFERemoteNotificationController: NSObject, IFENotifiable {
     private var client: SupabaseClient
     private var schema: String
     private var table: String
     private var userID: UUID?
     private var realtimeChannel: RealtimeChannelV2?
     
-    required init(_ client: Supabase.SupabaseClient, schema: String = "public", table: String, userID: UUID?) {
+    var notificationCenter = UNUserNotificationCenter.current()
+    
+    required init(_ client: SupabaseClient, schema: String = "public", table: String, userID: UUID?) {
         self.client = client
         self.schema = schema
         self.table = table
@@ -112,14 +114,8 @@ class IFERemoteNotificationController: IFENotifiable {
             }
         }
         
-        // Extract the "new" record from payload
-        guard let newRecord = payload["new"] as? [String: Any] else {
-            print("Failed to extract 'new' record from payload")
-            return
-        }
-        
         // Convert dictionary to JSON data
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: newRecord) else {
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
             print("Failed to serialize record to JSON")
             return
         }
@@ -147,67 +143,77 @@ class IFERemoteNotificationController: IFENotifiable {
         showPushNotification(notification)
     }
     
-    /// Subscribes to real-time updates from the specified database table.
+    /// Subscribes to real-time notifications from the specified table and schema.
     ///
-    /// This function sets up a subscription to receive real-time data changes from the given database table (`table`) within the specified schema (`schema`).
-    /// It listens specifically for `INSERT` actions and triggers the `handlePayload(_:)` function whenever a new record is added.
-    /// The subscription is managed through the `realtimeChannel` property, and any existing subscription is canceled before establishing a new one.
+    /// This function sets up a real-time channel to listen for `INSERT` operations on the specified table.
+    /// The channel is filtered by `recipient_id`, matching the current user's ID.
+    /// It also handles automatic unsubscription before subscribing to avoid duplicate channels.
     ///
-    /// # Implementation Details
-    /// - The function unsubscribes from any previous subscription to ensure no duplicate listeners.
-    /// - It connects to a real-time channel using the combination of `schema` and `table`.
-    /// - On receiving an insert action, it converts the record into a dictionary and passes it to `handlePayload(_:)`.
+    /// - Asynchronous Function: The function operates asynchronously and uses real-time channels for updates.
+    /// - Handles channel creation, subscription, and listening for changes in a separate task.
+    /// - In case of failure to create or subscribe to the channel, it logs the issue for debugging purposes.
+    ///
+    /// # Real-time Subscription Flow
+    /// 1. Unsubscribe from any existing channel.
+    /// 2. Create a new real-time channel for the given schema and table.
+    /// 3. Subscribe to the channel and wait for confirmation.
+    /// 4. Log the subscription status to track the process.
+    /// 5. Continuously listen for incoming changes and handle them via `handlePayload`.
     ///
     /// # Example Usage
     /// ```swift
-    /// Task {
-    ///     await subscribe()
-    /// }
+    /// await subscribe()
     /// ```
     ///
-    /// - Note: Uses weak self to prevent retain cycles and ensure memory safety.
+    /// - Note: The function uses a short delay (0.5 seconds) to ensure the subscription stabilizes.
+    /// - Uses `Task` for asynchronous listening to real-time changes.
     func subscribe() async {
         await unsubscribe()
         
-        let channel = client
+        self.realtimeChannel = client
                 .realtimeV2
                 .channel("realtime:\(schema):\(table)")
-
-        _ = channel.onPostgresChange(
-            InsertAction.self,
-            schema: schema,
-            table: table,
-            filter: nil
-        ) { [weak self] action in
-            print("Received new record: \(action.record)")
-            guard let self = self else { return }
-            
-
-            // Convert the action record to a dictionary
-            var payload: [String: Any] = [:]
-            action.record.forEach { key, value in
-                payload[key] = value.value
-            }
-
-            // Pass the record payload to the handler
-            self.handlePayload(payload)
+        if realtimeChannel == nil {
+            print("Unable to create realtime channel.")
+        } else {
+            print("Realtime channel successfully created.")
         }
 
-        // Subscribe to the channel and store it
-        await channel.subscribe()
+        
+        let changes = realtimeChannel?.postgresChange(InsertAction.self,
+                                                      schema: schema,
+                                                      table: table,
+                                                      filter: .eq("recipient_id", value: userID ?? ""))
+
+        
+        await realtimeChannel?.subscribe()
         do {
             try await Task.sleep(nanoseconds: 500_000_000)
         } catch {
             print("Error while sleeping for 0.5 seconds for real time subscription.")
         }
+
         
-        switch channel.status {
+        switch realtimeChannel?.status {
         case .subscribing: print("Subscribing to channel for real time notifications.")
         case .subscribed: print("Successfully subscribed to notification channel for real time updates.")
-        default: break
+        default: print("Channel status: \(String(describing: realtimeChannel?.status))")
         }
         
-        self.realtimeChannel = channel
+        Task {
+            if let changes {
+                for await change in changes {
+                    var payload: [String: Any] = [:]
+                    change.record.forEach { key, value in
+                        payload[key] = value.value
+                    }
+                    
+                    self.handlePayload(payload)
+                }
+            } else {
+                print("Found nil in changes while listening to real-time updates.")
+            }
+        }
     }
     
     /// Unsubscribes from the active real-time channel, if any.
@@ -258,20 +264,116 @@ class IFERemoteNotificationController: IFENotifiable {
     /// ```
     ///
     /// - Note: This function is available only on iOS platforms.
-    func showPushNotification(_ notification: IFEPushNotification) {
-        #if os(iOS)
-        print(notification)
-        
+    func showPushNotification(_ notification: IFEPushNotification,
+                              sound: UNNotificationSound? = UNNotificationSound.default) {
+        Task {
+            let senderMetaData = await notification.getSenderMetaData()
+            guard let senderMetaData else {
+                print("Unable to fetch notification sender meta data.")
+                return
+            }
+            
+            var infoKey: String = "Message from"
+            switch senderMetaData.role {
+            case .driver: infoKey = "\(infoKey) Driver"
+            case .fleetManager: infoKey = "\(infoKey) Fleet Manager"
+            case .maintenancePersonnel: infoKey = "\(infoKey) Maintenance Personnel"
+            }
+            
             let content = UNMutableNotificationContent()
             content.title = notification.title
-            content.body = notification.message
+            content.body = """
+            \(notification.message)
+            """
+            content.userInfo = [infoKey: senderMetaData.fullName]
+            content.categoryIdentifier = "persistentNotification"
+            content.sound = sound
             
-            let request = UNNotificationRequest(identifier: notification.id.uuidString,
-                                                content: content,
-                                                trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1,
-                                                                                           repeats: false))
+            // Trigger after 1 seconds (for demonstration)
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
             
-            UNUserNotificationCenter.current().add(request)
-        #endif
+            // Create the request
+            let request = UNNotificationRequest(identifier: notification.id.uuidString, content: content, trigger: trigger)
+            
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+                print("Notification scheduled successfully.")
+            } catch {
+                print("Error scheduling notification: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Requests permission to display notifications to the user.
+    ///
+    /// This function prompts the user to grant permission for displaying alerts, badges, and sounds through notifications.
+    /// It handles the result by logging whether the permission was granted or denied, or if an error occurred.
+    ///
+    /// - Uses: `UNUserNotificationCenter` to request authorization with the specified options.
+    /// - Parameters: None
+    /// - Returns: Void
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// requestNotificationPermission()
+    /// ```
+    ///
+    /// - Note: This function should be called during app launch or when the user initiates notification-related features.
+    func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+            if let error = error {
+                print("Error requesting permission: \(error.localizedDescription)")
+            } else {
+                print(granted ? "Permission granted" : "Permission denied")
+            }
+        }
+    }
+    
+    /// Registers a persistent notification category to ensure that notifications are not automatically dismissed by the system.
+    ///
+    /// This function sets up a notification category with the option `.customDismissAction`,
+    /// which keeps the notification visible until explicitly dismissed by the user.
+    /// It helps maintain critical or important alerts that should not disappear automatically.
+    ///
+    /// - Uses: `UNUserNotificationCenter` to configure the notification category.
+    /// - Category Identifier: `"persistentNotification"`
+    /// - Parameters: None
+    /// - Returns: Void
+    ///
+    /// # Example Usage
+    /// ```swift
+    /// registerPersistentNotificationCategory()
+    /// ```
+    ///
+    /// - Note: Use this function to register categories during app launch or when setting up notifications.
+    func registerPersistentNotificationCategory() {
+        let persistentCategory = UNNotificationCategory(
+            identifier: "persistentNotification",
+            actions: [],
+            intentIdentifiers: [],
+            options: [.customDismissAction]  // Prevent automatic dismissal
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([persistentCategory])
+        print("Notifications registered to persistent.")
+    }
+}
+
+extension IFERemoteNotificationController: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Show notification even when app is in foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        completionHandler()
     }
 }

@@ -40,9 +40,6 @@ class IFEDataController: ObservableObject {
             }
             
             if let user = user {
-                await sendSOSAlert(to: UUID(uuidString: "7bc308d2-c197-4c13-87a9-ec3c93cd81ae")!,
-                                             title: "SOS Alert",
-                                             message: "Testing notification sending feature.")
                 if user.role == .driver {
                     await loadTripsForDriver()
                     await loadServiceCenters()
@@ -68,6 +65,8 @@ class IFEDataController: ObservableObject {
         do {
             user = try await AuthManager.shared.getCurrentSession()
             notifier = .init(RemoteController.shared.client, table: "Notifications", userID: user?.id)
+            notifier?.notificationCenter.delegate = notifier
+            notifier?.registerPersistentNotificationCategory()
         } catch {
             print("Error while fetching user: \(error.localizedDescription)")
         }
@@ -1050,23 +1049,26 @@ class IFEDataController: ObservableObject {
         }
     }
     
-    /// Sends an SOS alert notification asynchronously to a specified recipient.
+    /// Sends a push notification message to a specified recipient asynchronously.
     ///
-    /// This function creates an `IFEPushNotification` object containing the SOS alert details, including the sender and recipient IDs, title, message, and the current timestamp.
-    /// The notification is then sent using the `notifier` service.
+    /// This function creates a push notification object and sends it using the notifier.
+    /// If the notifier is not initialized, it logs an error message and exits.
     ///
     /// - Parameters:
-    ///   - recipientID: The unique identifier of the recipient who will receive the SOS alert.
-    ///   - title: The title of the SOS alert message.
-    ///   - message: The content of the SOS alert message.
+    ///   - recipientID: The unique identifier of the message recipient.
+    ///   - title: The title of the message to be sent.
+    ///   - message: The content of the message.
+    /// - Returns: Void
     ///
     /// # Example Usage
     /// ```swift
-    /// await sendSOSAlert(to: UUID(), title: "Emergency!", message: "Vehicle breakdown at location X.")
+    /// await sendMessage(to: recipientID, title: "Emergency", message: "SOS! Please help.")
     /// ```
-    func sendSOSAlert(to recipientID: UUID, title: String, message: String) async {
+    ///
+    /// - Note: This function requires the notifier to be initialized before calling.
+    func sendMessage(to recipientID: UUID, title: String, message: String) async {
         guard let notifier else {
-            print("Can't send SOS Alert as notifier is not initialzied.")
+            print("Can't send message notifier is not initialzied.")
             return
         }
         

@@ -20,6 +20,15 @@ struct IFEPushNotification: Codable, Identifiable, Equatable, CustomStringConver
         """
     }
     
+    func getRecipientMetaData() async -> UserMetaData? {
+        return await IFEDataController.shared
+            .getUserMetaData(by: recipientID)
+    }
+    
+    func getSenderMetaData() async -> UserMetaData? {
+        return await IFEDataController.shared.getUserMetaData(by: senderID)
+    }
+    
     var id: UUID
     var senderID: UUID
     var recipientID: UUID

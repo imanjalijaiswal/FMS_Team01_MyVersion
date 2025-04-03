@@ -7,6 +7,7 @@
 
 import Foundation
 import Supabase
+import UserNotifications
 
 protocol DatabaseAPIIntegrable {
     //MARK: User APIs
@@ -136,5 +137,7 @@ protocol IFENotifiable {
     
     func unsubscribe() async
     
-    func showPushNotification(_ notification: IFEPushNotification)
+    func showPushNotification(_ notification: IFEPushNotification, sound: UNNotificationSound?)
+    
+    func registerPersistentNotificationCategory()
 }
