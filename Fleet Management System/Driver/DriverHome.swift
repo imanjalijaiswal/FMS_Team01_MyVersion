@@ -59,13 +59,6 @@ struct MainTabView: View {
                         Text("Dashboard")
                     }
                     .tag(0)
-            
-            MapView(selectedTab: $selectedTab)
-                .tabItem {
-                    Image(systemName: "map")
-                    Text("Trip")
-                }
-                .tag(1)
         }
         .accentColor(.primaryGradientStart)
     }
