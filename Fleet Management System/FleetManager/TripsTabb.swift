@@ -495,7 +495,7 @@ struct AssignTripView: View {
                             }
                         }
                     }
-                    .foregroundColor(Color.primaryGradientEnd)
+                    .foregroundColor(isFormValid ? Color.primaryGradientEnd : Color.gray)
                     .disabled(!isFormValid)
                 }
 
