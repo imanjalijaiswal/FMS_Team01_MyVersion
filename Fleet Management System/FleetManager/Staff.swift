@@ -30,7 +30,7 @@ struct DriverRowView: View {
     @ObservedObject var viewModel: IFEDataController
     
     var body: some View {
-        NavigationLink(destination: DriverDetailView(driver: driver, viewModel: viewModel).navigationBarBackButtonHidden(false)) {
+        NavigationLink(destination: DriverDetailView(driver: driver, viewModel: viewModel).navigationBarBackButtonHidden(true)) {
             HStack(spacing: 12) {
                 Image(systemName: "person.circle.fill")
                     .font(.system(size: 32))
@@ -79,6 +79,7 @@ struct DriverRowView: View {
                     .font(.caption2)
                     .foregroundColor(.gray)
             }
+            .tint(Color.primaryGradientStart)
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background(Color.white)
@@ -100,7 +101,7 @@ struct MaintenancePersonnelRowView: View {
     }
     
     var body: some View {
-        NavigationLink(destination: MaintenancePersonnelDetailView(personnel: personnel, viewModel: viewModel).navigationBarBackButtonHidden(false)) {
+        NavigationLink(destination: MaintenancePersonnelDetailView(personnel: personnel, viewModel: viewModel).navigationBarBackButtonHidden(true)) {
             HStack(spacing: 12) {
                 Image(systemName: "wrench.fill")
                     .font(.system(size: 32))
@@ -152,7 +153,9 @@ struct MaintenancePersonnelRowView: View {
             .padding(.horizontal, 12)
             .background(Color.white)
             .cornerRadius(12)
+            .tint(Color.primaryGradientStart)
         }
+        .tint(Color.primaryGradientStart)
     }
 }
 
@@ -375,6 +378,8 @@ struct StaffView: View {
         }
         .id(viewRefreshTrigger)
         .navigationTitle("Staff")
+        .navigationBarTitleDisplayMode(.large)
+        .tint(Color.primaryGradientStart)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { showingAddStaff = true }) {
@@ -479,7 +484,7 @@ struct DriverDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(isEditing ? "Save" : "Edit") {
+                Button(action: {
                     withAnimation {
                         if isEditing {
                             viewModel.updateDriverPhone(driver, with: editedPhone)
@@ -488,10 +493,26 @@ struct DriverDetailView: View {
                             isEditing.toggle()
                         }
                     }
+                }) {
+                    Text(isEditing ? "Save" : "Edit")
+                        .foregroundColor(.primaryGradientStart) // Apply color to Text
                 }
-                
             }
+            ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        // Action to dismiss the view
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "chevron.left")
+                                .foregroundColor(Color.primaryGradientStart) // Custom color
+                            Text("Back")
+                                .foregroundColor(Color.primaryGradientStart) // Custom color
+                        }
+                    }
+                }
         }
+        .tint(Color.primaryGradientStart)
         .alert("Make Driver Inactive", isPresented: $showingDisableAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Inactive", role: .destructive) {
@@ -590,9 +611,10 @@ struct MaintenancePersonnelDetailView: View {
         }
         .listStyle(.insetGrouped)
         .navigationBarTitleDisplayMode(.inline)
+        .foregroundColor(Color.primaryGradientStart)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(isEditing ? "Save" : "Edit") {
+                Button(action: {
                     withAnimation {
                         if isEditing {
                             isEditing.toggle()
@@ -600,9 +622,24 @@ struct MaintenancePersonnelDetailView: View {
                             isEditing.toggle()
                         }
                     }
+                }) {
+                    Text(isEditing ? "Save" : "Edit")
+                        .foregroundColor(.primaryGradientStart) // Apply color to Text
                 }
-                
             }
+            ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        // Action to dismiss the view
+                        dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "chevron.left")
+                                .foregroundColor(Color.primaryGradientStart) // Custom color
+                            Text("Back")
+                                .foregroundColor(Color.primaryGradientStart) // Custom color
+                        }
+                    }
+                }
         }
         .alert("Make Personnel Inactive", isPresented: $showingDisableAlert) {
             Button("Cancel", role: .cancel) { }

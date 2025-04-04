@@ -16,7 +16,7 @@ struct Fleet_Management_SystemApp: App {
         
         // Set the selected tab color to teal
         UITabBar.appearance().tintColor = .systemTeal
-        
+        UINavigationBar.appearance().tintColor = UIColor(Color.primaryGradientStart)
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
