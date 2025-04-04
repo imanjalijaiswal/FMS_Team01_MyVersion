@@ -47,6 +47,23 @@ struct TripsView: View {
         }
     }
     
+    // Skeleton filter view
+    var skeletonFilterView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.4))
+                        .frame(height: 32)
+                        .frame(width: 100)
+                        .cornerRadius(16)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.top, 8)
+    }
+    
     func refreshData() {
         self.isRefreshing = true
         
@@ -67,29 +84,46 @@ struct TripsView: View {
             SearchBar(text: $searchText)
                 .padding(.top, 8)
             
-            FilterSection(
-                title: "",
-                filters: filters,
-                selectedFilter: $selectedFilter
-            )
-            .id(viewRefreshTrigger)
+            if isRefreshing {
+                // Skeleton filters during loading
+                skeletonFilterView
+            } else {
+                // Real filters when not loading
+                FilterSection(
+                    title: "",
+                    filters: filters,
+                    selectedFilter: $selectedFilter
+                )
+                .id(viewRefreshTrigger)
+            }
             
             ScrollView {
                 PullToRefresh(coordinateSpaceName: "tripsPullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
                 
-                VStack(spacing: 16) {
-                    if filteredTrips.isEmpty {
-                        Text("No trips available")
-                            .foregroundColor(.gray)
-                            .padding()
-                    } else {
-                        ForEach(filteredTrips) { trip in
-                            TripCard(trip: trip, viewModel: viewModel)
+                if isRefreshing {
+                    // Skeleton View for trips
+                    VStack(spacing: 16) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            TripCardSkeletonView()
                         }
                     }
+                    .padding(.horizontal)
+                } else {
+                    // Regular content view
+                    VStack(spacing: 16) {
+                        if filteredTrips.isEmpty {
+                            Text("No trips available")
+                                .foregroundColor(.gray)
+                                .padding()
+                        } else {
+                            ForEach(filteredTrips) { trip in
+                                TripCard(trip: trip, viewModel: viewModel)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .id(viewRefreshTrigger)
                 }
-                .padding(.horizontal)
-                .id(viewRefreshTrigger)
             }
             .coordinateSpace(name: "tripsPullToRefresh")
         }
@@ -461,7 +495,7 @@ struct AssignTripView: View {
                             }
                         }
                     }
-                    .foregroundColor(Color.primaryGradientEnd)
+                    .foregroundColor(isFormValid ? Color.primaryGradientEnd : Color.gray)
                     .disabled(!isFormValid)
                 }
 

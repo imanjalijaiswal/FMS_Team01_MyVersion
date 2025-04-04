@@ -33,6 +33,22 @@ struct MaintenanceSchedulingView: View {
             ]
         }
 
+    // Skeleton filter view
+    var skeletonFilterView: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.4))
+                        .frame(height: 32)
+                        .frame(width: 100)
+                        .cornerRadius(16)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.top, 8)
+    }
     
     var filteredTasks: [MaintenanceTask] {
         let searchResults = viewModel.managerAssignedMaintenanceTasks.filter { task in
@@ -65,28 +81,46 @@ struct MaintenanceSchedulingView: View {
                 SearchBar(text: $searchText)
                     .padding(.top, 8)
                 
-                FilterSection(
-                    title: "",
-                    filters: filters,
-                    selectedFilter: $selectedFilter
-                )
-                .id(viewRefreshTrigger)
+                if isRefreshing {
+                    // Skeleton filters during loading
+                    skeletonFilterView
+                } else {
+                    // Real filters when not loading
+                    FilterSection(
+                        title: "",
+                        filters: filters,
+                        selectedFilter: $selectedFilter
+                    )
+                    .id(viewRefreshTrigger)
+                }
                 
                 ScrollView {
                     PullToRefresh(coordinateSpaceName: "maintenancePullToRefresh", onRefresh: refreshData, isRefreshing: isRefreshing)
                     
-                    VStack(spacing: 16) {
-                        if filteredTasks.isEmpty {
-                            Text("No maintenance tasks available")
-                            .foregroundColor(.gray)
-                            .padding()
-                        } else {
-                            ForEach(filteredTasks) { task in
-                                MaintenanceTaskCard(task: task)
+                    if isRefreshing {
+                        // Skeleton View for maintenance tasks
+                        VStack(spacing: 16) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                MaintenanceTaskCardSkeletonView()
                             }
                         }
+                        .padding()
+                    } else {
+                        // Regular content view
+                        VStack(spacing: 16) {
+                            if filteredTasks.isEmpty {
+                                Text("No maintenance tasks available")
+                                .foregroundColor(.gray)
+                                .padding()
+                            } else {
+                                ForEach(filteredTasks) { task in
+                                    MaintenanceTaskCard(task: task)
+                                }
+                            }
+                        }
+                        .padding()
+                        .id(viewRefreshTrigger)
                     }
-                    .padding()
                 }
                 .coordinateSpace(name: "maintenancePullToRefresh")
             }
@@ -94,18 +128,11 @@ struct MaintenanceSchedulingView: View {
             .navigationTitle("Maintenance")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack {
-//                        Button(action: refreshData) {
-//                            Image(systemName: "arrow.clockwise")
-//                                .foregroundColor(.primaryGradientEnd)
-//                        }
-                        
-                        Button(action: {
-                            showScheduleForm = true
-                        }) {
-                            Image(systemName: "plus")
-                                .foregroundColor(.primaryGradientEnd)
-                        }
+                    Button(action: {
+                        showScheduleForm = true
+                    }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(.primaryGradientEnd)
                     }
                 }
             }
@@ -127,8 +154,6 @@ struct MaintenanceSchedulingView: View {
             if selectedFilter.isEmpty {
                 selectedFilter = filters[0]
             }
-            
-            // Initial data load removed
         }
     }
     
@@ -138,6 +163,7 @@ struct MaintenanceSchedulingView: View {
         Task {
             await viewModel.loadManagerAssignedMaintenanceTasks()
             await viewModel.loadVehicles()
+            await viewModel.loadMaintenancePersonnels()
             
             DispatchQueue.main.async {
                 self.isRefreshing = false
@@ -528,7 +554,7 @@ struct PersonnelRowView: View {
         HStack(spacing: 12) {
             Image(systemName: "person.circle.fill")
                 .font(.system(size: 40))
-                .foregroundColor(.green)
+                .foregroundColor(Color.primaryGradientStart)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(personnel.meta_data.fullName)

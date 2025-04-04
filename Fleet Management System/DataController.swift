@@ -78,6 +78,7 @@ class IFEDataController: ObservableObject {
             user = try await AuthManager.shared.getCurrentSession()
             notifier = .init(RemoteController.shared.client, table: "Notifications", userID: user?.id)
             notifier?.notificationCenter.delegate = notifier
+            notifier?.requestNotificationPermission()
             notifier?.registerPersistentNotificationCategory()
         } catch {
             print("Error while fetching user: \(error.localizedDescription)")
