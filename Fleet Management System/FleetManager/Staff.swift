@@ -552,7 +552,7 @@ struct MaintenancePersonnelDetailView: View {
                     }
                 } else {
                     InfoRow(title: "Phone", value: editedPhone.isEmpty ? "Not available" : editedPhone, textColor: .primary)
-                    InfoRow(title: "Service Center", value: editedPhone.isEmpty ? "Not available" : editedPhone, textColor: .primary)
+//                    InfoRow(title: "Service Center", value: personnel.serviceCenterID ? "Not available" : editedPhone, textColor: .primary)
                 }
             }
             
