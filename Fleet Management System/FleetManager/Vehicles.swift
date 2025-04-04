@@ -206,9 +206,10 @@ struct VehicleDetailView: View {
         }
         .navigationTitle("Vehicle Details")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(isEditing ? "Save" : "Edit") {
+                Button(action:  {
                     if isEditing {
                         var newVehicle = vehicle
                         newVehicle.pucExpiryDate = pucExpiry
@@ -218,6 +219,22 @@ struct VehicleDetailView: View {
                         showAlert = true
                     }
                     isEditing.toggle()
+                })
+                {
+                    Text(isEditing ? "Save" : "Edit")
+                        .foregroundColor(.primaryGradientStart)
+                }
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    dismiss() // Dismiss the current view
+                }) {
+                    HStack {
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(Color.primaryGradientStart) // Apply custom color
+                        Text("Back")
+                            .foregroundColor(Color.primaryGradientStart) // Apply custom color
+                    }
                 }
             }
         }
