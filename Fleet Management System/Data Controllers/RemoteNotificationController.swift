@@ -15,6 +15,7 @@ class IFERemoteNotificationController: NSObject, IFENotifiable {
     private var userID: UUID?
     private var realtimeChannel: RealtimeChannelV2?
     
+    /// Instance of UNUserNotificationCenter used to manage local and remote notifications
     var notificationCenter = UNUserNotificationCenter.current()
     
     required init(_ client: SupabaseClient, schema: String = "public", table: String, userID: UUID?) {

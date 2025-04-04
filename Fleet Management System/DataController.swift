@@ -14,19 +14,40 @@ class IFEDataController: ObservableObject {
     
     var user: AppUser?
     
+    /// List of all registered drivers (updated from backend)
     @Published var drivers: [Driver] = []
+    
+    /// List of all registered vehicles (updated from backend)
     @Published var vehicles: [Vehicle] = []
+    
+    /// Trips assigned to the currently logged-in fleet manager
     @Published var trips: [Trip] = []
+    
+    /// Trips assigned to the currently logged-in driver
     @Published var tripsForDriver: [Trip] = []
+    
+    /// List of all registered maintenance personnels
     @Published var maintenancePersonnels: [MaintenancePersonnel] = []
+    
+    /// Tasks assigned by the fleet manager to maintenance personnels
     @Published var managerAssignedMaintenanceTasks: [MaintenanceTask] = []
+    
+    /// Tasks assigned to the currently logged-in maintenance personnel
     @Published var personnelTasks: [MaintenanceTask] = []
+    
+    /// List of registered vehicle company names
     @Published var vehicleCompanies: [String] = []
+    
+    /// List of registered service centers
     @Published var serviceCenters: [ServiceCenter] = []
+    
+    /// Map of service center ID to its resolved human-readable address
     @Published var serviceCenterLocations: [Int: String] = [:]
     
-    
+    /// Singleton instance of RemoteController used to handle all remote (network/API)
     let remoteController = RemoteController.shared
+    
+    /// Optional notifier used for handling remote push notifications
     var notifier: IFERemoteNotificationController?
     
     init() {
@@ -85,6 +106,10 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads all registered drivers from the backend.
+    ///
+    /// - Note: Updates the `drivers` array on the main thread.
+    /// - Warning: Logs an error message if the fetch fails.
     @MainActor
      func loadDrivers() async {
         do {
@@ -94,6 +119,10 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads all registered vehicles from the backend.
+    ///
+    /// - Note: Updates the `vehicles` array on the main thread.
+    /// - Warning: Logs an error message if the fetch fails.
     @MainActor
     func loadVehicles() async {
         do {
@@ -103,6 +132,10 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads all registered maintenance personnels.
+    ///
+    /// - Note: Updates the `maintenancePersonnels` array.
+    /// - Warning: Logs an error message if the fetch fails.
     @MainActor
      func loadMaintenancePersonnels() async {
         do {
@@ -112,6 +145,11 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads trips assigned to the current fleet manager.
+    ///
+    /// - Requires: The current `user` must be a fleet manager.
+    /// - Note: Updates the `trips` array.
+    /// - Warning: Logs an error if user role is invalid or request fails.
     @MainActor
      func loadTrips() async {
         do {
@@ -125,6 +163,10 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads all registered vehicle companies.
+    ///
+    /// - Note: Updates the `vehicleCompanies` array.
+    /// - Warning: Logs an error message if the fetch fails.
     @MainActor
      func loadVehicleCompanies() async {
         do {
@@ -134,6 +176,11 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads trips assigned to the currently logged-in driver.
+    ///
+    /// - Requires: The current `user` must be a driver.
+    /// - Note: Updates the `tripsForDriver` array.
+    /// - Warning: Logs an error if user role is invalid or request fails.
     @MainActor
     func loadTripsForDriver() async {
         do {
@@ -147,6 +194,11 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads all registered service centers for the current user role.
+    ///
+    /// - Requires: The user must be a fleet manager or driver.
+    /// - Note: Updates the `serviceCenters` array.
+    /// - Warning: Logs an error message if the fetch fails.
     @MainActor
     func loadServiceCenters() async {
         do {
@@ -160,6 +212,11 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Converts coordinates of all service centers to human-readable addresses.
+    ///
+    /// - Requires: The user must be a fleet manager or driver.
+    /// - Note: Populates the `serviceCenterLocations` dictionary with resolved addresses.
+    /// - Warning: Logs individual errors for failed reverse geocoding.
     @MainActor
     func loadServiceCenterLocations() async {
         do {
@@ -180,7 +237,11 @@ class IFEDataController: ObservableObject {
     }
 
 
-    
+    /// Loads maintenance tasks assigned to the currently logged-in maintenance personnel.
+    ///
+    /// - Requires: The user must be a maintenance personnel.
+    /// - Note: Updates the `personnelTasks` array.
+    /// - Warning: Logs an error if user role is invalid or request fails.
     @MainActor
     func loadPersonnelTasks() async {
         do {
@@ -194,6 +255,11 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Loads all maintenance tasks assigned by the fleet manager.
+    ///
+    /// - Requires: The user must be a fleet manager.
+    /// - Note: Updates the `managerAssignedMaintenanceTasks` array.
+    /// - Warning: Logs an error if user role is invalid or request fails.
     @MainActor
     func loadManagerAssignedMaintenanceTasks() async {
         do {
@@ -208,6 +274,27 @@ class IFEDataController: ObservableObject {
     }
     
 
+    /// Adds a new driver to the system asynchronously.
+    ///
+    /// This function performs the full driver registration flow:
+    /// 1. Saves the current fleet manager's ID.
+    /// 2. Creates a new driver account using the provided email and password.
+    /// 3. Fetches the maximum current employee ID and assigns the next available one.
+    /// 4. Saves the driver's metadata (phone, full name, employee ID, license number).
+    /// 5. Restores the fleet manager session if the user object gets reset during the process.
+    ///
+    /// - Parameters:
+    ///   - driver: The `Driver` object containing metadata and license information.
+    ///   - password: The password to be associated with the new driver’s account.
+    ///
+    /// # Example
+    /// ```swift
+    /// await addDriver(driver, password: "SecurePass123")
+    /// ```
+    ///
+    /// - Note: This method ensures the fleet manager session is preserved after registering a driver.
+    ///         Make sure the `user` is set before calling this function.
+    /// - Warning: Network errors or backend issues may prevent driver creation; always handle errors gracefully.
     func addDriver(_ driver: Driver, password: String) async {
         do {
             // Save the current fleet manager ID before any operations
@@ -240,15 +327,47 @@ class IFEDataController: ObservableObject {
             print("Error adding driver: \(error.localizedDescription)")
         }
     }
-    func getFleetManager(by id: UUID) async throws -> FleetManager? {
-            do {
-                return try await remoteController.getFleetManager(by: id)
-            } catch {
-                print("Error while fetching fleet manager: \(error.localizedDescription)")
-                return nil
-            }
-        }
     
+    /// Fetches a `FleetManager` from the remote server using the provided UUID.
+    ///
+    /// This asynchronous function attempts to retrieve a fleet manager's details by their unique ID.
+    /// If the operation fails, it logs the error and returns `nil`.
+    ///
+    /// - Parameter id: The unique identifier (`UUID`) of the fleet manager to fetch.
+    /// - Returns: A `FleetManager` instance if found, otherwise `nil`.
+    ///
+    /// # Example
+    /// ```swift
+    /// let manager = try await getFleetManager(by: managerId)
+    /// ```
+    ///
+    /// - Note: Even though the function is marked as `throws`, it handles the error internally
+    ///         and still returns `nil` on failure instead of propagating the error further.
+    /// - Warning: Ensure the `id` is valid and corresponds to a registered fleet manager in the system.
+    func getFleetManager(by id: UUID) async throws -> FleetManager? {
+        do {
+            return try await remoteController.getFleetManager(by: id)
+        } catch {
+            print("Error while fetching fleet manager: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    /// Disables a driver by updating their active status to `false` on the remote server.
+    ///
+    /// This function sets the driver's `activeStatus` to `false` both remotely and locally.
+    /// After the update, the local `drivers` list is refreshed to reflect the change.
+    ///
+    /// - Parameter driver: The `Driver` object to be disabled.
+    ///
+    /// # Example
+    /// ```swift
+    /// removeDriver(driver)
+    /// ```
+    ///
+    /// - Note: The driver is first removed from the local list and then re-appended with the updated status.
+    /// - Important: This function performs UI-related updates on the main thread to ensure thread safety.
+    /// - Warning: If the remote update fails, the local list remains unchanged and the error is logged.
     func removeDriver(_ driver: Driver) {
         Task {
             do {
@@ -265,6 +384,21 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Enables a driver by updating their active status to `true` on the remote server.
+    ///
+    /// This function sets the driver's `activeStatus` to `true` both remotely and locally.
+    /// After the update, the local `drivers` list is updated to reflect the change.
+    ///
+    /// - Parameter driver: The `Driver` object to be enabled.
+    ///
+    /// # Example
+    /// ```swift
+    /// enableDriver(driver)
+    /// ```
+    ///
+    /// - Note: The driver is removed and re-appended to the `drivers` array to reflect the updated status.
+    /// - Important: Make sure the provided `Driver` object matches exactly with the one stored locally for the `.removeAll` check to succeed.
+    /// - Warning: If the remote update fails, the driver remains disabled and the error is printed to the console.
     func enableDriver(_ driver: Driver) {
         Task {
             do {
@@ -279,7 +413,23 @@ class IFEDataController: ObservableObject {
         }
     }
     
-
+    /// Adds a new vehicle to the fleet by sending data to the remote server.
+    ///
+    /// This function sends the given `vehicle` to the backend to be registered,
+    /// receives the generated `id`, and constructs a new `Vehicle` instance with it.
+    /// The new vehicle is then appended to the local `vehicles` list on the main thread.
+    ///
+    /// - Parameter vehicle: A `Vehicle` instance containing the details to be added (without `id`).
+    ///
+    /// # Example
+    /// ```swift
+    /// let vehicle = Vehicle(..., id: UUID(), ...)
+    /// addVehicle(vehicle)
+    /// ```
+    ///
+    /// - Note: The `model` field is automatically converted to uppercase before being stored.
+    /// - Important: This function must be called on a background thread. It handles UI updates on the main thread internally.
+    /// - Warning: If the API call fails, the vehicle won't be added and the error is printed to the console.
     func addVehicle(_ vehicle: Vehicle) {
         Task {
             do {
@@ -311,6 +461,23 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Disables a vehicle by setting its active status to false.
+    ///
+    /// This function marks the provided `vehicle` as inactive by setting `activeStatus` to `false`.
+    /// It then sends this update to the remote server via `remoteController`, and updates the local
+    /// `vehicles` list by removing the old vehicle entry and appending the updated one.
+    ///
+    /// - Parameter vehicle: The `Vehicle` instance to be removed (deactivated).
+    ///
+    /// # Example
+    /// ```swift
+    /// let vehicle = Vehicle(id: UUID(), activeStatus: true, ...)
+    /// removeVehicle(vehicle)
+    /// ```
+    ///
+    /// - Note: The local `vehicles` array is updated after the remote update succeeds.
+    /// - Warning: Ensure the vehicle's `id` exists in the local list before calling this to avoid redundancy.
+    /// - Throws: Logs an error if the remote update fails.
     func removeVehicle(_ vehicle: Vehicle) {
         Task{
             do {
@@ -326,6 +493,23 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Enables a vehicle by updating its active status and availability.
+    ///
+    /// This function sets the given vehicle's `activeStatus` to `true` and updates its status to `.available`.
+    /// It then sends the update to the remote server using `remoteController` and replaces the old vehicle
+    /// entry in the local `vehicles` array with the updated one.
+    ///
+    /// - Parameter vehicle: The `Vehicle` object to be enabled.
+    ///
+    /// # Example
+    /// ```swift
+    /// let vehicle = Vehicle(id: UUID(), activeStatus: false, status: .inactive, ...)
+    /// enableVehicle(vehicle)
+    /// ```
+    ///
+    /// - Note: This operation also updates the vehicle's status locally after the remote update.
+    /// - Warning: Make sure the vehicle exists in the local `vehicles` array, or the replacement will have no effect.
+    /// - Throws: Logs any error that occurs during the remote update.
     func enableVehicle(_ vehicle: Vehicle) {
         Task{
             do {
@@ -341,6 +525,35 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Assigns a new trip using the provided `Trip` object and updates the local driver and vehicle status.
+    ///
+    /// This function parses the pickup and destination coordinates from string format,
+    /// converts them to latitude and longitude, and sends a request to assign a new trip
+    /// via the remote controller. It also updates the driver's status to `.onTrip` and the vehicle's status to `.assigned`
+    /// locally if the assignment is successful.
+    ///
+    /// - Parameter trip: A `Trip` object containing all required data to assign a new trip.
+    ///
+    /// # Example
+    /// ```swift
+    /// let trip = Trip(
+    ///     id: UUID(),
+    ///     pickupLocation: "28.6139,77.2090",
+    ///     destination: "28.7041,77.1025",
+    ///     assignedVehicleID: vehicleID,
+    ///     assignedDriverIDs: [driverID],
+    ///     estimatedArrivalDateTime: Date(),
+    ///     scheduledDateTime: Date().addingTimeInterval(3600),
+    ///     totalDistance: 15.2,
+    ///     totalTripDuration: DateComponents(hour: 1, minute: 30),
+    ///     description: "Airport drop"
+    /// )
+    /// addTrip(trip)
+    /// ```
+    ///
+    /// - Note: Make sure the pickup and destination coordinates are in valid `"lat,lng"` string format.
+    /// - Note: Coordinates, vehicle status, and driver status are updated only if parsing and remote assignment are successful.
+    /// - Warning: The function assumes `user` is non-nil and force unwraps its `id`.
     func addTrip(_ trip: Trip) {
         Task {
             do {
@@ -394,6 +607,17 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Returns trips filtered by a given status.
+    ///
+    /// - Parameter status: The `TripStatus` to filter by. If `nil`, all trips are returned.
+    ///
+    /// # Example
+    /// ```swift
+    /// let assignedTrips = getFilteredTrips(status: .assigned)
+    /// let allTrips = getFilteredTrips(status: nil)
+    /// ```
+    ///
+    /// - Note: If no status is provided (`nil`), this function returns all available trips.
     func getFilteredTrips(status: TripStatus?) -> [Trip] {
         if let status = status {
             return trips.filter { $0.status == status }
@@ -401,11 +625,27 @@ class IFEDataController: ObservableObject {
         return trips
     }
     
+    /// Sends a welcome email containing login credentials to a new user.
+    ///
+    /// This function uses Gmail's SMTP server to send an email with the user's login details.
+    /// Make sure to use an [App Password](https://support.google.com/accounts/answer/185833) for authentication,
+    /// not the actual Gmail account password.
+    ///
+    /// - Parameters:
+    ///   - email: The recipient's email address.
+    ///   - password: The password assigned to the user.
+    ///
+    /// # Example
+    /// ```swift
+    /// sendWelcomeEmail(to: "newuser@example.com", password: "TempPass@123")
+    /// ```
+    ///
+    /// - Note: Avoid logging sensitive data like passwords in production. Consider using secure channels instead.
     func sendWelcomeEmail(to email: String, password: String) {
         let smtp = SMTP(
             hostname: "smtp.gmail.com",  // Google's SMTP server
             email: "infleetexpress@gmail.com",
-            password: "tpko cqtp oajo dflz" // Use App Password, not your actual password
+            password: "tpko cqtp oajo dflz" // Google App Password, not account's actual password
         )
         
         let sender = Mail.User(name: "InFleet Express", email: "infleetexpress@gmail.com")
@@ -439,6 +679,21 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Updates the phone number of a given driver.
+    ///
+    /// This function modifies the driver's phone number locally and sends the update to the remote controller.
+    /// After a successful update, it removes the old driver object from the local list and appends the updated one.
+    ///
+    /// - Parameters:
+    ///   - driver: The `Driver` object whose phone number needs to be updated.
+    ///   - phone: The new phone number to assign.
+    ///
+    /// # Example
+    /// ```swift
+    /// updateDriverPhone(driverInstance, with: "9876543210")
+    /// ```
+    ///
+    /// - Note: The driver is first removed and then re-added to the local list with updated phone metadata.
     func updateDriverPhone(_ driver: Driver,with phone: String) {
         Task {
             do {
@@ -453,6 +708,22 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Updates the expiry dates (PUC, insurance, registration) of a given vehicle.
+    ///
+    /// This function sends an update request to the remote controller with the new expiry dates.
+    /// Upon successful update, the local vehicle list is updated by removing the old vehicle instance
+    /// and appending the new one with updated dates.
+    ///
+    /// - Parameters:
+    ///   - vehicle: The current `Vehicle` object to be updated.
+    ///   - newVehicle: The `Vehicle` object containing the new expiry dates.
+    ///
+    /// # Example
+    /// ```swift
+    /// updateVehicleExpiryDates(currentVehicle, with: updatedVehicle)
+    /// ```
+    ///
+    /// - Note: This operation replaces the old vehicle object in the local `vehicles` list.
     func updateVehicleExpiryDates(_ vehicle: Vehicle, with newVehicle: Vehicle) {
         Task {
             do {
@@ -469,6 +740,22 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Updates the status of a specific trip both remotely and locally.
+    ///
+    /// This method checks the user's role (fleet manager or driver) and selects the appropriate
+    /// local trip list. If the trip exists in the list, it attempts to update the status remotely
+    /// via the `remoteController`. Upon success, the corresponding local trip's status is also updated.
+    ///
+    /// - Parameters:
+    ///   - trip: The `Trip` object whose status is to be updated.
+    ///   - newStatus: The new `TripStatus` to assign.
+    ///
+    /// # Example
+    /// ```swift
+    /// updateTripStatus(myTrip, to: .completed)
+    /// ```
+    ///
+    /// - Note: If the user role is not fleet manager or driver, no action is taken.
     func updateTripStatus(_ trip: Trip, to newStatus: TripStatus) {
         if let user {
             let tripsToSearch: [Trip]
@@ -499,6 +786,22 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Updates the status of a given driver both remotely and locally.
+    ///
+    /// This method sends an update request to the remote controller to change the driver's status.
+    /// Upon success, the local `drivers` array is also updated to reflect the new status.
+    /// If the remote update fails, the error is printed to the console.
+    ///
+    /// - Parameters:
+    ///   - driver: The `Driver` object whose status is to be updated.
+    ///   - newStatus: The new `DriverStatus` to be assigned.
+    ///
+    /// # Example
+    /// ```swift
+    /// updateDriverStatus(someDriver, with: .inactive)
+    /// ```
+    ///
+    /// - Note: The operation runs asynchronously inside a `Task`.
     func updateDriverStatus(_ driver: Driver, with newStatus: DriverStatus) {
         if let index = drivers.firstIndex(where: { $0 == driver }) {
             Task {
@@ -512,6 +815,22 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Updates the status of a given vehicle both remotely and locally.
+    ///
+    /// This method attempts to update the status of the specified vehicle using the remote controller.
+    /// If successful, it also updates the local `vehicles` array with the new status.
+    /// Errors encountered during the remote update are logged.
+    ///
+    /// - Parameters:
+    ///   - vehicle: The `Vehicle` object whose status needs to be updated.
+    ///   - newStatus: The new `VehicleStatus` to be applied.
+    ///
+    /// # Example
+    /// ```swift
+    /// updateVehicleStatus(someVehicle, with: .inactive)
+    /// ```
+    ///
+    /// - Note: This operation is performed asynchronously within a `Task`.
     func updateVehicleStatus(_ vehicle: Vehicle, with newStatus: VehicleStatus) {
         if let index = vehicles.firstIndex(where: { $0.id == vehicle.id }) {
             Task {
@@ -525,6 +844,18 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Fetches a registered driver by their UUID asynchronously.
+    ///
+    /// This method communicates with the remote controller to retrieve the driver details.
+    /// If the operation fails, it logs an error and returns `nil`.
+    ///
+    /// - Parameter id: The UUID of the driver to fetch.
+    /// - Returns: A `Driver` object if the fetch is successful, otherwise `nil`.
+    ///
+    /// # Example
+    /// ```swift
+    /// let driver = await getRegisteredDriver(by: someUUID)
+    /// ```
     func getRegisteredDriver(by id: UUID) async -> Driver? {
         do {
             return try await remoteController.getRegisteredDriver(by: id)
@@ -534,6 +865,18 @@ class IFEDataController: ObservableObject {
         }
     }
     
+    /// Fetches a registered vehicle by its ID asynchronously.
+    ///
+    /// This method calls the remote controller to retrieve a vehicle associated with the given ID.
+    /// If the fetch fails, it prints an error message and returns `nil`.
+    ///
+    /// - Parameter id: The unique identifier of the vehicle to be retrieved.
+    /// - Returns: A `Vehicle` object if successful, otherwise `nil`.
+    ///
+    /// # Example
+    /// ```swift
+    /// let vehicle = await getRegisteredVehicle(by: 101)
+    /// ```
     func getRegisteredVehicle(by id: Int) async -> Vehicle? {
         do {
             return try await remoteController.getRegisteredVehicle(by: id)
