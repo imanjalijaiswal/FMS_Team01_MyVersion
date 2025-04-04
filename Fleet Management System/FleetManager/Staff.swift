@@ -515,6 +515,8 @@ struct MaintenancePersonnelDetailView: View {
     @State private var editedPhone = ""
     @State private var showEmailError = false
     @State private var showingDisableAlert = false
+    @State private var serviceCenterAddress: String = "Loading..."
+    var dataController = IFEDataController.shared
     
     var body: some View {
         List {
@@ -552,8 +554,14 @@ struct MaintenancePersonnelDetailView: View {
                     }
                 } else {
                     InfoRow(title: "Phone", value: editedPhone.isEmpty ? "Not available" : editedPhone, textColor: .primary)
-//                    InfoRow(title: "Service Center", value: personnel.serviceCenterID ? "Not available" : editedPhone, textColor: .primary)
                 }
+            }
+            Section("Service Center") {
+                InfoRow(
+                    title: "Service Center",
+                    value: serviceCenterAddress,
+                    textColor: isEditing ? .gray : .primary
+                )
             }
             
             Section {
@@ -606,7 +614,12 @@ struct MaintenancePersonnelDetailView: View {
         }
         .onAppear {
             editedPhone = personnel.meta_data.phone
-//            editedCenter =
+            let coordinate = dataController.serviceCenters[personnel.serviceCenterID].coordinate
+                getAddress(from: coordinate) { address in
+                    DispatchQueue.main.async {
+                        serviceCenterAddress = address ?? "Unknown Location"
+                    }
+                }
         }
     }
 }
