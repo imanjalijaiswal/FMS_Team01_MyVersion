@@ -34,3 +34,10 @@ brew install jq
 This script **contains sensitive API keys and credentials**. Ensure proper security before deploying.
 
 🛠 Developed by [Devansh Seth](https://github.com/Devansh-Seth-DEV) 🚀
+
+
+## My Contribution
+* Designed and Developed the entire Frontend UI for the "Maintenance" Tab.
+* Implemented the "Vehicles" tab with structured layouts and responsive design.
+* Made "Trips" Tab navigation smooth.
+* Focused on UI/UX consistency across major modules, adhering to SwiftUI and iOS design guidelines.
